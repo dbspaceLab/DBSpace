@@ -20,8 +20,8 @@ plt.rcParams['image.cmap'] = 'jet'
 np.seterr(divide='raise')
 
 #Definitions for oscillatory features -> Oscillatory Vector
-band_dict = {'Delta':(1,4), 'Theta':(4,8), 'Alpha':(8,14), 'Beta*':(14,20), 'Beta+':(25,30), 'Gamma1':(30,50), 'Gamma2':(50,80), 'Gamma3':(80,100), 'Stim':(128,132)}
-band_order = ['Delta','Theta','Alpha','Beta*','Beta+','Gamma1','Gamma2','Gamma3','Stim']
+#band_dict = {'Delta':(1,4), 'Theta':(4,8), 'Alpha':(8,14), 'Beta*':(14,20), 'Beta+':(25,30), 'Gamma1':(30,50), 'Gamma2':(50,80), 'Gamma3':(80,100), 'Stim':(128,132)}
+#band_order = ['Delta','Theta','Alpha','Beta*','Beta+','Gamma1','Gamma2','Gamma3','Stim']
 
 all_pts = ['901','903','905','906','907','908']
 
@@ -60,29 +60,16 @@ def gen_psd(inpX,Fs=422,nfft=2**10,polyord=0):
         polysub = np.zeros((inpX[chann].shape[-1],polyord+1))
         
         for seg in range(inpX[chann].shape[-1]):
+            
             psd = F_Domain(inpX[chann][:,seg].squeeze(),Fs=Fs,nfft=nfft)['Pxx']
             
-            if polyord != 0:
-                intermed = 10*np.log10(psd)
-                fVect = np.linspace(0,Fs/2,int(nfft/2)+1)
                 
-                polyCoeff = np.polyfit(fVect,psd,polyord)
-                polyfunc = np.poly1d(polyCoeff)
-                polyitself = polyfunc(fVect)
-                
-                
-                fmatr[seg,:] = 10**((intermed - polyitself)/10)
-                polysub[seg,:] = polyCoeff
-                
-            else:
-                fmatr[seg,:] = psd
-            
-        
+            fmatr[seg,:] = psd
+                    
         outPSD[chann] = fmatr.squeeze()
-        outPoly[chann] = polysub.squeeze()
 
     #Return here is a dictionary with Nchann keys
-    return outPSD,outPoly
+    return outPSD
 
 #This function takes a PSD and subtracts out the PSD's fourth order polynomial fit
 def poly_subtr(inpPSD,fVect,order=4):
@@ -117,7 +104,14 @@ def get_pow(Pxx,F,frange,cmode=np.median):
     
     #check if Pxx is NOT a dict
     if isinstance(Pxx,np.ndarray):
-        Pxx = {0:Pxx}
+        #JUST ADDED THIS
+        chann_order = range(Pxx.shape[0])
+        Pxx = {ch:Pxx[ch,:] for ch in chann_order}
+        
+        #ThIS WAS WORKING BEFORE
+        #Pxx = {0:Pxx}
+    else:
+        chann_order = ['Left','Right']
     
     #find the power in the range of the PSD
     #Always assume PSD is a dictionary of channels, and each value is a dictionary with Pxx and F
@@ -125,15 +119,20 @@ def get_pow(Pxx,F,frange,cmode=np.median):
     #frange should just be a tuple with the low and high bounds of the band
     out_feats = {keys:0 for keys in Pxx.keys()}
     
-    Fidxs = np.where(np.logical_and(F > frange[0],F < frange[1]))
+    Fidxs = np.where(np.logical_and(F > frange[0],F < frange[1]))[0]
     
-    for chans,psd in Pxx.items():
+    #for chans,psd in Pxx.items():
+    for cc,chann in enumerate(chann_order):
         #if we want the sum
         #out_feats[chans] = np.sum(psd[Fidxs])
         #if we want the MEDIAN instead
-        out_feats[chans] = cmode(psd[Fidxs])
+        try:
+            out_feats[chann] = cmode(Pxx[chann][Fidxs])
+        except:
+            pdb.set_trace()
     
     #return is going to be a dictionary with same elements
+    
     return out_feats
 
 
@@ -244,10 +243,13 @@ def calc_feats(psdIn,yvect):
     feat_vect = []
     for feat in feat_order:
         #dofunc = feat_dict[feat]['fn']
-        feat_vect.append(feat_dict[feat]['fn'](psdIn,yvect,feat_dict[feat]['param'])[0])
+        computed_featinspace = feat_dict[feat]['fn'](psdIn,yvect,feat_dict[feat]['param'])
+        
+        cfis_matrix = [computed_featinspace[ch] for ch in np.arange(0,257)]
+        feat_vect.append(cfis_matrix)
         #feat_dict[feat] = dofunc['fn'](datacontainer,yvect,dofunc['param'])[0]
 
-    feat_vect = np.array(feat_vect)
+    feat_vect = np.array(feat_vect).squeeze()
     
     return feat_vect
 

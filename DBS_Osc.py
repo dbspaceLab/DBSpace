@@ -63,6 +63,8 @@ def gen_psd(inpX,Fs=422,nfft=2**10,polyord=0):
             
             psd = F_Domain(inpX[chann][:,seg].squeeze(),Fs=Fs,nfft=nfft)['Pxx']
             
+
+            
                 
             fmatr[seg,:] = psd
                     
@@ -101,7 +103,8 @@ def gen_SG(inpX,Fs=422,nfft=2**10,plot=False):
 
 def get_pow(Pxx,F,frange,cmode=np.median):
     #Pxx is a dictionary where the keys are the channels, the values are the [Pxx desired]
-    
+    #Pxx is assumed to NOT be log transformed, so "positive semi-def"
+
     #check if Pxx is NOT a dict
     if isinstance(Pxx,np.ndarray):
         #JUST ADDED THIS
@@ -112,6 +115,7 @@ def get_pow(Pxx,F,frange,cmode=np.median):
         #Pxx = {0:Pxx}
     else:
         chann_order = ['Left','Right']
+        
     
     #find the power in the range of the PSD
     #Always assume PSD is a dictionary of channels, and each value is a dictionary with Pxx and F
@@ -123,13 +127,17 @@ def get_pow(Pxx,F,frange,cmode=np.median):
     
     #for chans,psd in Pxx.items():
     for cc,chann in enumerate(chann_order):
+        #let's make sure the Pxx we're dealing with is as expected and a true PSD
+        assert (Pxx[chann] >= 0).all()
         #if we want the sum
         #out_feats[chans] = np.sum(psd[Fidxs])
         #if we want the MEDIAN instead
-        try:
-            out_feats[chann] = cmode(Pxx[chann][Fidxs])
-        except:
-            pdb.set_trace()
+        
+        #log transforming this makes sense, since we find the median of the POLYNOMIAL CORRECTED Pxx, which is still ALWAYS positive
+        out_feats[chann] = 10*np.log10(cmode(Pxx[chann][Fidxs]))
+        
+        
+        
     
     #return is going to be a dictionary with same elements
     
@@ -145,6 +153,7 @@ def F_Domain(timeser,nperseg=512,noverlap=128,nfft=2**10,Fs=422):
     #what are the dimensions of the timeser we're dealing with?
     
     Fvect,Pxx = sig.welch(timeser,Fs,window='blackmanharris',nperseg=nperseg,noverlap=noverlap,nfft=nfft)
+    
     FreqReturn = {'F': Fvect,'Pxx': Pxx}
     
     return FreqReturn
@@ -228,8 +237,8 @@ feat_dict = {
                 'Gamma1':{'fn':get_pow,'param':(30,60)},
                 'Gamma2':{'fn':get_pow,'param':(60,100)},
                 'Stim':{'fn':get_pow,'param':(129,131)},
-                'SHarm':{'fn':get_pow,'param':(31,33)}, #Secondary Harmonic
-                'THarm':{'fn':get_pow,'param':(63,66)}, #Tertiary Harmonic
+                'SHarm':{'fn':get_pow,'param':(30,34)}, #Secondary Harmonic
+                'THarm':{'fn':get_pow,'param':(62,66)}, #Tertiary Harmonic
                 'Clock':{'fn':get_pow,'param':(104.5,106.5)},
                 'fSlope':{'fn':get_slope,'param':{'frange':(1,20),'linorder':1}},
                 'nFloor':{'fn':get_slope,'param':{'frange':(50,200),'linorder':0}}

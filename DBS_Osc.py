@@ -74,21 +74,36 @@ def gen_psd(inpX,Fs=422,nfft=2**10,polyord=0):
     return outPSD
 
 #This function takes a PSD and subtracts out the PSD's fourth order polynomial fit
+    #I THINK this is only used in EEG cortical signatures
 def poly_subtr(inpPSD,fVect,order=4):
     #What's our feature/frequency vector?
-    
+    fix_psd = defaultdict()
     for chann in inpPSD.keys():
-        for seg in range(inpX[chann].shape[-1]):
-            polyCoeff = np.polyfit(fVect,inpPSD[chann][seg,:],order)
+        fix_psd[chann] = []
+        inpPSD[chann] = inpPSD[chann].reshape(-1,1).T
+        #This should now be (513(nfft) x segments).T
+        
+        try:
+            #SEGMENTS x PSD
+            postpsd_matr = np.zeros((inpPSD[chann].shape[0],inpPSD[chann].shape[1]))
+        except:
+            pdb.set_trace()
+        
+        for seg in range(inpPSD[chann].shape[0]):
+            curr_psd = 10*np.log10(inpPSD[chann][seg,:])
+            
+            try:         polyCoeff = np.polyfit(fVect,curr_psd,order)
+            except: pdb.set_trace()
             polyfunc = np.poly1d(polyCoeff)
             polyitself = polyfunc(fVect)
             
-            fix_psd[seg,:] = inpPSD[chann][seg,:] - polyfit
-            fix_poly[seg,:] = polyCoeff
+            postpsd_matr[seg,:] = curr_psd - polyitself
+            #fix_poly[seg,:] = polyCoeff
         
+        fix_psd[chann] = 10**(postpsd_matr/10).T
         
     
-    return fix_psd,fix_poly
+    return fix_psd
     
 
 def gen_SG(inpX,Fs=422,nfft=2**10,plot=False):
@@ -113,6 +128,8 @@ def get_pow(Pxx,F,frange,cmode=np.median):
         
         #ThIS WAS WORKING BEFORE
         #Pxx = {0:Pxx}
+    elif len(Pxx.keys()) > 2:
+        chann_order = np.arange(0,257)
     else:
         chann_order = ['Left','Right']
         
@@ -128,13 +145,18 @@ def get_pow(Pxx,F,frange,cmode=np.median):
     #for chans,psd in Pxx.items():
     for cc,chann in enumerate(chann_order):
         #let's make sure the Pxx we're dealing with is as expected and a true PSD
-        assert (Pxx[chann] >= 0).all()
+        assert (Pxx[chann] > 0).all()
+    
         #if we want the sum
         #out_feats[chans] = np.sum(psd[Fidxs])
         #if we want the MEDIAN instead
         
         #log transforming this makes sense, since we find the median of the POLYNOMIAL CORRECTED Pxx, which is still ALWAYS positive
-        out_feats[chann] = 10*np.log10(cmode(Pxx[chann][Fidxs]))
+        try:
+            out_feats[chann] = 10*np.log10(cmode(Pxx[chann][Fidxs]))
+        except Exception as e:
+            print(e)
+            pdb.set_trace()
         
         
         
@@ -234,7 +256,7 @@ feat_dict = {
                 'Alpha':{'fn':get_pow,'param':(8,14)},
                 'Theta':{'fn':get_pow,'param':(4,8)},
                 'Beta':{'fn':get_pow,'param':(14,30)},
-                'Gamma1':{'fn':get_pow,'param':(30,60)},
+                'Gamma1':{'fn':get_pow,'param':(35,60)},
                 'Gamma2':{'fn':get_pow,'param':(60,100)},
                 'Stim':{'fn':get_pow,'param':(129,131)},
                 'SHarm':{'fn':get_pow,'param':(30,34)}, #Secondary Harmonic
@@ -246,11 +268,13 @@ feat_dict = {
 feat_order = ['Delta','Theta','Alpha','Beta','Gamma1']#,'fSlope','nFloor']
 
 #Function to go through and find all the features from the PSD structure of dbo
-def calc_feats(psdIn,yvect):
+def calc_feats(psdIn,yvect,dofeats=''):
     #psdIn is a VECTOR, yvect is the basis vector
-    
+    if dofeats == '':
+        dofeats = feat_order
+        
     feat_vect = []
-    for feat in feat_order:
+    for feat in dofeats:
         #dofunc = feat_dict[feat]['fn']
         computed_featinspace = feat_dict[feat]['fn'](psdIn,yvect,feat_dict[feat]['param'])
         

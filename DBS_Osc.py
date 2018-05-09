@@ -63,13 +63,17 @@ def gen_psd(inpX,Fs=422,nfft=2**10,polyord=0):
             
             psd = F_Domain(inpX[chann][:,seg].squeeze(),Fs=Fs,nfft=nfft)['Pxx']
             
-
-            
                 
             fmatr[seg,:] = psd
                     
         outPSD[chann] = fmatr.squeeze()
 
+
+        #do polysub here
+    if polyord != 0:
+        print("Polynomial Correcting Stack")
+        outPSD = poly_subtr(outPSD,np.linspace(0,Fs/2,nfft/2 + 1))
+        
     #Return here is a dictionary with Nchann keys
     return outPSD
 
@@ -83,17 +87,16 @@ def poly_subtr(inpPSD,fVect,order=4):
         inpPSD[chann] = inpPSD[chann].reshape(-1,1).T
         #This should now be (513(nfft) x segments).T
         
-        try:
-            #SEGMENTS x PSD
-            postpsd_matr = np.zeros((inpPSD[chann].shape[0],inpPSD[chann].shape[1]))
-        except:
-            pdb.set_trace()
+        
+        #SEGMENTS x PSD
+        postpsd_matr = np.zeros((inpPSD[chann].shape[0],inpPSD[chann].shape[1]))
         
         for seg in range(inpPSD[chann].shape[0]):
             curr_psd = 10*np.log10(inpPSD[chann][seg,:])
+            print(fVect.shape)
+            print(curr_psd.shape)
+            polyCoeff = np.polyfit(fVect,curr_psd,order)
             
-            try:         polyCoeff = np.polyfit(fVect,curr_psd,order)
-            except: pdb.set_trace()
             polyfunc = np.poly1d(polyCoeff)
             polyitself = polyfunc(fVect)
             
@@ -256,7 +259,7 @@ feat_dict = {
                 'Alpha':{'fn':get_pow,'param':(8,14)},
                 'Theta':{'fn':get_pow,'param':(4,8)},
                 'Beta':{'fn':get_pow,'param':(14,30)},
-                'Gamma1':{'fn':get_pow,'param':(35,60)},
+                'Gamma1':{'fn':get_pow,'param':(30,60)},
                 'Gamma2':{'fn':get_pow,'param':(60,100)},
                 'Stim':{'fn':get_pow,'param':(129,131)},
                 'SHarm':{'fn':get_pow,'param':(30,34)}, #Secondary Harmonic
@@ -299,7 +302,9 @@ def featDict_to_Matr(featDict):
 
 
 
-
+#simplified spot PSD check
+def spot_PSD(ts,tvect):
+    pass
 
 
 #%%

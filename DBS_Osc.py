@@ -259,7 +259,7 @@ feat_dict = {
                 'Alpha':{'fn':get_pow,'param':(8,14)},
                 'Theta':{'fn':get_pow,'param':(4,8)},
                 'Beta':{'fn':get_pow,'param':(14,30)},
-                'Gamma1':{'fn':get_pow,'param':(30,60)},
+                'Gamma1':{'fn':get_pow,'param':(35,60)},
                 'Gamma2':{'fn':get_pow,'param':(60,100)},
                 'Stim':{'fn':get_pow,'param':(129,131)},
                 'SHarm':{'fn':get_pow,'param':(30,34)}, #Secondary Harmonic
@@ -275,9 +275,11 @@ def calc_feats(psdIn,yvect,dofeats=''):
     #psdIn is a VECTOR, yvect is the basis vector
     if dofeats == '':
         dofeats = feat_order
-        
+    
+    
     feat_vect = []
     for feat in dofeats:
+        #print(feat_dict[feat]['param'])
         #dofunc = feat_dict[feat]['fn']
         computed_featinspace = feat_dict[feat]['fn'](psdIn,yvect,feat_dict[feat]['param'])
         

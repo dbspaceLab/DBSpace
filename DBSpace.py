@@ -5,6 +5,8 @@ Created on Fri Jan  5 17:47:02 2018
 
 @author: virati
 DBSpace Library
+
+Copyright (C) 2018 Vineet Ravi Tiruvadi
 """
 
 #import sys

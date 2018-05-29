@@ -258,7 +258,7 @@ feat_dict = {
                 'Delta':{'fn':get_pow,'param':(1,4)},
                 'Alpha':{'fn':get_pow,'param':(8,14)},
                 'Theta':{'fn':get_pow,'param':(4,8)},
-                'Beta':{'fn':get_pow,'param':(14,30)},
+                'Beta*':{'fn':get_pow,'param':(14,20)},
                 'Gamma1':{'fn':get_pow,'param':(35,60)},
                 'Gamma2':{'fn':get_pow,'param':(60,100)},
                 'Stim':{'fn':get_pow,'param':(129,131)},
@@ -268,7 +268,7 @@ feat_dict = {
                 'fSlope':{'fn':get_slope,'param':{'frange':(1,20),'linorder':1}},
                 'nFloor':{'fn':get_slope,'param':{'frange':(50,200),'linorder':0}}
             }
-feat_order = ['Delta','Theta','Alpha','Beta','Gamma1']#,'fSlope','nFloor']
+feat_order = ['Delta','Theta','Alpha','Beta*','Gamma1']#,'fSlope','nFloor']
 
 #Function to go through and find all the features from the PSD structure of dbo
 def calc_feats(psdIn,yvect,dofeats=''):

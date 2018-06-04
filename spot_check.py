@@ -19,6 +19,7 @@ from collections import defaultdict
 #json file for major experiments
 experiments = ['Targeting','Amplitude','Frequency','Resting']
 
+
 flist = []
 #flist = ['/home/virati/MDD_Data/BR/908/Session_2016_01_19_Tuesday/908_2016_01_13_16_27_06__MR_2.txt','/home/virati/MDD_Data/BR/908/Session_2016_04_18_Monday/DBS908_2016_04_11_21_15_45__MR_2.txt']
 #flist = ['/run/media/virati/Samsung USB/VRT_Impedance_RB/Session_2018_04_04_Wednesday/PCSTES_2018_04_04_15_37_06__MR_1.txt', '/run/media/virati/Samsung USB/VRT_Impedance_RB/Session_2018_04_04_Wednesday/PCSTES_2018_04_04_15_33_36__MR_0.txt']

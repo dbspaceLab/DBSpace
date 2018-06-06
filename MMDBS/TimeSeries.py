@@ -8,11 +8,17 @@ import matplotlib.pyplot as plt
 
 from collections import defaultdict, OrderedDict
 
+import sys
+sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
+import DBS_Osc as dbo
+
 #Debug stuff
 import pdb
 
-band_dict = {'Delta':(1,4),'Theta':(4,8),'Alpha':(8,14),'Beta':(14,30),'Beta*':(14,20),'Beta+':(25,30),'Gamma':(30,50),'Gamma+':(50,70)}
-do_bands = ['Delta','Theta','Alpha','Beta*']
+#band_dict = {'Delta':(1,4),'Theta':(4,8),'Alpha':(8,14),'Beta':(14,30),'Beta*':(14,20),'Beta+':(25,30),'Gamma1':(35,50),'Gamma+':(50,70)}
+#
+band_dict = dbo.feat_dict
+do_bands = dbo.feat_order
 
 def band_structs():
     return band_dict
@@ -91,8 +97,12 @@ class timeser:
 
     def compute_bands(self,f,SG):
         BandPow = defaultdict(dict)
-        for bb, band in enumerate(band_dict):
-            f_idxs = np.where(np.logical_and(f > band_dict[band][0],f < band_dict[band][1]))
+        for bb, band in enumerate(do_bands):
+            
+            
+            try: f_idxs = np.where(np.logical_and(f > band_dict[band]['param'][0],f < band_dict[band]['param'][1]))
+            except: pdb.set_trace()
+            
             BandPow[band] = np.mean(np.squeeze(SG[f_idxs,:]),0)
         return BandPow
             

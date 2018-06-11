@@ -2,11 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="95df0b85-75ce-4a07-8dc9-c1f361924beb" name="Default" comment="">
-      <change beforePath="" afterPath="$PROJECT_DIR$/.idea/misc.xml" />
-      <change beforePath="" afterPath="$PROJECT_DIR$/pre_proc/spotcheck_gui.py" />
-      <change beforePath="$PROJECT_DIR$/.idea/DBSpace.iml" afterPath="$PROJECT_DIR$/.idea/DBSpace.iml" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change beforePath="$PROJECT_DIR$/pre_proc/.ipynb_checkpoints/rawtoexperiment-checkpoint.ipynb" afterPath="" />
+      <change beforePath="$PROJECT_DIR$/pre_proc/spotcheck_gui.py" afterPath="$PROJECT_DIR$/pre_proc/spotcheck_gui.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -27,23 +23,23 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="spot_check.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="spot_check.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/spot_check.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="120">
-              <caret line="16" column="35" lean-forward="true" selection-start-line="16" selection-start-column="35" selection-end-line="16" selection-end-column="35" />
+            <state relative-caret-position="30">
+              <caret line="2" column="0" lean-forward="false" selection-start-line="2" selection-start-column="0" selection-end-line="6" selection-end-column="3" />
               <folding />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="spotcheck_gui.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="spotcheck_gui.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/pre_proc/spotcheck_gui.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="213">
-              <caret line="44" column="33" lean-forward="true" selection-start-line="44" selection-start-column="33" selection-end-line="44" selection-end-column="33" />
+            <state relative-caret-position="60">
+              <caret line="4" column="3" lean-forward="true" selection-start-line="4" selection-start-column="3" selection-end-line="4" selection-end-column="3" />
               <folding>
-                <element signature="e#0#23#0" expanded="true" />
+                <element signature="e#68#91#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -84,8 +80,8 @@
         <option value="$PROJECT_DIR$/DBSpace.py" />
         <option value="$PROJECT_DIR$/pre_proc/rawtoexperiment.py" />
         <option value="$PROJECT_DIR$/pre_proc/.ipynb_checkpoints/gui_test.py" />
-        <option value="$PROJECT_DIR$/pre_proc/spotcheck_gui.py" />
         <option value="$PROJECT_DIR$/spot_check.py" />
+        <option value="$PROJECT_DIR$/pre_proc/spotcheck_gui.py" />
       </list>
     </option>
   </component>
@@ -616,21 +612,21 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/pre_proc/spotcheck_gui.py">
+    <entry file="file://$PROJECT_DIR$/spot_check.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="213">
-          <caret line="44" column="33" lean-forward="true" selection-start-line="44" selection-start-column="33" selection-end-line="44" selection-end-column="33" />
-          <folding>
-            <element signature="e#0#23#0" expanded="true" />
-          </folding>
+        <state relative-caret-position="30">
+          <caret line="2" column="0" lean-forward="false" selection-start-line="2" selection-start-column="0" selection-end-line="6" selection-end-column="3" />
+          <folding />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/spot_check.py">
+    <entry file="file://$PROJECT_DIR$/pre_proc/spotcheck_gui.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="120">
-          <caret line="16" column="35" lean-forward="true" selection-start-line="16" selection-start-column="35" selection-end-line="16" selection-end-column="35" />
-          <folding />
+        <state relative-caret-position="60">
+          <caret line="4" column="3" lean-forward="true" selection-start-line="4" selection-start-column="3" selection-end-line="4" selection-end-column="3" />
+          <folding>
+            <element signature="e#68#91#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>

@@ -1,3 +1,8 @@
+"""
+Created on Monday Jan 11 12:20 2018
+
+@author: Dolu Obatusin
+"""
 from tkinter import ttk
 from tkinter import *
 import tkinter

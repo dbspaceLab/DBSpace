@@ -7,7 +7,7 @@ Created on Thu Jan 19 11:23:07 2017
 """
 import sys
 sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/IntegratedAnalysis')
-import DBSOsc
+import DBS_Osc
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -43,7 +43,7 @@ plt.rcParams['image.cmap'] = 'jet'
 
 def spot_check(fname):
     
-    Container = DBSOsc.load_BR_feats(fname,snippet=False)
+    Container = DBS_Osc.load_BR_feats(fname,snippet=False)
     #plt.plot(Container['TS']['T'][:-1],Container['TS']['Y'][:,0])
     
     plt.figure()
@@ -71,44 +71,44 @@ def spot_check(fname):
 
     return {'TS':Container['TS']['Y'],'TF':{'SG':SG,'F':F,'T':T}}
 
-patients = ['901']#,'903','905','906','907','908']
+# patients = ['901']#,'903','905','906','907','908']
 #file chooser
-patient=  '905'
+# patient=  '905'
 
-from tkinter.filedialog import askopenfilename
-import tkinter as tk
-
-root = tk.Tk()
-root.withdraw()
-
-notdone = 1
-plt.ion()
+# from tkinter.filedialog import askopenfilename
+# import tkinter as tk
+#
+# root = tk.Tk()
+# root.withdraw()
+#
+# notdone = 1
+# plt.ion()
 
 #curr_dir = '/home/virati/MDD_Data/BR/'
-curr_dir = '/run/media/virati/'
+# curr_dir = '/run/media/virati/'
 
 results = defaultdict(dict)
 
-if flist == []:
-    while notdone:
-        fname = askopenfilename(initialdir=curr_dir)
-        
-        if fname == None or fname == '':
-            notdone = 0
-            print('No File Selected: Goodbye!')
-        else:
-            print('File selected: ' + fname[-20:])
-            flist.append(fname)
-            #results[fname] = spot_check(fname)
-            curr_dir = '/'.join(fname.split('/')[:-1])
-            print(curr_dir)
+# if flist == []:
+#     while notdone:
+#         fname = askopenfilename(initialdir=curr_dir)
+#
+#         if fname == None or fname == '':
+#             notdone = 0
+#             print('No File Selected: Goodbye!')
+#         else:
+#             print('File selected: ' + fname[-20:])
+#             flist.append(fname)
+#             #results[fname] = spot_check(fname)
+#             curr_dir = '/'.join(fname.split('/')[:-1])
+#             print(curr_dir)
         
         
 for fname in flist:
     results[fname] = spot_check(fname)
 
 
-root.destroy()
+# root.destroy()
 
 
 #%%

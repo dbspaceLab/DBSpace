@@ -1,0 +1,6 @@
+collections
+matplotlib
+numpy
+os
+scipy
+tkinter

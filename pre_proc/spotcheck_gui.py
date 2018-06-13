@@ -8,7 +8,7 @@ from tkinter import *
 import tkinter
 import os
 from tkinter import filedialog
-
+# from pre_proc import spotcheck
 
 class GUI(Frame):
     def __init__(self, master=None):
@@ -33,7 +33,6 @@ class GUI(Frame):
         self.fileList.grid(row=1, column=0, sticky='nsew', rowspan=2)
         self.fileList.config(border=2, relief='sunken')
 
-
         self.listScroll = tkinter.Scrollbar(self.mainWindow, orient=tkinter.VERTICAL, command=self.fileList.yview)
         self.listScroll.grid(row=1, column=1, sticky='nsw', rowspan=2)
         self.fileList['yscrollcommand'] = self.listScroll.set
@@ -53,6 +52,7 @@ class GUI(Frame):
     # Clear contents of the file list
     def clear(self):
         self.fileList.delete(0, 'end')
+
 
 if __name__ == "__main__":
     guiFrame = GUI()

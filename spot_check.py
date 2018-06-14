@@ -7,7 +7,7 @@ Created on Thu Jan 19 11:23:07 2017
 """
 import sys
 sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/IntegratedAnalysis')
-import DBS_Osc
+import DBSOsc
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -24,7 +24,7 @@ flist = []
 #flist = ['/home/virati/MDD_Data/BR/908/Session_2016_01_19_Tuesday/908_2016_01_13_16_27_06__MR_2.txt','/home/virati/MDD_Data/BR/908/Session_2016_04_18_Monday/DBS908_2016_04_11_21_15_45__MR_2.txt']
 #flist = ['/run/media/virati/Samsung USB/VRT_Impedance_RB/Session_2018_04_04_Wednesday/PCSTES_2018_04_04_15_37_06__MR_1.txt', '/run/media/virati/Samsung USB/VRT_Impedance_RB/Session_2018_04_04_Wednesday/PCSTES_2018_04_04_15_33_36__MR_0.txt']
 #flist = ['/home/virati/MDD_Data/BR/907/Session_2015_12_17_Thursday/DBS907_2015_12_17_11_39_26__MR_0.txt']
-
+flist = ['/Volumes/MaybergStorage/DoluObatusin/projects/LFP_Analysis/raw/DBS910/chronic/Session_2018_04_23_Monday/DBS910_2018_04_23_13_34_12/DBS910_2018_04_23_13_32_46__MR_0.txt']
 #%%
 
 #import ipdb as pdb
@@ -76,10 +76,14 @@ def spot_check(fname):
 # patient=  '905'
 
 # from tkinter.filedialog import askopenfilename
+from tkinter import filedialog
 # import tkinter as tk
-#
-# root = tk.Tk()
-# root.withdraw()
+
+from tkinter import ttk
+from tkinter import *
+# import tkinter
+# root = tkinter.Tk()
+# # root.withdraw()
 #
 # notdone = 1
 # plt.ion()
@@ -139,7 +143,7 @@ for key,val in results.items():
 
 #plt.ion()
 #data = defaultdict(dict)
-#for pt in patients:
+# for pt in patients:
 #    plt.figure()
 #    data[pt] = spot_check('/home/virati/temp_pavel_6mo/' + pt + '_LFP_OnTarget')
 #    plt.show()
@@ -148,3 +152,4 @@ for key,val in results.items():
 ##io.savemat('/tmp/Recording_Bryan.mat',data)
 #    
 
+plt.show()

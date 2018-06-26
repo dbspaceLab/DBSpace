@@ -274,11 +274,15 @@ feat_dict = {
 feat_order = ['Delta','Theta','Alpha','Beta*','Gamma1']#,'fSlope','nFloor']
 
 #Function to go through and find all the features from the PSD structure of dbo
-def calc_feats(psdIn,yvect,dofeats=''):
+def calc_feats(psdIn,yvect,dofeats='',modality='eeg'):
     #psdIn is a VECTOR, yvect is the basis vector
     if dofeats == '':
         dofeats = feat_order
     
+    if modality == 'eeg':
+        ch_list = np.arange(0,257)
+    elif modality == 'lfp':
+        ch_list = ['Left','Right']
     
     feat_vect = []
     for feat in dofeats:
@@ -286,13 +290,14 @@ def calc_feats(psdIn,yvect,dofeats=''):
         #dofunc = feat_dict[feat]['fn']
         computed_featinspace = feat_dict[feat]['fn'](psdIn,yvect,feat_dict[feat]['param'])
         
-        cfis_matrix = [computed_featinspace[ch] for ch in np.arange(0,257)]
+        cfis_matrix = [computed_featinspace[ch] for ch in ch_list]
         feat_vect.append(cfis_matrix)
         #feat_dict[feat] = dofunc['fn'](datacontainer,yvect,dofunc['param'])[0]
 
     feat_vect = np.array(feat_vect).squeeze()
     
     return feat_vect
+
 
 #Convert a feat dict that comes from a get feature function (WHERE IS IT?!)
 def featDict_to_Matr(featDict):

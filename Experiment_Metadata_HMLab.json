@@ -3,158 +3,158 @@
     "TurnOn":{
       "DBS901":{
         "OnTarget":{
-          "Filename":"",
+          "BR_Filename":"",
           "Intervals":{
-            "B0":'[(0,30)]',
-            "UL":'[(60,180)]',
-            "B1":'[(180,200)]',
-            "UR":'[(0,0)]',
-            "B2":'[(0,0)]',
-            "BL":'[(0,0)]'
+            "B0":"(0,30)]",
+            "UL":"[(60,180)]",
+            "B1":"[(180,200)]",
+            "UR":"[(0,0)]",
+            "B2":"[(0,0)]",
+            "BL":"[(0,0)]"
           },
-          "Channels":['LeftSCC-LFP','RightSCC-LFP']
+          "Channels":["LeftSCC-LFP","RightSCC-LFP","dEEG"]
         },
         "OffTarget":{
-          "Filename":"",
+          "BR_Filename":"",
           "Intervals":{
-            "B0":'[(0,30)]',
-            "UL":'[(60,180)]',
-            "B1":'[(180,200)]',
-            "UR":'[(0,0)]',
-            "B2":'[(0,0)]',
-            "BL":'[(0,0)]'
+            "B0":"[(0,30)]",
+            "UL":"[(60,180)]",
+            "B1":"[(180,200)]",
+            "UR":"[(0,0)]",
+            "B2":"[(0,0)]",
+            "BL":"[(0,0)]"
           },
-          "Channels":['LeftSCC-LFP','RightSCC-LFP']
+          "Channels":["LeftSCC-LFP","RightSCC-LFP","dEEG"]
         }
       },
       "DBS903":{
         "OnTarget":{
-          "Filename":"",
+          "BR_Filename":"",
           "Intervals":{
-            "B0":'[(0,30)]',
-            "UL":'[(60,180)]',
-            "B1":'[(180,200)]',
-            "UR":'[(0,0)]',
-            "B2":'[(0,0)]',
-            "BL":'[(0,0)]'
+            "B0":"[(0,30)]",
+            "UL":"[(60,180)]",
+            "B1":"[(180,200)]",
+            "UR":"[(0,0)]",
+            "B2":"[(0,0)]",
+            "BL":"[(0,0)]"
           },
-          "Channels":['LeftSCC-LFP','RightSCC-LFP']
+          "Channels":["LeftSCC-LFP","RightSCC-LFP"]
         },
         "OffTarget":{
-          "Filename":"",
+          "BR_Filename":"",
           "Intervals":{
-            "B0":'[(0,30)]',
-            "UL":'[(60,180)]',
-            "B1":'[(180,200)]',
-            "UR":'[(0,0)]',
-            "B2":'[(0,0)]',
-            "BL":'[(0,0)]'
+            "B0":"[(0,30)]",
+            "UL":"[(60,180)]",
+            "B1":"[(180,200)]",
+            "UR":"[(0,0)]",
+            "B2":"[(0,0)]",
+            "BL":"[(0,0)]"
           },
-          "Channels":['LeftSCC-LFP','RightSCC-LFP']
+          "Channels":["LeftSCC-LFP","RightSCC-LFP"]
         }
       },
       "DBS905":{
         "OnTarget":{
-          "Filename":"",
+          "BR_Filename":"",
           "Intervals":{
-            "B0":'[(0,30)]',
-            "UL":'[(60,180)]',
-            "B1":'[(180,200)]',
-            "UR":'[(0,0)]',
-            "B2":'[(0,0)]',
-            "BL":'[(0,0)]'
+            "B0":"[(0,30)]",
+            "UL":"[(60,180)]",
+            "B1":"[(180,200)]",
+            "UR":"[(0,0)]",
+            "B2":"[(0,0)]",
+            "BL":"[(0,0)]"
           },
-          "Channels":['LeftSCC-LFP','RightSCC-LFP']
+          "Channels":["LeftSCC-LFP","RightSCC-LFP"]
         },
         "OffTarget":{
-          "Filename":"",
+          "BR_Filename":"",
           "Intervals":{
-            "B0":'[(0,30)]',
-            "UL":'[(60,180)]',
-            "B1":'[(180,200)]',
-            "UR":'[(0,0)]',
-            "B2":'[(0,0)]',
-            "BL":'[(0,0)]'
+            "B0":"[(0,30)]",
+            "UL":"[(60,180)]",
+            "B1":"[(180,200)]",
+            "UR":"[(0,0)]",
+            "B2":"[(0,0)]",
+            "BL":"[(0,0)]"
           },
-          "Channels":['LeftSCC-LFP','RightSCC-LFP']
+          "Channels":["LeftSCC-LFP","RightSCC-LFP"]
         }
       },
       "DBS906":{
         "OnTarget":{
-          "Filename":"",
+          "BR_Filename":"",
           "Intervals":{
-            "B0":'[(0,30)]',
-            "UL":'[(60,180)]',
-            "B1":'[(180,200)]',
-            "UR":'[(0,0)]',
-            "B2":'[(0,0)]',
-            "BL":'[(0,0)]'
+            "B0":"[(0,30)]",
+            "UL":"[(60,180)]",
+            "B1":"[(180,200)]",
+            "UR":"[(0,0)]",
+            "B2":"[(0,0)]",
+            "BL":"[(0,0)]"
           },
-          "Channels":['LeftSCC-LFP','RightSCC-LFP']
+          "Channels":["LeftSCC-LFP","RightSCC-LFP"]
         },
         "OffTarget":{
-          "Filename":"",
+          "BR_Filename":"",
           "Intervals":{
-            "B0":'[(0,30)]',
-            "UL":'[(60,180)]',
-            "B1":'[(180,200)]',
-            "UR":'[(0,0)]',
-            "B2":'[(0,0)]',
-            "BL":'[(0,0)]'
+            "B0":"[(0,30)]",
+            "UL":"[(60,180)]",
+            "B1":"[(180,200)]",
+            "UR":"[(0,0)]",
+            "B2":"[(0,0)]",
+            "BL":"[(0,0)]"
           },
-          "Channels":['LeftSCC-LFP','RightSCC-LFP']
+          "Channels":["LeftSCC-LFP","RightSCC-LFP"]
         }
       },
       "DBS907":{
         "OnTarget":{
-          "Filename":"",
+          "BR_Filename":"",
           "Intervals":{
-            "B0":'[(0,30)]',
-            "UL":'[(60,180)]',
-            "B1":'[(180,200)]',
-            "UR":'[(0,0)]',
-            "B2":'[(0,0)]',
-            "BL":'[(0,0)]'
+            "B0":"[(0,30)]",
+            "UL":"[(60,180)]",
+            "B1":"[(180,200)]",
+            "UR":"[(0,0)]",
+            "B2":"[(0,0)]",
+            "BL":"[(0,0)]"
           },
-          "Channels":['LeftSCC-LFP','RightSCC-LFP']
+          "Channels":["LeftSCC-LFP","RightSCC-LFP"]
         },
         "OffTarget":{
-          "Filename":"",
+          "BR_Filename":"",
           "Intervals":{
-            "B0":'[(0,30)]',
-            "UL":'[(60,180)]',
-            "B1":'[(180,200)]',
-            "UR":'[(0,0)]',
-            "B2":'[(0,0)]',
-            "BL":'[(0,0)]'
+            "B0":"[(0,30)]",
+            "UL":"[(60,180)]",
+            "B1":"[(180,200)]",
+            "UR":"[(0,0)]",
+            "B2":"[(0,0)]",
+            "BL":"[(0,0)]"
           },
-          "Channels":['LeftSCC-LFP','RightSCC-LFP']
+          "Channels":["LeftSCC-LFP","RightSCC-LFP"]
         }
       },
       "DBS908":{
         "OnTarget":{
-          "Filename":"",
+          "BR_Filename":"",
           "Intervals":{
-            "B0":'[(0,30)]',
-            "UL":'[(60,180)]',
-            "B1":'[(180,200)]',
-            "UR":'[(0,0)]',
-            "B2":'[(0,0)]',
-            "BL":'[(0,0)]'
+            "B0":"[(0,30)]",
+            "UL":"[(60,180)]",
+            "B1":"[(180,200)]",
+            "UR":"[(0,0)]",
+            "B2":"[(0,0)]",
+            "BL":"[(0,0)]"
           },
-          "Channels":['LeftSCC-LFP','RightSCC-LFP']
+          "Channels":["LeftSCC-LFP","RightSCC-LFP"]
         },
         "OffTarget":{
-          "Filename":"",
+          "BR_Filename":"",
           "Intervals":{
-            "B0":'[(0,30)]',
-            "UL":'[(60,180)]',
-            "B1":'[(180,200)]',
-            "UR":'[(0,0)]',
-            "B2":'[(0,0)]',
-            "BL":'[(0,0)]'
+            "B0":"[(0,30)]",
+            "UL":"[(60,180)]",
+            "B1":"[(180,200)]",
+            "UR":"[(0,0)]",
+            "B2":"[(0,0)]",
+            "BL":"[(0,0)]"
           },
-          "Channels":['LeftSCC-LFP','RightSCC-LFP']
+          "Channels":["LeftSCC-LFP","RightSCC-LFP"]
         }
       }
     }
@@ -163,28 +163,28 @@
     "TurnOn":{
       "DBS901":{
         "Voltage":{
-          "Filename":"",
+          "BR_Filename":"",
           "Intervals":{
-            "B0":'[(0,30)]',
-            "UL":'[(60,180)]',
-            "B1":'[(180,200)]',
-            "UR":'[(0,0)]',
-            "B2":'[(0,0)]',
-            "BL":'[(0,0)]'
+            "B0":"[(0,30)]",
+            "UL":"[(60,180)]",
+            "B1":"[(180,200)]",
+            "UR":"[(0,0)]",
+            "B2":"[(0,0)]",
+            "BL":"[(0,0)]"
           },
-          "Channels":['LeftSCC-LFP','RightSCC-LFP']
+          "Channels":["LeftSCC-LFP","RightSCC-LFP"]
         },
         "Current":{
-          "Filename":"",
+          "BR_Filename":"",
           "Intervals":{
-            "B0":'[(0,30)]',
-            "UL":'[(60,180)]',
-            "B1":'[(180,200)]',
-            "UR":'[(0,0)]',
-            "B2":'[(0,0)]',
-            "BL":'[(0,0)]'
+            "B0":"[(0,30)]",
+            "UL":"[(60,180)]",
+            "B1":"[(180,200)]",
+            "UR":"[(0,0)]",
+            "B2":"[(0,0)]",
+            "BL":"[(0,0)]"
           },
-          "Channels":['LeftSCC-LFP','RightSCC-LFP']
+          "Channels":["LeftSCC-LFP","RightSCC-LFP"]
         }
       }
     }
@@ -193,29 +193,37 @@
     "TurnOn":{
       "DBS901":{
         "Low":{
-          "Filename":"",
+          "BR_Filename":"",
           "Intervals":{
-            "B0":'[(0,30)]',
-            "UL":'[(60,180)]',
-            "B1":'[(180,200)]',
-            "UR":'[(0,0)]',
-            "B2":'[(0,0)]',
-            "BL":'[(0,0)]'
+            "B0":"[(0,30)]",
+            "UL":"[(60,180)]",
+            "B1":"[(180,200)]",
+            "UR":"[(0,0)]",
+            "B2":"[(0,0)]",
+            "BL":"[(0,0)]"
           }
         },
         "High":{
-          "Filename":"",
+          "BR_Filename":"",
           "Intervals":{
-            "B0":'[(0,30)]',
-            "UL":'[(60,180)]',
-            "B1":'[(180,200)]',
-            "UR":'[(0,0)]',
-            "B2":'[(0,0)]',
-            "BL":'[(0,0)]'
+            "B0":"[(0,30)]",
+            "UL":"[(60,180)]",
+            "B1":"[(180,200)]",
+            "UR":"[(0,0)]",
+            "B2":"[(0,0)]",
+            "BL":"[(0,0)]"
           }
         }
       }
     }
     
+  },
+  
+  "Discontinuation":{
+    "Realtime":{
+      "DBS901":{
+        
+      }
+    }
   }
 }

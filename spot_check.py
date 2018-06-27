@@ -43,7 +43,7 @@ plt.rcParams['image.cmap'] = 'jet'
 
 def spot_check(fname):
     
-    Container = DBS_Osc.load_BR_feats(fname,snippet=False)
+    Container = DBSOsc.load_BR_feats(fname,snippet=False)
     #plt.plot(Container['TS']['T'][:-1],Container['TS']['Y'][:,0])
     
     plt.figure()
@@ -82,8 +82,8 @@ from tkinter import filedialog
 from tkinter import ttk
 from tkinter import *
 # import tkinter
-# root = tkinter.Tk()
-# # root.withdraw()
+# inputfile = tkinter.Tk()
+# # inputfile.withdraw()
 #
 # notdone = 1
 # plt.ion()
@@ -112,7 +112,7 @@ for fname in flist:
     results[fname] = spot_check(fname)
 
 
-# root.destroy()
+# inputfile.destroy()
 
 
 #%%

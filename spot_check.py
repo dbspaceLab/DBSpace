@@ -158,6 +158,7 @@ def spot_check(fname,tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']):
         
         
         F,T,SG[chann_labels[cc]] = sig.spectrogram(Container['TS']['Y'][nlims[0]:nlims[1],cc],nperseg=NFFT,noverlap=NFFT*0.5,window=sig.get_window('blackmanharris',NFFT),fs=422)    
+        #Need to transpose for the segmentation approach to work, retranspose in the plotting
     
     polycorr = True
     if plot_sg:
@@ -165,7 +166,7 @@ def spot_check(fname,tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']):
         #if we want to do polynomial corrections
         if polycorr:
             print('Polynom Correction!')
-            corr_sg = dbo.poly_subtr(SG,F)
+            corr_sg = dbo.poly_SG(SG,F)
             
             pdb.set_trace()
             
@@ -175,7 +176,7 @@ def spot_check(fname,tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']):
                     
                     
                     
-                plt.pcolormesh(T,F,10*np.log10(SG[chann_labels[cc]]),rasterized=True)
+                plt.pcolormesh(T,F,10*np.log10(SG[chann_labels[cc]].T),rasterized=True)
                 plt.clim((-200,-100))
             plt.suptitle('Raw TS: ' + fname.split('/')[-1])
         

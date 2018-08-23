@@ -110,6 +110,19 @@ def poly_subtr(inpPSD,fVect,order=4):
         
     
     return fix_psd
+
+def poly_SG(inSG,fVect,order=4):
+    out_sg = np.zeros_like(inSG)
+    
+    for seg in range(inSG.shape[1]):
+        inpsd = 10*np.log10(inpPSD[chann][seg,:])
+        polyCoeff = np.polyfit(fVect,inpsd,order)
+        polyfunc = np.poly1d(polyCoeff)
+        polyitself = polyfunc(fVect)
+        out_sg[:,seg] = 10**((curr_psd - polyitself)/10)
+        
+    return out_sg
+    
     
 
 def gen_SG(inpX,Fs=422,nfft=2**10,plot=False):

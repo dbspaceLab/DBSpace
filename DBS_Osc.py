@@ -96,8 +96,8 @@ def poly_subtr(inpPSD,fVect,order=4):
         
         for seg in range(inpPSD[chann].shape[0]):
             curr_psd = 10*np.log10(inpPSD[chann][seg,:])
-            print(fVect.shape)
-            print(curr_psd.shape)
+            #print(fVect.shape)
+            #print(curr_psd.shape)
             polyCoeff = np.polyfit(fVect,curr_psd,order)
             
             polyfunc = np.poly1d(polyCoeff)
@@ -171,6 +171,17 @@ def get_pow(Pxx,F,frange,cmode=np.median):
     
     return out_feats
 
+
+
+def get_ratio(Pxx,F,f_r_set,cmode=np.median):
+    bandpow = [None] * len(f_r_set)
+    #first get the power for each of the individual bands
+    for bb, frange in enumerate(f_r_set):
+        bandpow[bb] = get_pow(Pxx,F,frange,cmode=cmode)
+        
+    
+    ret_ratio = {ch:bandpow[1][ch]/bandpow[0][ch] for ch in bandpow[0].keys()}
+    return ret_ratio
 
 
 def F_Domain(timeser,nperseg=512,noverlap=128,nfft=2**10,Fs=422):
@@ -262,19 +273,24 @@ feat_dict = {
                 'Alpha':{'fn':get_pow,'param':(8,14)},
                 'Theta':{'fn':get_pow,'param':(4,8)},
                 'Beta*':{'fn':get_pow,'param':(14,20)},
+                'Beta':{'fn':get_pow,'param':(14,30)},
                 'Gamma1':{'fn':get_pow,'param':(35,60)},
                 'Gamma2':{'fn':get_pow,'param':(60,100)},
+                'Gamma':{'fn':get_pow,'param':(30,100)},
                 'Stim':{'fn':get_pow,'param':(129,131)},
                 'SHarm':{'fn':get_pow,'param':(30,34)}, #Secondary Harmonic
                 'THarm':{'fn':get_pow,'param':(62,66)}, #Tertiary Harmonic
                 'Clock':{'fn':get_pow,'param':(104.5,106.5)},
                 'fSlope':{'fn':get_slope,'param':{'frange':(1,20),'linorder':1}},
-                'nFloor':{'fn':get_slope,'param':{'frange':(50,200),'linorder':0}}
+                'nFloor':{'fn':get_slope,'param':{'frange':(50,200),'linorder':0}},
+                'GCratio':{'fn':get_ratio,'param':((30,34),(62,66))}
             }
+
+
 feat_order = ['Delta','Theta','Alpha','Beta*','Gamma1']#,'fSlope','nFloor']
 
 #Function to go through and find all the features from the PSD structure of dbo
-def calc_feats(psdIn,yvect,dofeats='',modality='eeg'):
+def calc_feats(psdIn,yvect,dofeats='',modality='eeg',compute_method='median'):
     #psdIn is a VECTOR, yvect is the basis vector
     if dofeats == '':
         dofeats = feat_order
@@ -288,7 +304,10 @@ def calc_feats(psdIn,yvect,dofeats='',modality='eeg'):
     for feat in dofeats:
         #print(feat_dict[feat]['param'])
         #dofunc = feat_dict[feat]['fn']
-        computed_featinspace = feat_dict[feat]['fn'](psdIn,yvect,feat_dict[feat]['param'])
+        if compute_method == 'median':
+            computed_featinspace = feat_dict[feat]['fn'](psdIn,yvect,feat_dict[feat]['param'])
+        elif compute_method == 'mean':
+            computed_featinspace = feat_dict[feat]['fn'](psdIn,yvect,feat_dict[feat]['param'],cmode=np.mean)
         
         cfis_matrix = [computed_featinspace[ch] for ch in ch_list]
         feat_vect.append(cfis_matrix)
@@ -296,7 +315,7 @@ def calc_feats(psdIn,yvect,dofeats='',modality='eeg'):
 
     feat_vect = np.array(feat_vect).squeeze()
     
-    return feat_vect
+    return feat_vect, dofeats
 
 
 #Convert a feat dict that comes from a get feature function (WHERE IS IT?!)
@@ -311,11 +330,14 @@ def featDict_to_Matr(featDict):
     return ret_matr
 
 
-
-#simplified spot PSD check
-def spot_PSD(ts,tvect):
-    pass
-
+def plot_bands(bandM,bandLabels):
+    ''' Function to plot bands since this has been annoying every time I've had to recode the thing from scratch'''
+    
+    plt.figure()
+    for cc in bandM:
+        plt.bar(cc)
+        plt.xticks(range(len(cc)))
+        plt.xticklabels(bandLabels)
 
 #%%
 ## SIMPLE FUNCTIONS

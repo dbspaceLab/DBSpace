@@ -3,9 +3,11 @@
 Created on Fri Aug 19 10:19:45 2016
 
 @author: virati
+THIS IS OLD AND NEEDS TO BE REMOVED/PHASED OUT of all scripts
 """
 
 #Oscillatory Functions and link between methods and signal processing
+raise ValueError
 
 import scipy.signal as sig
 import numpy as np

@@ -7,45 +7,52 @@ Created on Fri Jan  5 17:47:02 2018
 DBSpace Library
 
 Copyright (C) 2018 Vineet Ravi Tiruvadi
+Main library for DBSpace
+Has basic loading functions and large-scale dataframes
 """
 
 #import sys
 #sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/IntegratedAnalysis/')
 
-import DBS_Osc as dbo
+import numpy as np
+import pandas as pd
+
 from collections import defaultdict
 import scipy.signal as sig
 import matplotlib.pyplot as plt
 
-#Uses DBSOsc for the analytical methods
-class timeseries:
-    def __init__(self,x,t):
-        self.ts = defaultdict(dict)
-        self.ts['x'] = x
-        self.ts['t'] = t
-        self.ts['fs'] = x.shape[0]/(t[-1] - t[0])
-        
-    def transforms(self,domains=['F','TF']):
-        for dd,dom in enumerate(domains):
-            if dom == 'F':
-                #self.F['F'],self.F['PSD'] = sig.welch(self.ts['x'])
-                #f,P[:,ii] = sig.welch(x_in[:,ii],fs,window='blackmanharris',nperseg=512,noverlap=128,nfft=nfft)
-                self.Freq = dbo.F_Domain(self.ts)
-            elif dom == 'TF':
-                #self.TF['F'],self.TF['T'],self.TF['SG'] = sig.spectrogram(self.ts['x'],nperseg=512,noverlap=256,window=sig.get_window('blackmanharris',512),fs=fs)
-                self.TimeFreq = dbo.TF_Domain(self.ts)
-            
-        
-    def display(self,domains=['T','F','TF']):
-        plt.figure()
-        numdoms = len(domains)
-        
-        for dd,dom in enumerate(domains):
-        
-            plt.subplot(numdoms,1,dd)
-            
-            if dom == 'T':
-                plt.plot(self.ts['t'],self.ts['x'])
-            elif dom == 'TF':
-                pass
-        
+
+# Basic loading functions for text file based recordings (such as those used by the Activa PC+S)
+
+def load_br(fname,from_end=10,fs=422):
+    #Bring in raw data
+    rawdata = np.array(pd.read_csv(fname,sep=',',header=None))
+    
+    #calculate what the sample number is for the from_end clipping: this stage is to avoid the first ~5 second settling artifact
+    start_sample = -422*from_end
+    #The PC+S has channels 1 and 2 in the first and third columns.
+    txtdata = rawdata[from_end:-1,[0,2]]
+    
+    #make a dictionary structure for the two channels in the PC+S
+    Y = {'Left':txtdata[:,0],'Right':txtdata[:,1]}
+    
+    return Y
+
+# This function will parse out the filename from BrainRadio Recordings
+def parse_filename(fname):
+    pass
+
+def poly_subtr(inPSD,order=4):
+    #inPSD should be a dictionary with the PSD and fvect in it
+    fixed_psd = {chann:[] for chann in inPSD.keys()}
+    
+    #Main loop to go through channels
+    # KEEP IN MIND, .keys() does not guarantee order
+    for chann in inPSD.keys():
+        active_PSD = 10*np.log10(inPSD[chann][seg,:])
+
+
+# Finally, we'll have a class that performs a fixed preprocessing pipeline for a single recording
+class BR_Pipeline:
+    def __init__(self):
+        pass

@@ -52,6 +52,36 @@ def poly_subtr(inPSD,order=4):
         active_PSD = 10*np.log10(inPSD[chann][seg,:])
 
 
+def feat_extract(inY):
+
+    
+def calc_feats(psdIn,yvect,dofeats='',modality='eeg',compute_method='median'):
+    #psdIn is a VECTOR, yvect is the basis vector
+    if dofeats == '':
+        dofeats = feat_order
+    
+    if modality == 'eeg':
+        ch_list = np.arange(0,257)
+    elif modality == 'lfp':
+        ch_list = ['Left','Right']
+    
+    feat_vect = []
+    for feat in dofeats:
+        #print(feat_dict[feat]['param'])
+        #dofunc = feat_dict[feat]['fn']
+        if compute_method == 'median':
+            computed_featinspace = feat_dict[feat]['fn'](psdIn,yvect,feat_dict[feat]['param'])
+        elif compute_method == 'mean':
+            computed_featinspace = feat_dict[feat]['fn'](psdIn,yvect,feat_dict[feat]['param'],cmode=np.mean)
+        
+        cfis_matrix = [computed_featinspace[ch] for ch in ch_list]
+        feat_vect.append(cfis_matrix)
+        #feat_dict[feat] = dofunc['fn'](datacontainer,yvect,dofunc['param'])[0]
+
+    feat_vect = np.array(feat_vect).squeeze()
+    
+    return feat_vect, dofeats
+
 # Finally, we'll have a class that performs a fixed preprocessing pipeline for a single recording
 class BR_Pipeline:
     def __init__(self):

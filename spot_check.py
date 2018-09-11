@@ -6,7 +6,7 @@ Created on Thu Jan 19 11:23:07 2017
 @author: virati
 """
 import sys
-#sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/IntegratedAnalysis')
+sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/IntegratedAnalysis')
 #import DBSOsc as dbo
 import DBS_Osc as dbo
 

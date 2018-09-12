@@ -4,12 +4,12 @@
 Created on Thu Jan 19 11:23:07 2017
 
 @author: virati
+Spot check GUI. THIS STILL USES THE OLD DBSOsc and needs to be ported to new DBS_Osc library. But everything breaks for 50 reasons, so might be best to just start from scratch
 """
 import sys
 sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/IntegratedAnalysis')
-#import DBSOsc as dbo
+import DEPR_DBSOsc as DBSOsc
 import DBS_Osc as dbo
-
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -37,15 +37,20 @@ flist = []
 #flist = ['/home/virati/MDD_Data/VRT_Impedance_RB/Session_2018_04_04_Wednesday/PCSTES_2018_04_04_15_37_06__MR_1.txt', '/home/virati/MDD_Data/VRT_Impedance_RB/Session_2018_04_04_Wednesday/PCSTES_2018_04_04_15_33_36__MR_0.txt']
 flist = ['/home/virati/MDD_Data/BR/907/Session_2015_12_17_Thursday/DBS907_2015_12_17_11_39_26__MR_0.txt']
 expname=['test']
-#Below is the saline testing recordings
 
-#flist = ['/home/virati/MDD_Data/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_16_53_36__MR_0.txt',
-# '/home/virati/MDD_Data/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_17_15_20__MR_0.txt',
-# '/home/virati/MDD_Data/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_17_32_09__MR_0.txt',
-# '/home/virati/MDD_Data/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_17_49_21__MR_0.txt',
-# '/home/virati/MDD_Data/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_17_56_09__MR_1.txt',
-# '/home/virati/MDD_Data/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_18_02_40__MR_2.txt']
-#expname = ['IF-300','GE-300','SA-100','2IF-300','2GE-100','2SA-100']
+
+
+#Below is the saline testing recordings
+flist = ['/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_16_53_36__MR_0.txt',
+ '/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_17_15_20__MR_0.txt',
+ '/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_17_32_09__MR_0.txt',
+ '/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_17_49_21__MR_0.txt',
+ '/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_17_56_09__MR_1.txt',
+ '/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_18_02_40__MR_2.txt']
+expname = ['IF-300','GE-300','SA-100','2IF-300','2GE-100','2SA-100']
+
+flist = ['/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_16_53_36__MR_0.txt']
+expname = ['IF-300']
 
 #%%
 
@@ -60,7 +65,10 @@ matplotlib.rcParams['svg.fonttype'] = 'none'
 
 plt.rcParams['image.cmap'] = 'jet'
 
-#plt.close('all')
+#Parameters for analysis
+band_scheme = 'Adjusted'
+band_compute = 'median'
+
 
 def grab_median(TFcont,tlim=(880,900),title='',do_corr=True):
     #Plot some PSDs
@@ -90,10 +98,13 @@ def grab_median(TFcont,tlim=(880,900),title='',do_corr=True):
         
         if do_corr:
             #do polynomial subtraction
-            pf_lPSD[chann_label[cc]] = dbo.poly_subtr(corr_psd,F)[chann_label[cc]].reshape(-1,1)
-            #plt.ylim((0,10))
+            fixed_psd, polyitself = dbo.poly_subtr(corr_psd,F)
+            pf_lPSD[chann_label[cc]] = fixed_psd[chann_label[cc]].reshape(-1,1)
         else:
+            correct_psd, polyitself = dbo.poly_subtr(corr_psd,F)
+
             pf_lPSD[chann_label[cc]] = 10**(med_psd/10).reshape(-1,1)
+            plt.plot(F,polyitself,label='Polynomial Fit')
             
         plt.plot(F,10*np.log10(pf_lPSD[chann_label[cc]]),label=title)
         plt.title('Channel ' + chann_label[cc] + ' psd')
@@ -108,16 +119,25 @@ def grab_median(TFcont,tlim=(880,900),title='',do_corr=True):
         plt.title('Variance in PSD across time: ' + chann_label[cc])
         plt.legend()
         
-    fcalced,bands = dbo.calc_feats(pf_lPSD,F,modality='lfp')
+    
+
+    if band_scheme == 'Standard':
+        band_wins = ['Delta','Theta','Alpha','Beta','Gamma']
+    elif band_scheme == 'Adjusted':
+        band_wins = ['Delta','Theta','Alpha','Beta*','Gamma1']
+    
+    
+    fcalced,bands = dbo.calc_feats(pf_lPSD,F,dofeats=band_wins, modality='lfp',compute_method=band_compute)
     
     plt.figure(osc_feat.number)
     plt.subplot(1,2,1)
     plt.plot(fcalced[:,0],label=title)
+    
     plt.title('Left')
     plt.subplot(1,2,2)
     plt.plot(fcalced[:,1],label=title)
     plt.title('Right')
-    plt.suptitle('Features')
+    plt.suptitle('Features ' + band_compute + ' ' + band_scheme)
 
 #%%
 
@@ -128,6 +148,7 @@ def spot_check(fname,tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']):
     '''
     
     Container = DBSOsc.load_BR_feats(fname,snippet=False)
+    #Container = dbo.load_BR_dict(fname)
     
     NFFT = 2**10
     fs = 422 #hardcoded for brLFP for now
@@ -160,23 +181,22 @@ def spot_check(fname,tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']):
         F,T,SG[chann_labels[cc]] = sig.spectrogram(Container['TS']['Y'][nlims[0]:nlims[1],cc],nperseg=NFFT,noverlap=NFFT*0.5,window=sig.get_window('blackmanharris',NFFT),fs=422)    
         #Need to transpose for the segmentation approach to work, retranspose in the plotting
     
-    polycorr = True
+    polycorr = False
     if plot_sg:
         plt.figure()
         #if we want to do polynomial corrections
         if polycorr:
             print('Polynom Correction!')
-            corr_sg = dbo.poly_SG(SG,F)
-            
-            pdb.set_trace()
+            for chann in SG.keys():
+                corr_sg = dbo.poly_SG(SG[chann],F)
             
         #Now we want to plot
         else:
-            for cc in range(2):
-                    
-                    
-                    
-                plt.pcolormesh(T,F,10*np.log10(SG[chann_labels[cc]].T),rasterized=True)
+            for cc in range(1):
+                plt.subplot(2,1,1)
+                plt.plot(Container['TS']['Y'][:,cc])
+                plt.subplot(2,1,2)
+                plt.pcolormesh(T,F,10*np.log10(SG[chann_labels[cc]]),rasterized=True)
                 plt.clim((-200,-100))
             plt.suptitle('Raw TS: ' + fname.split('/')[-1])
         

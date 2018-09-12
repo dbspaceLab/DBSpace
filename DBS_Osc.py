@@ -31,8 +31,13 @@ all_pts = ['901','903','905','906','907','908']
 
 #Method to load in brainradio file
 def load_br_file(fname):
+    return load_br_data(fname)
+
+#Method to load in the data itself
+def load_br_data(fname):
     rawdata = np.array(pd.read_csv(fname,sep=',',header=None))
     return rawdata
+
 
 def load_BR_dict(fname,sec_end=10):
     txtdata = load_br_file(fname)[:,[0,2]]
@@ -110,7 +115,7 @@ def poly_subtr(inpPSD,fVect,order=4):
         fix_psd[chann] = 10**(postpsd_matr/10).T
         
     
-    return fix_psd
+    return fix_psd, polyitself
 
 def poly_SG(inSG,fVect,order=4):
     out_sg = np.zeros_like(inSG)

@@ -86,3 +86,8 @@ def calc_feats(psdIn,yvect,dofeats='',modality='eeg',compute_method='median'):
 class BR_Pipeline:
     def __init__(self):
         pass
+    
+#A class that wraps a BR recording
+class BR_recording:
+    def __init__(self):
+        

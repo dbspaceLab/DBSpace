@@ -159,6 +159,9 @@ def grab_median(TFcont,tlim=(880,900),title='',do_corr=True):
 
 #%%
 
+def spot_SG(fname,chann_labels=['Left','Right']):
+    F,T,SG[chann_labels[cc]] = sig.spectrogram(Container['TS']['Y'][nlims[0]:nlims[1],cc],nperseg=NFFT,noverlap=NFFT*0.5,window=sig.get_window('blackmanharris',NFFT),fs=422)
+    
 
 def spot_check(fname,tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']):
     ''' Spotcheck function

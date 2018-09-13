@@ -82,12 +82,36 @@ def calc_feats(psdIn,yvect,dofeats='',modality='eeg',compute_method='median'):
     
     return feat_vect, dofeats
 
+
+#%%
+def plot_ts(y_dict,x,fs,x_offset=0):
+    plt.figure()
+    for cc in y_dict.keys():
+        plt.subplot(n,1,cc)
+        plt.plot(x,y_dict[cc])
+
+#%%
 # Finally, we'll have a class that performs a fixed preprocessing pipeline for a single recording
 class BR_Pipeline:
     def __init__(self):
         pass
     
 #A class that wraps a BR recording
-class BR_recording:
+class BRec:
     def __init__(self):
-        
+       self.filename = [] #what file is this recording associated with?
+       self.Tser = {} #dictionary with keys for channels
+       self.Data = {} #
+       
+    @property
+    def preproc(self):
+        return self.__preproc
+    
+    @preproc.setter
+    def preproc(self):
+        self.__preproc = []
+      
+    # Display function for the raw timeseries
+    def view_ts(self):
+        plt.figure()
+        plt.plot(self.Tser)

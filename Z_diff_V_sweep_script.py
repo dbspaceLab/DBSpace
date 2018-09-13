@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jan 19 11:23:07 2017
+Created on Thu Sep 13 11:34:21 2018
 
 @author: virati
-Spot check GUI. THIS STILL USES THE OLD DBSOsc and needs to be ported to new DBS_Osc library. But everything breaks for 50 reasons, so might be best to just start from scratch
+Script for VOLTAGE SPOT CHECK Only
+This script checks across experiments/impedance mismatch conditions
+
 """
 import sys
 sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/IntegratedAnalysis')
@@ -72,21 +74,6 @@ plt.rcParams['image.cmap'] = 'jet'
 band_scheme = 'Adjusted'
 band_compute = 'median'
 
-
-def gui_file_select():
-    curr_dir = '/run/media/virati/'
-    notdone = True
-    flist = []
-    
-    while notdone:
-        fname = askopenfilename(initialdir=curr_dir)
-        if fname == None or fname == '':
-            notdone = False
-        else:
-            flist.append(fname)
-            curr_dir = '/'.join(fname.split('/')[:-1])
-
-    return flist
 
 def grab_median(TFcont,tlim=(880,900),title='',do_corr=True):
     #Plot some PSDs
@@ -244,17 +231,29 @@ if __name__ == '__main__':
     root = tk.Tk()
     root.withdraw()
     
+    notdone = 1
     plt.ion()
     
-    
+    #curr_dir = '/home/virati/MDD_Data/BR/'
+    curr_dir = '/run/media/virati/'
     
     results = defaultdict(dict)
     
     if flist == []:
-        flist = gui_file_select()
+        while notdone:
+            fname = askopenfilename(initialdir=curr_dir)
             
-    
-    #Here, we do the actual spot_checking method
+            if fname == None or fname == '':
+                notdone = 0
+                print('No File Selected: Goodbye!')
+            else:
+                print('File selected: ' + fname[-20:])
+                flist.append(fname)
+                #results[fname] = spot_check(fname)
+                curr_dir = '/'.join(fname.split('/')[:-1])
+                print(curr_dir)
+            
+            
     for ff,fname in enumerate(flist):
         results[expname[ff]] = spot_check(fname,plot_sg=True)
     

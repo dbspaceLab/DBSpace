@@ -86,6 +86,49 @@ def gen_psd(inpX,Fs=422,nfft=2**10,polyord=0):
     #Return here is a dictionary with Nchann keys
     return outPSD
 
+def cmedian(inArray,axis=-1):
+    return  np.median(np.real(inArray),axis=axis) + 1j * np.median(np.imag(inArray),axis=axis)
+
+# Make a coherence generation function
+def gen_coher(inpX,Fs=422,nfft=2**10,polyord=0,band='Alpha'):
+    print('Starting a coherence run...')
+    outCoher = nestdict()
+    
+    #What's our goddamn fvector
+    fvect = np.linspace(0,Fs/2,nfft/2+1)
+    
+    if band == []:
+        band_idxs = np.arange(0,513)
+    else:
+        band_bounds = (8,14)
+        band_idxs = np.where(np.logical_and(fvect > band_bounds[0],fvect < band_bounds[1]))
+        
+    
+    for chann_i in inpX.keys():
+        print(chann_i)
+        for chann_j in inpX.keys():
+            if band == []:
+                coh_ensemble = np.zeros((inpX[chann_i].shape[1],513),dtype=complex)
+            else:
+                coh_ensemble = np.zeros((inpX[chann_i].shape[1],1),dtype=complex)
+            
+            for seg in range(inpX[chann_i].shape[1]):
+                #First we get the cross spectral density
+                csd_out = sig.csd(inpX[chann_i][:,seg].squeeze(),inpX[chann_j][:,seg],fs=Fs,nperseg=1024)[1]
+                
+                #Are we focusing on a band or doing the entire CSD?
+                if band == []:
+                    coh_ensemble[seg] = csd_out
+                else:
+                    coh_ensemble[seg] = cmedian(csd_out)
+
+            outCoher[chann_i][chann_j] = cmedian(coh_ensemble,axis=0)
+            #if chann_i > 10: pdb.set_trace()
+            ## PLV abs EEG -> 
+            ## Coherence value
+            
+    return outCoher
+    
 #This function takes a PSD and subtracts out the PSD's fourth order polynomial fit
     #I THINK this is only used in EEG cortical signatures
 def poly_subtr(inpPSD,fVect,order=4):

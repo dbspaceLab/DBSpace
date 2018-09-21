@@ -98,11 +98,34 @@ class BR_Pipeline:
     
 #A class that wraps a BR recording
 class BRec:
-    def __init__(self):
-       self.filename = [] #what file is this recording associated with?
+    def __init__(self,fname=''):
+       self.filename = fname #what file is this recording associated with?
        self.Tser = {} #dictionary with keys for channels
        self.Data = {} #
        
+       # Apply a partition on the recording
+       self.partition(profile='chronic')
+       
+       if fname != '':
+           self.load_recording(fname)
+       
+    #wrapper for external call to main BR loading function
+    def load_recording(self,fname,partition=-1):
+        data_dict = load_br(fname)
+        
+        
+    # All recordings can be PARTITIONED, with the default partition being two partitions
+    # 0 - settling partition; 1 - remaining
+    
+    @property
+    def partition(self,profile='chronic'):
+        self.partition
+    
+    @partition.setter
+    def partition(self):
+        pass    
+        
+        
     @property
     def preproc(self):
         return self.__preproc

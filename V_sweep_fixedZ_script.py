@@ -32,10 +32,13 @@ from spot_check import *
 
 chann_label = ['Left','Right']
 
-flist = '/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_16_53_36__MR_0.txt'
-expname = 'IF-300'
+fname = {'IF-300':'/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_16_53_36__MR_0.txt', 
+         'SA-100':'/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_17_32_09__MR_0.txt',
+         '2SA-100': '/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_18_02_40__MR_2.txt'}
+
+do_exp = 'IF-300'
 V_list = [2,4,6,8]
-V_dict = {2:(0,0),4:(0,0),6:(0,0),8:(230,250)} #The times *in seconds) that the voltages are active
+V_dict = {2:(40,50),4:(110,120),6:(170,180),8:(230,250)} #The times *in seconds) that the voltages are active
 
 #%%
 
@@ -62,9 +65,11 @@ if __name__ == '__main__':
     plt.ion()
     
     results = defaultdict(dict)
-            
-    for vv in V_list:
-        results[expname[ff]] = spot_check(fname,plot_sg=True)
+
+    #Generate a single SG for the entire experiment
+    _ = spot_check(fname[do_exp],plot_sg=True)            
+
+    results = spot_check(fname[do_exp],plot_sg=False)
 
     root.destroy()
     
@@ -72,10 +77,8 @@ if __name__ == '__main__':
     #%%
     bigmed = plt.figure()
     osc_feat = plt.figure()
-    
-    for key in expname:
-        print(key)
-        for vv in V_list:
-            grab_median(results[key],tlim=do_voltage,title=key,do_corr=False)
+
+    for vv in V_list:
+        grab_median(results,bigmed,osc_feat,tlim=V_dict[vv],title='Voltage ' + str(vv),do_corr=False)
     
     plt.legend()

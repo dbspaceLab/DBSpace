@@ -52,7 +52,6 @@ def gen_T(inpX,Fs=422,nfft=2**10):
         outT[chann] = {'T':np.linspace(0,inpX[chann].shape[0]/Fs,inpX[chann].shape[0]),'V':inpX[chann]}
         
     return outT
-        
 
 #ALERT    
 #gen_psd has gotten super complicated.... need to check if it still works with DSV and Regression stuff
@@ -89,10 +88,14 @@ def gen_psd(inpX,Fs=422,nfft=2**10,polyord=0):
 def cmedian(inArray,axis=-1):
     return  np.median(np.real(inArray),axis=axis) + 1j * np.median(np.imag(inArray),axis=axis)
 
+def l2_pow(x):
+    return np.sqrt(np.sum(x**2))
+
 # Make a coherence generation function
 def gen_coher(inpX,Fs=422,nfft=2**10,polyord=0,band='Alpha'):
     print('Starting a coherence run...')
-    outCoher = nestdict()
+    outPLV = nestdict()
+    outCSD = nestdict()
     
     #What's our goddamn fvector
     fvect = np.linspace(0,Fs/2,nfft/2+1)
@@ -103,31 +106,40 @@ def gen_coher(inpX,Fs=422,nfft=2**10,polyord=0,band='Alpha'):
         band_bounds = (8,14)
         band_idxs = np.where(np.logical_and(fvect > band_bounds[0],fvect < band_bounds[1]))
         
-    
     for chann_i in inpX.keys():
         print(chann_i)
         for chann_j in inpX.keys():
             if band == []:
-                coh_ensemble = np.zeros((inpX[chann_i].shape[1],513),dtype=complex)
+                csd_ensemble = np.zeros((inpX[chann_i].shape[1],513),dtype=complex)
             else:
-                coh_ensemble = np.zeros((inpX[chann_i].shape[1],1),dtype=complex)
-            
+                csd_ensemble = np.zeros((inpX[chann_i].shape[1],1),dtype=complex)
+                plv = np.zeros((inpX[chann_i].shape[1],1))
+                
             for seg in range(inpX[chann_i].shape[1]):
                 #First we get the cross spectral density
-                csd_out = sig.csd(inpX[chann_i][:,seg].squeeze(),inpX[chann_j][:,seg],fs=Fs,nperseg=1024)[1]
+                csd_out = sig.csd(inpX[chann_i][:,seg],inpX[chann_j][:,seg],fs=Fs,nperseg=1024)[1]
+                #normalize the entire CSD for the total power in input signals
+                norm_ms_csd = np.abs(csd_out) / np.sqrt(l2_pow(inpX[chann_i][:,seg]) * l2_pow(inpX[chann_j][:,seg]))
                 
                 #Are we focusing on a band or doing the entire CSD?
                 if band == []:
-                    coh_ensemble[seg] = csd_out
+                    csd_ensemble[seg] = csd_out
                 else:
-                    coh_ensemble[seg] = cmedian(csd_out)
-
-            outCoher[chann_i][chann_j] = cmedian(coh_ensemble,axis=0)
+                    csd_ensemble[seg] = cmedian(csd_out[band_idxs])
+                    plv[seg] = np.max(norm_ms_csd[band_idxs])
+                #Compute the PLV
+                
+            # Here we find the median across segments
+            outCSD[chann_i][chann_j] = cmedian(csd_ensemble,axis=0)
+            
+            #Compute the normalized coherence/PLV
+            outPLV[chann_i][chann_j] = np.median(plv,axis=0)
+            #if chann_j == 176: pdb.set_trace()
             #if chann_i > 10: pdb.set_trace()
             ## PLV abs EEG -> 
             ## Coherence value
             
-    return outCoher
+    return outCSD, outPLV
     
 #This function takes a PSD and subtracts out the PSD's fourth order polynomial fit
     #I THINK this is only used in EEG cortical signatures
@@ -413,3 +425,11 @@ def displog(values):
 
 def nestdict():
     return defaultdict(nestdict)
+
+
+#%% Function for chronic recordings
+    
+# Here, we get a series of observations for a patient and the patient name, we detrend in the blocks based on the phases
+    
+def block_detrend():
+    pass

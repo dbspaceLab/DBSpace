@@ -17,12 +17,12 @@ import scipy.stats as stats
 import scipy.signal as sig
 import scipy.io as sio
 
-sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
+#sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
 sys.path.append('/home/virati/Dropbox/projects/libs/robust-pca/')
 sys.path.append('/home/virati/Dropbox/projects/')
 #import rpcaADMM
 import r_pca
-import DBS_Osc as dbo
+import DBSpace as dbo
 
 import matplotlib.pyplot as plt
 

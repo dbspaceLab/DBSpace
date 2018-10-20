@@ -10,11 +10,12 @@ The PURPOSE of this library should be to just bring in the BrainRadio data in a 
 For example: Determining which phase a recording belongs to will NOT be done in this script, that is under the perview of the DSV
 
 """
-import sys
+#import sys
 #Need to important DBSpace and DBS_Osc Libraries
 #sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/SigProc/CFC-Testing/Python CFC/')
-sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
-import DBS_Osc as dbo
+#sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
+
+import DBSpace as dbo
 import pdb
 
 import numpy as np

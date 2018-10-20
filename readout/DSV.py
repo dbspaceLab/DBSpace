@@ -32,10 +32,10 @@ import matplotlib.cm as cm
 
 import random
 
-import sys
-sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
-import DBS_Osc as dbo
-from DBS_Osc import nestdict
+#import sys
+#sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
+import DBSpace as dbo
+from DBSpace import nestdict
 
 from sklearn import linear_model
 

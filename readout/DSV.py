@@ -21,7 +21,7 @@ from itertools import compress
 
 import json
 
-import ipdb
+import pdb
 
 import numpy as np
 import scipy.stats as stats
@@ -560,7 +560,7 @@ class ORegress:
         if do_split:
             print('Splitting out validation set')
             print('Pre splot YFrame ' + str(len(self.YFrame.file_meta)))
-            self.train_set, self.valid_set = train_test_split(self.YFrame.file_meta,train_size=0.6,shuffle=True)
+            self.train_set, self.valid_set = train_test_split(self.YFrame.file_meta,train_size=0.7,shuffle=True)
             
             print('Train set' + str(len(self.train_set)))
             print('Validation set ' + str(len(self.valid_set)))
@@ -600,7 +600,10 @@ class ORegress:
         
         ###THIS IS NEW
         #generate our stack of interest, with all the flags and all
-        pt_dict_flags = {pt:{phase:[rec for rec in fmeta if rec['Patient'] == pt and rec['Phase'] == phase] for phase in ePhases} for pt in pts}
+        import pdb
+        #pdb.set_trace()
+        try: pt_dict_flags = {pt:{phase:[rec for rec in fmeta if rec['Patient'] == pt and rec['Phase'] == phase] for phase in ePhases} for pt in pts}
+        except: pdb.set_trace()
         
         #How many recordings are going in for now?
         
@@ -726,7 +729,7 @@ class ORegress:
                     Coefs[mtype][sid] = mod['Model'].estimator_.coef_[0][sides_idxs[sid]]
                 elif mtype == 'LASSO':
                     Coefs[mtype][sid] = mod['Model'].coef_[sides_idxs[sid]]
-                elif mtype == 'ENR_Osc':
+                elif mtype == 'ENR_Osc' or mtype=='ENR_Osc_PT':
                     Coefs[mtype][sid] = mod['Model'].coef_[sides_idxs[sid]]
                 else: 
                     try: Coefs[mtype][sid] = mod['Model'].coef_[0][sides_idxs[sid]]
@@ -808,16 +811,23 @@ class ORegress:
     def new_regress(self,method):
         pass
 
-    def O_regress(self,method='OLS',inpercent=1,doplot=False,avgweeks=False,ignore_flags=False,ranson=True,circ='',plot_indiv=False,scale='HDRS17',lindetrend = 'Block',train_pts = ['903','906','907'],train_all=False,finalWrite=False):
+    #Method for the actual oscillatory regression
+    #TODO Need to split this out into the regression method and then the 'test-train' scheme method
+    def O_regress(self,method='OLS',inpercent=1,doplot=False,avgweeks=False,ignore_flags=False,ranson=True,circ='',plot_indiv=False,scale='HDRS17',lindetrend = 'Block',train_pts = ['903','906','907'],train_all=False,finalWrite=False,pt_specific=False):
 
         print('Doing DETREND: ' + lindetrend)
         
-        #Test/Train patient separation
-        if not train_all:
-            test_pts = [pt for pt in dbo.all_pts if pt not in train_pts]
+        if not pt_specific:
+            #Test/Train patient separation
+            if not train_all:
+                test_pts = [pt for pt in dbo.all_pts if pt not in train_pts]
+            else:
+                train_pts = dbo.all_pts
+                test_pts = dbo.all_pts
         else:
-            train_pts = dbo.all_pts
-            test_pts = dbo.all_pts
+            test_pts = [train_pts]
+            train_pts = [train_pts]
+            
         
         #test_pts = ['905','906','907','908']
         #ALWAYS train on the HDRS17
@@ -845,14 +855,26 @@ class ORegress:
             # Below works decently well
             #regmodel = linear_model.ElasticNetCV(l1_ratio=np.linspace(0.1,0.5,50), copy_X=True,fit_intercept=True,normalize=True,cv=10)
             
+            #BELOW WORKS FOR P2 FIGURES
             regmodel = linear_model.ElasticNetCV(l1_ratio=np.linspace(0.1,0.8,50), copy_X=True,fit_intercept=True,normalize=True,cv=10)
+            scatter_alpha=0.9
+        elif method == 'ENR_Osc_PT':
+            #THIS IS US MESSING AROUND FOR PT SPECIFIC
+            regmodel = linear_model.ElasticNetCV(alphas=np.linspace(0.1,0.2,20),l1_ratio=0,copy_X=True,fit_intercept=True,normalize=True,cv=10)
             scatter_alpha=0.9
             
         
         
         #Do the model's fit
         #For this method, we'll do it on ALL available features
+        #import pdb
+        #pdb.set_trace()
         regmodel.fit(Otrain,Ctrain.reshape(-1,1))
+        plt.figure()
+        plt.subplot(211)
+        plt.hist(Otrain)
+        plt.subplot(212)
+        plt.hist(Ctrain)
         
         #Test the model's performance in the other patients
         #Generate the testing set data
@@ -914,12 +936,19 @@ class ORegress:
         
         self.Model[method]['NORMALIZED'] = lindetrend
         
-        
         #post-process the test and predicted things
         #Cpredictions = cpred_msub
         #Ctest = ctest_msub
         
         #now we can do other stuff I suppose...
+        
+    def plot_model_coeffs(self,model='ENR_Osc'):
+        plt.figure()
+        #pdb.set_trace()
+        plt.plot(self.Model[model]['Model'].coef_[:5],label='Left')
+        plt.plot(self.Model[model]['Model'].coef_[5:],label='Right')
+        plt.suptitle('Coefficients of model')
+        plt.legend()
     
     def Clinical_Summary(self,method='RIDGE',plot_indiv=False,ranson=True,doplot=True):
         print('Clinical Summary')

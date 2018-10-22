@@ -16,6 +16,10 @@ import pandas as pd
 from collections import defaultdict
 import scipy.signal as sig
 
+
+# IF you want to do OR related analyses, this needs to be uncommented
+#from brpylib import NsxFile
+
 import pdb
 
 import matplotlib.pyplot as plt
@@ -29,22 +33,35 @@ np.seterr(divide='raise')
 
 all_pts = ['901','903','905','906','907','908']
 
+
+#%%
+# BlackRock Methods
+
+def load_or_file(fname):
+    nsx_file = NsxFile(fname)
+
+    # Extract data - note: data will be returned based on *SORTED* elec_ids, see cont_data['elec_ids']
+    cont_data = nsx_file.getdata(elec_ids, start_time_s, data_time_s, downsample)
+    
+    # Close the nsx file now that all data is out
+    nsx_file.close()
+    
+    return cont_data
+
+def load_or_dict(fname,sec_win=(0,10),channels=[0]):
+    pass
+
+#%%
+# BRAIN RADIO METHODS
 #Method to load in brainradio file
 def load_br_file(fname):
-    return load_br_data(fname)
+    return np.array(pd.read_csv(fname,sep=',',header=None))
 
-#Method to load in the data itself
-def load_br_data(fname):
-    rawdata = np.array(pd.read_csv(fname,sep=',',header=None))
-    return rawdata
-
-
-def load_BR_dict(fname,sec_end=10):
+# Load BR file and return it as a dictionary
+def load_BR_dict(fname,sec_end=10,channels=['Left','Right']):
     txtdata = load_br_file(fname)[:,[0,2]]
     
-    X = {'Left':txtdata[-(422*sec_end):-1,0],'Right':txtdata[-(422*sec_end):-1,1]}
-    
-    return X
+    return {chann:txtdata[-(422*sec_end):-1,cidx] for cidx,chann in enumerate(channels)}
 
 def gen_T(inpX,Fs=422,nfft=2**10):
     outT = defaultdict(dict)

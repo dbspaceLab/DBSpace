@@ -6,10 +6,7 @@ Created on Thu Jan 19 11:23:07 2017
 @author: virati
 Spot check GUI. THIS STILL USES THE OLD DBSOsc and needs to be ported to new DBS_Osc library. But everything breaks for 50 reasons, so might be best to just start from scratch
 """
-import sys
-sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/IntegratedAnalysis')
-import DEPR_DBSOsc as DBSOsc
-import DBS_Osc as dbo
+import DBSpace as dbo
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -17,7 +14,7 @@ import scipy.signal as sig
 import numpy as np
 import scipy.io as io
 from collections import defaultdict
-from DBS_Osc import nestdict
+from DBSpace import nestdict
 
 import pdb
 
@@ -174,23 +171,26 @@ def spot_check(fname,tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']):
     else:
         curr_exp = 'Generic'
         
-    Container = DBSOsc.load_BR_feats(fname,snippet=False)
-    #Container = dbo.load_BR_dict(fname)
+    #Container = DBSOsc.load_BR_feats(fname,snippet=False)
+    Container = dbo.load_BR_dict(fname)
     
     NFFT = 2**10
     fs = 422 #hardcoded for brLFP for now
     
-    inv_try = [None] * 100
-    # Try inverse tanh
-    for cc,cs in enumerate(np.linspace(0.002,1,100)):
-        inv_try[cc] = np.arctanh(Container['TS']['Y']/cs)
     
-    #go to each and compute how much power there is in 32/64 Hz band and find the smallest
-    #for cc in range(len(inv_try)):
-     
-    inv_x = inv_try[0]
-    
-    #What are our time limits?
+    #%%
+#    # Try to do some inversions, this is very not important
+#    inv_try = [None] * 100
+#    # Try inverse tanh
+#    for cc,cs in enumerate(np.linspace(0.002,1,100)):
+#        inv_try[cc] = np.arctanh(Container['TS']['Y']/cs)
+#    
+#    #go to each and compute how much power there is in 32/64 Hz band and find the smallest
+#    #for cc in range(len(inv_try)):
+#     
+#    inv_x = inv_try[0]
+#    
+#    #What are our time limits?
     nlims = np.array(tlims) * fs
     
     if tlims[1] == -1:
@@ -200,14 +200,14 @@ def spot_check(fname,tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']):
     ## Do spectrogram stuff
     SG = defaultdict(dict)
     Pxx = defaultdict(dict)
-    for cc in range(2):
+    for cc,side in enumerate(['Left','Right']):
         #first, let's do the PWelch
-        Fpsd,Pxx[chann_labels[cc]] = sig.welch(Container['TS']['Y'][nlims[0]:nlims[1],cc],fs,window='blackmanharris',nperseg=NFFT,noverlap=0,nfft=NFFT)
+        Fpsd,Pxx[chann_labels[cc]] = sig.welch(Container[side][nlims[0]:nlims[1]],fs,window='blackmanharris',nperseg=NFFT,noverlap=0,nfft=NFFT)
         
         
-        F,T,SG[chann_labels[cc]] = sig.spectrogram(Container['TS']['Y'][nlims[0]:nlims[1],cc],nperseg=NFFT,noverlap=0,window=sig.get_window('blackmanharris',NFFT),fs=422)    
+        F,T,SG[side] = sig.spectrogram(Container[side][nlims[0]:nlims[1]],nperseg=NFFT,noverlap=0,window=sig.get_window('blackmanharris',NFFT),fs=422)    
         #Need to transpose for the segmentation approach to work, retranspose in the plotting
-    
+    #%%
     polycorr = False
     if plot_sg:
         plt.figure()
@@ -219,11 +219,11 @@ def spot_check(fname,tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']):
             
         #Now we want to plot
         else:
-            for cc in range(1):
+            for cc,side in enumerate(['Left']):
                 plt.subplot(2,1,1)
-                plt.plot(Container['TS']['Y'][:,cc])
+                plt.plot(Container[side][:])
                 plt.subplot(2,1,2)
-                plt.pcolormesh(T,F,10*np.log10(SG[chann_labels[cc]]),rasterized=True)
+                plt.pcolormesh(T,F,10*np.log10(SG[side]),rasterized=True)
                 plt.clim((-200,-100))
                 plt.title('Channel ' + chann_label[cc])
                 

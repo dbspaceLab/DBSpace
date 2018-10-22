@@ -8,15 +8,12 @@ Voltage sweep normalization using polynomial fits
 Here, we focus on just one gel-agar interface and demonstrate that each of the correction steps does what we want it to in terms of normalizing out impedance mismatch
 
 """
-import sys
-sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace')
-
 from spot_check import spot_check
 from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
-import DBS_Osc as dbo
-from DBS_Osc import nestdict
+import DBSpace as dbo
+from DBSpace import nestdict
 
 #%%
 v_files = {'IF-300':'/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_16_53_36__MR_0.txt',

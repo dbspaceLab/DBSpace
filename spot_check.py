@@ -172,7 +172,7 @@ def spot_check(fname,tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']):
         curr_exp = 'Generic'
         
     #Container = DBSOsc.load_BR_feats(fname,snippet=False)
-    Container = dbo.load_BR_dict(fname)
+    Container = dbo.load_BR_dict(fname,sec_offset=0)
     
     NFFT = 2**10
     fs = 422 #hardcoded for brLFP for now
@@ -224,7 +224,7 @@ def spot_check(fname,tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']):
                 plt.plot(Container[side][:])
                 plt.subplot(2,1,2)
                 plt.pcolormesh(T,F,10*np.log10(SG[side]),rasterized=True)
-                plt.clim((-200,-100))
+                #plt.clim((-200,-100))
                 plt.title('Channel ' + chann_label[cc])
                 
             #plt.suptitle('Raw TS: ' + fname.split('/')[-1])
@@ -240,7 +240,7 @@ def spot_check(fname,tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']):
     #return {'TS':Container['TS']['Y'],'TF':{'SG':SG,'F':F,'T':T},'F':{'Pxx':Pxx,'F':Fpsd},'InvTS':inv_x}
     #if you want to try to work with the inverse
     print('RETURNING INVERSE!!')
-    return {'TS':0.004*inv_x/(3),'TF':{'SG':SG,'F':F,'T':T},'F':{'Pxx':Pxx,'F':Fpsd},'InvTS':inv_x}
+    return {'TS':Container,'TF':{'SG':SG,'F':F,'T':T},'F':{'Pxx':Pxx,'F':Fpsd}}
 
 
 

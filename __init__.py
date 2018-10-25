@@ -450,3 +450,21 @@ def nestdict():
     
 def block_detrend():
     pass
+
+
+#%%
+    
+''' PCA function for merging rPCA results into final DSC '''
+def simple_pca(data,numComps=None):
+    m,n = data.shape
+    data -= data.mean(axis=0)
+    R = np.cov(data,rowvar=False)
+    evals,evecs = np.linalg.eigh(R)
+    idx=np.argsort(evals)[::-1]
+    evecs = evecs[:,idx]
+    evals = evals[idx]
+    
+    if numComps is not None:
+        evecs = evecs[:,:numComponents]
+    
+    return np.dot(evecs.T,data.T).T,evals,evecs

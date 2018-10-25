@@ -870,11 +870,12 @@ class ORegress:
         #import pdb
         #pdb.set_trace()
         regmodel.fit(Otrain,Ctrain.reshape(-1,1))
-        plt.figure()
-        plt.subplot(211)
-        plt.hist(Otrain)
-        plt.subplot(212)
-        plt.hist(Ctrain)
+        
+        #plt.figure()
+        #plt.subplot(211)
+        #plt.hist(Otrain)
+        #plt.subplot(212)
+        #plt.hist(Ctrain)
         
         #Test the model's performance in the other patients
         #Generate the testing set data
@@ -942,12 +943,13 @@ class ORegress:
         
         #now we can do other stuff I suppose...
         
-    def plot_model_coeffs(self,model='ENR_Osc'):
+    def plot_model_coeffs(self,model='ENR_Osc',pt=''):
         plt.figure()
         #pdb.set_trace()
-        plt.plot(self.Model[model]['Model'].coef_[:5],label='Left')
-        plt.plot(self.Model[model]['Model'].coef_[5:],label='Right')
-        plt.suptitle('Coefficients of model')
+        plt.plot(self.Model[model]['Model'].coef_[0,:5],label='Left',linewidth=10)
+        plt.plot(self.Model[model]['Model'].coef_[0,5:],label='Right',linewidth=10)
+        plt.ylim((-0.1,0.1))
+        plt.suptitle('Coefficients of model for pt ' + pt)
         plt.legend()
     
     def Clinical_Summary(self,method='RIDGE',plot_indiv=False,ranson=True,doplot=True):

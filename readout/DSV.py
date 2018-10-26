@@ -1320,8 +1320,9 @@ class ORegress:
                     Cval[28*pp:28*(pp+1)] = sig.detrend(cval_block,axis=0,type='linear')
                     cpred_block = Cpred[28*pp:28*(pp+1)]
                     Cpred[28*pp:28*(pp+1)] = sig.detrend(cpred_block,axis=0,type='linear')
-            except:
-                ipdb.set_trace()
+            except e:
+                print(e)
+                pdb.set_trace()
         
         elif do_detrend == 'All':
             Cval = sig.detrend(Cval,axis=0,type='constant')
@@ -1330,10 +1331,9 @@ class ORegress:
         
         
         ### Plotting and actual summary results
-        if do_plots:
-            self.Pred_vs_Meas_NEW(Cpred,Cval,labels_val,show_clin=show_clin)
+        self.Pred_vs_Meas_NEW(Cpred,Cval,labels_val,show_clin=show_clin,plot=do_plots)
         
-        pr_aucs = self.algo_perfs(Cpred,Cval,labels_val,do_plots,Crand=True)
+        pr_aucs = self.algo_perfs(Cpred,Cval,labels_val,do_plots,Crand=False)
         pr_null = self.null_algo(Cpred,Cval,labels_val)
         plt.suptitle('Actual Model')
         return pr_aucs, pr_null
@@ -1383,7 +1383,7 @@ class ORegress:
         return ostimchange
         
     
-    def Pred_vs_Meas_NEW(self,Cpred,Cmeas,labels,show_clin=True):
+    def Pred_vs_Meas_NEW(self,Cpred,Cmeas,labels,show_clin=True,plot=True):
         Cpredictions = Cpred.reshape(-1,1)
         Ctest = Cmeas.reshape(-1,1)
 
@@ -1404,7 +1404,8 @@ class ORegress:
         
         #Plot individually
         for pt in test_pts:
-            plt.figure()
+            
+            
             #check if the sizes are right
             try:
                 assert len(Cpredictions) == len(labels['Patient'])
@@ -1414,16 +1415,17 @@ class ORegress:
             pt_preds = [cpred for cpred,pat in zip(Cpredictions,labels['Patient']) if pat == pt]
             pt_actuals = [ctest for ctest,pat in zip(Ctest,labels['Patient']) if pat == pt]
             
-            
-            plt.plot(pt_preds,label='Predicted')
-            plt.plot(pt_actuals,label=self.test_MEAS)
-            #plt.plot(np.vstack((np.array([0]).reshape(-1,1),np.diff(np.array(pt_preds),axis=0))),label='Diff')
-            plt.legend()
-            
-            plt.xlabel('Week')
-            plt.ylabel('Normalized Disease Severity')
-            plt.suptitle(pt)
-            sns.despine()
+            if plot:
+                plt.figure()
+                plt.plot(pt_preds,label='Predicted')
+                plt.plot(pt_actuals,label=self.test_MEAS)
+                #plt.plot(np.vstack((np.array([0]).reshape(-1,1),np.diff(np.array(pt_preds),axis=0))),label='Diff')
+                plt.legend()
+                
+                plt.xlabel('Week')
+                plt.ylabel('Normalized Disease Severity')
+                plt.suptitle(pt)
+                sns.despine()
                 
    
         x,y = (1,1)
@@ -1431,23 +1433,25 @@ class ORegress:
         
         ###
         #sweep threshold
-        if 1:
 
-            outlier_percent = []
-            sweep_thresh = np.linspace(0.1,5,100)
-            corr_level = []
+
+        outlier_percent = []
+        sweep_thresh = np.linspace(0.1,5,100)
+        corr_level = []
+        
+        for rthresh in sweep_thresh:
+            assesslr = linear_model.RANSACRegressor(base_estimator=linear_model.LinearRegression(fit_intercept=False),residual_threshold=rthresh) #0.15 residual threshold works great!
+            assesslr.fit(Ctest,Cpredictions)
+            inlier_mask = assesslr.inlier_mask_      
             
-            for rthresh in sweep_thresh:
-                assesslr = linear_model.RANSACRegressor(base_estimator=linear_model.LinearRegression(fit_intercept=False),residual_threshold=rthresh) #0.15 residual threshold works great!
-                assesslr.fit(Ctest,Cpredictions)
-                inlier_mask = assesslr.inlier_mask_      
-                
-                slsl,inin,rval,pval,stderr = stats.mstats.linregress(Ctest[inlier_mask].reshape(-1,1),Cpredictions[inlier_mask].reshape(-1,1))
-                
-                outlier_mask = np.logical_not(inlier_mask)
-                outlier_percent.append(100*np.sum(outlier_mask)/len(outlier_mask))
-                corr_level.append(slsl)
+            slsl,inin,rval,pval,stderr = stats.mstats.linregress(Ctest[inlier_mask].reshape(-1,1),Cpredictions[inlier_mask].reshape(-1,1))
+            
+            outlier_mask = np.logical_not(inlier_mask)
+            outlier_percent.append(100*np.sum(outlier_mask)/len(outlier_mask))
+            corr_level.append(slsl)
             ###
+            
+        if plot:
             plt.figure()
             fig, ax1=plt.subplots()
             
@@ -1492,51 +1496,54 @@ class ORegress:
         
         ##What weeks are the outliers in?
         outlier_week_num = [int(weeknum[-2:]) for weeknum in outlier_phases]
-        plt.figure()
-        plt.hist(outlier_week_num)
         
-        #plotting work
-
-        scatter_alpha = 0.2
-
+        if plot:
+            plt.figure()
+            plt.hist(outlier_week_num)
+        
+            #plotting work
+    
+            scatter_alpha = 0.2
+    
+                
+            plt.figure()
+            plt.scatter(Ctest[outlier_mask],Cpredictions[outlier_mask],alpha=scatter_alpha,color='gray')
+            for ii, txt in enumerate(outlier_phases):
+                plt.annotate(txt+'\n'+outlier_pt[ii],(Ctest[outlier_mask][ii],Cpredictions[outlier_mask][ii]),fontsize=12,color='gray')
+                
             
-        plt.figure()
-        plt.scatter(Ctest[outlier_mask],Cpredictions[outlier_mask],alpha=scatter_alpha,color='gray')
-        for ii, txt in enumerate(outlier_phases):
-            plt.annotate(txt+'\n'+outlier_pt[ii],(Ctest[outlier_mask][ii],Cpredictions[outlier_mask][ii]),fontsize=12,color='gray')
+            #Plot all the inliers now
+            plt.scatter(Ctest[inlier_mask],Cpredictions[inlier_mask],alpha=scatter_alpha)
+            plt.plot(np.linspace(-x,x,2),np.linspace(-y,y,2),alpha=0.2,color='gray')
             
-        
-        #Plot all the inliers now
-        plt.scatter(Ctest[inlier_mask],Cpredictions[inlier_mask],alpha=scatter_alpha)
-        plt.plot(np.linspace(-x,x,2),np.linspace(-y,y,2),alpha=0.2,color='gray')
-        
-        #This is the regression line itself
-        plt.plot(line_x,line_y,color='green')
-        plt.axes().set_aspect('equal')
-        plt.annotate(s=str(100*np.sum(outlier_mask)/len(outlier_mask)) + '% outliers',xy=(-3,0),fontsize=12)
+            #This is the regression line itself
+            plt.plot(line_x,line_y,color='green')
+            plt.axes().set_aspect('equal')
+            plt.annotate(s=str(100*np.sum(outlier_mask)/len(outlier_mask)) + '% outliers',xy=(-3,0),fontsize=12)
         
         
         #Finally, let's label the clinician's changes
         #find out the points that the stim was changed
-        if show_clin:
-            stim_change_list = self.CFrame.Stim_Change_Table()
-            ostimchange = []
-            
-            for ii in range(Ctest.shape[0]):
-                if (labels['Patient'][ii],labels['Phase'][ii]) in stim_change_list:                
-                    ostimchange.append(ii)
-            
-            for ii in ostimchange:
-                plt.annotate(labels['Patient'][ii] + ' ' + labels['Phase'][ii],(Ctest[ii],Cpredictions[ii]),fontsize=12,color='red')
+        if plot:
+            if show_clin:
+                stim_change_list = self.CFrame.Stim_Change_Table()
+                ostimchange = []
                 
-            plt.scatter(Ctest[ostimchange],Cpredictions[ostimchange],alpha=scatter_alpha,color='red',marker='^',s=130)
-        
-        plt.xlabel(self.test_MEAS)
-        plt.ylabel('Predicted')
-        #plt.xlim((-4,4))
-        #plt.ylim((-4,4))
-        #plt.title('All Observations')
-        sns.despine()
+                for ii in range(Ctest.shape[0]):
+                    if (labels['Patient'][ii],labels['Phase'][ii]) in stim_change_list:                
+                        ostimchange.append(ii)
+                
+                for ii in ostimchange:
+                    plt.annotate(labels['Patient'][ii] + ' ' + labels['Phase'][ii],(Ctest[ii],Cpredictions[ii]),fontsize=12,color='red')
+                    
+                plt.scatter(Ctest[ostimchange],Cpredictions[ostimchange],alpha=scatter_alpha,color='red',marker='^',s=130)
+            
+            plt.xlabel(self.test_MEAS)
+            plt.ylabel('Predicted')
+            #plt.xlim((-4,4))
+            #plt.ylim((-4,4))
+            #plt.title('All Observations')
+            sns.despine()
         print('There are ' + str(sum(outlier_mask)/len(outlier_mask)*100) + '% outliers')
             
         

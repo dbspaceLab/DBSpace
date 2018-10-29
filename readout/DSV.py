@@ -556,11 +556,11 @@ class ORegress:
             plt.scatter(Ctest,dispfunc(Otest[:,ff,1]),alpha=plotalpha)
             plt.suptitle(feat)
     
-    def split_validation_set(self,do_split = True):
+    def split_validation_set(self,do_split = True,train_size=0.6):
         if do_split:
             print('Splitting out validation set')
             print('Pre splot YFrame ' + str(len(self.YFrame.file_meta)))
-            self.train_set, self.valid_set = train_test_split(self.YFrame.file_meta,train_size=0.7,shuffle=True)
+            self.train_set, self.valid_set = train_test_split(self.YFrame.file_meta,train_size=train_size,shuffle=True)
             
             print('Train set' + str(len(self.train_set)))
             print('Validation set ' + str(len(self.valid_set)))
@@ -1288,9 +1288,9 @@ class ORegress:
                     
         return copy.deepcopy(self.Model[method]['Performance'])
 
-    def Model_Validation(self,method,scale='HDRS17',do_detrend='None',do_plots=False,randomize=0.0,show_clin=True):
+    def Model_Validation(self,method,scale='HDRS17',do_detrend='None',do_plots=False,randomize=0.0,show_clin=True,do_pts=['901','903','905','906','907','908']):
         #This function does the final model validation on the held out validation set
-        Oval,Cval_base,labels_val = self.dsgn_O_C(['901','903','905','906','907','908'],week_avg=True,circ='day',ignore_flags=True,scale=scale,from_set='VALIDATION',randomize=randomize)
+        Oval,Cval_base,labels_val = self.dsgn_O_C(do_pts,week_avg=True,circ='day',ignore_flags=True,scale=scale,from_set='VALIDATION',randomize=randomize)
         
         #HARD CHANGE MODEL COEFFICIENTS
         #self.Model[method]['Model'].coef_ = np.array([[-0.00583578, -0.00279751,  0.00131825,  0.01770169,  0.01166687],[-1.06586005e-02,  2.42700023e-05,  7.31445236e-03,  2.68723035e-03,-3.90440108e-06]]).reshape(-1)
@@ -1315,7 +1315,7 @@ class ORegress:
         elif do_detrend == 'Block':
             #go through each patient and detrend for each BLOCK
             try:
-                for pp,pt in enumerate(dbo.all_pts):
+                for pp,pt in enumerate(do_pts):
                     cval_block = Cval[28*pp:28*(pp+1)]
                     Cval[28*pp:28*(pp+1)] = sig.detrend(cval_block,axis=0,type='linear')
                     cpred_block = Cpred[28*pp:28*(pp+1)]

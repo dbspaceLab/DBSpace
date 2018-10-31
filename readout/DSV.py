@@ -1331,12 +1331,12 @@ class ORegress:
         
         
         ### Plotting and actual summary results
-        self.Pred_vs_Meas_NEW(Cpred,Cval,labels_val,show_clin=show_clin,plot=do_plots)
+        corr_measures = self.Pred_vs_Meas_NEW(Cpred,Cval,labels_val,show_clin=show_clin,plot=do_plots)
         
         pr_aucs = self.algo_perfs(Cpred,Cval,labels_val,do_plots,Crand=False)
         pr_null = self.null_algo(Cpred,Cval,labels_val)
         plt.suptitle('Actual Model')
-        return pr_aucs, pr_null
+        return pr_aucs, pr_null, corr_measures
         #self.algo_perfs(Cpred_random,Cval,labels_val)
         #plt.suptitle('Random Model')
         
@@ -1386,6 +1386,9 @@ class ORegress:
     def Pred_vs_Meas_NEW(self,Cpred,Cmeas,labels,show_clin=True,plot=True):
         Cpredictions = Cpred.reshape(-1,1)
         Ctest = Cmeas.reshape(-1,1)
+        
+        #Return variable
+        coeff_struct = defaultdict(dict)
 
         #self.Model.update({method:{'Performance':{'SpearCorr':spearcorr,'PearsCorr':pecorr,'Internal':0,'DProd':0}}})
         #self.Model['Performance'] = {'SpearCorr':spearcorr,'PearsCorr':pecorr,'Internal':0,'DProd':0}
@@ -1471,16 +1474,21 @@ class ORegress:
         #HANDLING OUTLIERS TO THE BIOMETRIC MODEL
         inlier_mask = assesslr.inlier_mask_
         corrcoef = assesslr.estimator_.coef_[0]
-      
-            
         outlier_mask = np.logical_not(inlier_mask)
         
-
+        
+        #Compute Pearson on all and on inliers
         slsl,inin,rval,pval,stderr = stats.mstats.linregress(Ctest.reshape(-1,1),Cpredictions.reshape(-1,1))
         print('ALL: ' + ' model has RANSAC ' + str(slsl) + ' correlation with real score (p < ' + str(pval) + ')')
         
-        slsl,inin,rval,pval,stderr = stats.mstats.linregress(Ctest[inlier_mask].reshape(-1,1),Cpredictions[inlier_mask].reshape(-1,1))
-        print('OUTLIER: ' + ' model has RANSAC ' + str(slsl) + ' correlation with real score (p < ' + str(pval) + ')')
+        inslsl,ininin,inrval,inpval,instderr = stats.mstats.linregress(Ctest[inlier_mask].reshape(-1,1),Cpredictions[inlier_mask].reshape(-1,1))
+        print('Inliers: ' + ' model has RANSAC ' + str(inslsl) + ' correlation with real score (p < ' + str(inpval) + ')')
+        
+        #Compute Spearman on ALL
+        spear_r,spear_p = stats.spearmanr(Ctest,Cpredictions)
+        coeff_struct['All'] = {'Pearson':{'r':slsl,'p':pval},'Spearman':{'r':spear_r,'p':spear_p}}
+        coeff_struct['Inliers'] = {'Pearson':{'r':inslsl,'p':inpval}}
+        
         
         #self.Model[method]['Performance']['Regression'] = assesslr
         
@@ -1544,10 +1552,12 @@ class ORegress:
             #plt.ylim((-4,4))
             #plt.title('All Observations')
             sns.despine()
-        print('There are ' + str(sum(outlier_mask)/len(outlier_mask)*100) + '% outliers')
             
+        print('There are ' + str(sum(outlier_mask)/len(outlier_mask)*100) + '% outliers')
         
-    def plot_Pred_vs_Meas(self,Cpred,Cmeas,labels,plot_type='scatter'):
+        return coeff_struct
+        
+    def DEPRplot_Pred_vs_Meas(self,Cpred,Cmeas,labels,plot_type='scatter'):
         main_clin_fig = plt.figure()
         
         

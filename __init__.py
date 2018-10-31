@@ -16,7 +16,6 @@ import pandas as pd
 from collections import defaultdict
 import scipy.signal as sig
 
-
 # IF you want to do OR related analyses, this needs to be uncommented
 #from brpylib import NsxFile
 
@@ -114,48 +113,48 @@ def l2_pow(x):
     return np.sqrt(np.sum(x**2))
 
 # Make a coherence generation function
-def gen_coher(inpX,Fs=422,nfft=2**10,polyord=0,band='Alpha'):
+def gen_coher(inpX,Fs=422,nfft=2**10,polyord=0):
     print('Starting a coherence run...')
     outPLV = nestdict()
     outCSD = nestdict()
     
     #What's our goddamn fvector
     fvect = np.linspace(0,Fs/2,nfft/2+1)
-    
-    if band == []:
-        band_idxs = np.arange(0,513)
-    else:
-        band_bounds = (8,14)
-        band_idxs = np.where(np.logical_and(fvect > band_bounds[0],fvect < band_bounds[1]))
-        
+
     for chann_i in inpX.keys():
         print(chann_i)
         for chann_j in inpX.keys():
-            if band == []:
-                csd_ensemble = np.zeros((inpX[chann_i].shape[1],513),dtype=complex)
-            else:
-                csd_ensemble = np.zeros((inpX[chann_i].shape[1],1),dtype=complex)
-                plv = np.zeros((inpX[chann_i].shape[1],1))
+            csd_ensemble = np.zeros((inpX[chann_i].shape[1],len(feat_order)),dtype=complex)
+            plv = np.zeros((inpX[chann_i].shape[1],len(feat_order)))
                 
             for seg in range(inpX[chann_i].shape[1]):
                 #First we get the cross spectral density
-                csd_out = sig.csd(inpX[chann_i][:,seg],inpX[chann_j][:,seg],fs=Fs,nperseg=1024)[1]
+                csd_out = sig.csd(inpX[chann_i][:,seg],inpX[chann_j][:,seg],fs=Fs,nperseg=512)[1]
+                
                 #normalize the entire CSD for the total power in input signals
                 norm_ms_csd = np.abs(csd_out) / np.sqrt(l2_pow(inpX[chann_i][:,seg]) * l2_pow(inpX[chann_j][:,seg]))
                 
                 #Are we focusing on a band or doing the entire CSD?
-                if band == []:
-                    csd_ensemble[seg] = csd_out
-                else:
-                    csd_ensemble[seg] = cmedian(csd_out[band_idxs])
-                    plv[seg] = np.max(norm_ms_csd[band_idxs])
+
+                for bb,band in enumerate(feat_order):
+                    #what are our bounds?
+                    band_bounds = feat_dict[band]['param']
+                    band_idxs =  np.where(np.logical_and(fvect >= band_bounds[0],fvect <= band_bounds[1]))
+                    csd_ensemble[seg,bb] = cmedian(csd_out[band_idxs])
+                    plv[seg,bb] = np.max(norm_ms_csd[band_idxs])
+                    
+                # Below brings in the entire csd, but this is dumb
+                #csd_ensemble[seg] = csd_out
+
                 #Compute the PLV
                 
             # Here we find the median across segments
-            outCSD[chann_i][chann_j] = cmedian(csd_ensemble,axis=0)
+            #outCSD[chann_i][chann_j] = cmedian(csd_ensemble,axis=0)
+            outCSD[chann_i][chann_j] = csd_ensemble
             
             #Compute the normalized coherence/PLV
-            outPLV[chann_i][chann_j] = np.median(plv,axis=0)
+            outPLV[chann_i][chann_j] = plv
+            #outPLV[chann_i][chann_j] = np.median(plv,axis=0)
             #if chann_j == 176: pdb.set_trace()
             #if chann_i > 10: pdb.set_trace()
             ## PLV abs EEG -> 
@@ -217,6 +216,12 @@ def gen_SG(inpX,Fs=422,nfft=2**10,plot=False):
         plot_TF(outSG,chs=inpX.keys())
     
     return outSG
+
+'''
+Single method that takes an inputX.channels dictionary and outputs the oscillatory state, no fuss
+'''
+def osc_state(inpX):
+    pass
 
 def get_pow(Pxx,F,frange,cmode=np.median):
     #Pxx is a dictionary where the keys are the channels, the values are the [Pxx desired]

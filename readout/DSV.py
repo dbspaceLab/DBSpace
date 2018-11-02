@@ -569,8 +569,21 @@ class ORegress:
             self.train_set = self.YFrame.file_meta
             self.valid_set = self.YFrame.file_meta
     
-    
-    
+    # Simple helper function to display the distribution of oscillatory powers for all recordings of a given patient
+    def plot_band_distributions(self,band='Alpha'):
+        pass
+        fmeta = self.YFrame.file_meta
+        pt_band_all = {pt:np.array([(rec['FeatVect'][band]['Left'],rec['FeatVect'][band]['Right']) for rec in fmeta if rec['Patient'] == pt]) for pt in dbo.all_pts}
+        
+        plt.figure()
+        for pt in dbo.all_pts:
+            
+            plt.subplot(1,2,1)
+            plt.hist(pt_band_all[pt][:,0],label=pt,alpha=0.4)
+            plt.subplot(1,2,2)
+            plt.hist(pt_band_all[pt][:,1],label=pt,alpha=0.4)
+        plt.legend()
+        plt.suptitle(band)            
     def dsgn_O_C(self,pts,scale='HDRS17',week_avg=True,collapse_chann=True,ignore_flags=False,circ='',from_set='TRAIN',randomize=0.0):
         #hardcoded for now, remove later
         nchann = 2
@@ -579,7 +592,7 @@ class ORegress:
         
         #fmeta = self.YFrame.file_meta
         if from_set == 'TRAIN':
-            print('Using Train Set ' + str(len(self.train_set)))
+            print('Full Training Set size (pre-circadian) ' + str(len(self.train_set)))
             fmeta = self.train_set
         elif from_set == 'VALIDATION':
             print('DIPPING INTO VALIDATION SET '  + str(len(self.valid_set)))
@@ -626,7 +639,7 @@ class ORegress:
         
         #tot_recs = ([[len(rec) for phz,rec in phase.items()] for pt,phase in pt_dict_flags.items()])
         tot_recs = sum([len(pt_dict_circ[pt][ph]) for pt,ph in itt.product(pts,ePhases)])
-        print(str(tot_recs) + ' recordings!!!!!!!!!!!!!')
+        print('After circadian filter, we have ' + str(tot_recs) + ' recordings!!!!!!!!!!!!!')
         
         
         
@@ -1320,7 +1333,7 @@ class ORegress:
                     Cval[28*pp:28*(pp+1)] = sig.detrend(cval_block,axis=0,type='linear')
                     cpred_block = Cpred[28*pp:28*(pp+1)]
                     Cpred[28*pp:28*(pp+1)] = sig.detrend(cpred_block,axis=0,type='linear')
-            except e:
+            except Exception as e:
                 print(e)
                 pdb.set_trace()
         

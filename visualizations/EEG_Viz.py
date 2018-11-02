@@ -56,12 +56,18 @@ def DEPRplot_flat_scalp(band,clims=(0,0),unwrap=True):
     sc = plt.scatter(flat_etrodes[:,0],flat_etrodes[:,1],c=np.arange(257),vmin=clims[0],vmax=clims[1],cmap=cm)
     plt.colorbar(sc)
 
-def plot_3d_scalp(band,fig,n=1,clims=(0,0),label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[]):
+def plot_3d_scalp(band,fig,n=1,clims=(0,0),label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense'):
     #fig = plt.figure()
     
-    egipos = mne.channels.read_montage('/home/virati/Dropbox/GSN-HydroCel-257.sfp')
+    if montage == 'dense':
+        fname = '/home/virati/Dropbox/GSN-HydroCel-257.sfp'
+    elif montage == 'standard':
+        fname = '/home/virati/Dropbox/standard_postfixed.elc'
+    
+    egipos = mne.channels.read_montage(fname)
     etrodes = egipos.pos
     
+    pdb.set_trace()
     #gotta normalize the color
     #band = np.tanh(band / 10) #5dB seems to be reasonable
     

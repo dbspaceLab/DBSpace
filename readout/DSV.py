@@ -1348,8 +1348,11 @@ class ORegress:
         
         pr_aucs = self.algo_perfs(Cpred,Cval,labels_val,do_plots,Crand=False)
         pr_null = self.null_algo(Cpred,Cval,labels_val)
+        pr_oracle = self.oracle_algo(Cpred,Cval,labels_val)
         plt.suptitle('Actual Model')
-        return pr_aucs, pr_null, corr_measures
+        
+        return pr_aucs, (pr_null,pr_oracle), corr_measures
+    
         #self.algo_perfs(Cpred_random,Cval,labels_val)
         #plt.suptitle('Random Model')
         
@@ -1629,6 +1632,23 @@ class ORegress:
         precision,recall,_=precision_recall_curve(true_change,fake_change)
         prauc = auc(precision,recall,reorder=True)
         avg_precision = average_precision_score(true_change,fake_change)
+        
+        return avg_precision
+    
+    def oracle_algo(self,Cpred,Cmeas,labels):
+        ostimchange = self.clin_changes(Cpred,Cmeas,labels,doplot=False)
+        stimstay = [x for x in range(Cmeas.shape[0]) if x not in ostimchange]
+        stimchange = [x for x in range(Cmeas.shape[0]) if x in ostimchange]
+        
+        true_change = np.zeros(Cmeas.shape)
+        true_change[stimchange] = 1
+        
+        oracle_change = np.copy(Cpred)
+        oracle_change[stimchange] += 1
+        
+        precision,recall,_=precision_recall_curve(true_change,oracle_change)
+        prauc = auc(precision,recall,reorder=True)
+        avg_precision = average_precision_score(true_change,oracle_change)
         
         return avg_precision
         

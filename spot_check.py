@@ -5,7 +5,10 @@ Created on Thu Jan 19 11:23:07 2017
 
 @author: virati
 Spot check GUI. THIS STILL USES THE OLD DBSOsc and needs to be ported to new DBS_Osc library. But everything breaks for 50 reasons, so might be best to just start from scratch
+TODO This needs to be stripped to bare-minimum spot checking of an arbitrary BRadio File
 """
+
+
 import DBSpace as dbo
 
 import matplotlib
@@ -48,6 +51,15 @@ do_voltage = (230,250)
 chann_label = ['Left','Right']
 flist = ['/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_16_53_36__MR_0.txt']
 expname = ['IF-300']
+
+
+
+
+flist = {'DBS905_VSweep':'/home/extend/MDD_Data/BR/905/Session_2015_10_13_Tuesday/Dbs905_2015_10_13_11_29_53__MR_0.txt'}
+
+
+#%%
+
 
 #%%
 

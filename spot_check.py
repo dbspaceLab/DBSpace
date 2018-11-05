@@ -26,44 +26,11 @@ import tkinter as tk
 
 import matplotlib.pyplot as plt
 
-
-#json file for major experiments
-experiments = ['Targeting','Amplitude','Frequency','Resting']
-
-#flist = ['/home/virati/MDD_Data/BR/908/Session_2016_01_19_Tuesday/908_2016_01_13_16_27_06__MR_2.txt','/home/virati/MDD_Data/BR/908/Session_2016_04_18_Monday/DBS908_2016_04_11_21_15_45__MR_2.txt']
-#expname = ['Exp0','Exp1']
-#flist = ['/home/virati/MDD_Data/VRT_Impedance_RB/Session_2018_04_04_Wednesday/PCSTES_2018_04_04_15_37_06__MR_1.txt', '/home/virati/MDD_Data/VRT_Impedance_RB/Session_2018_04_04_Wednesday/PCSTES_2018_04_04_15_33_36__MR_0.txt']
-#flist = ['/home/virati/MDD_Data/BR/907/Session_2015_12_17_Thursday/DBS907_2015_12_17_11_39_26__MR_0.txt']
-#expname=['test']
-
-#Below is the saline testing recordings
-#flist = ['/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_16_53_36__MR_0.txt',
-# '/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_17_15_20__MR_0.txt',
-# '/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_17_32_09__MR_0.txt',
-# '/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_17_49_21__MR_0.txt',
-# '/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_17_56_09__MR_1.txt',
-# '/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_18_02_40__MR_2.txt']
-
-
-#expname = ['IF-300','GE-300','SA-100','2IF-300','2GE-100','2SA-100']
-#(Interface, pure gel, pure saline; second interface, second gel, second saline)
-do_voltage = (230,250)
-chann_label = ['Left','Right']
-flist = ['/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_16_53_36__MR_0.txt']
-expname = ['IF-300']
-
-
-
-
-flist = {'DBS905_VSweep':'/home/extend/MDD_Data/BR/905/Session_2015_10_13_Tuesday/Dbs905_2015_10_13_11_29_53__MR_0.txt'}
+# Flist will be all the files we want to spotcheck, with the key as the experiment/info and the fname as the file loaded in
+flist = {'DBS905_VSweep':{'fname':'/home/extend/MDD_Data/BR/905/Session_2015_10_13_Tuesday/Dbs905_2015_10_13_11_29_53__MR_0.txt'}}
 
 
 #%%
-
-
-#%%
-
-#import ipdb as pdb
 
 font = {'family' : 'normal',
         'weight' : 'bold',
@@ -78,6 +45,10 @@ plt.rcParams['image.cmap'] = 'jet'
 #band_scheme = 'Adjusted'
 #band_compute = 'median'
 
+
+
+#%%
+# General methods
 
 def gui_file_select():
     curr_dir = '/run/media/virati/'
@@ -169,36 +140,23 @@ def spot_SG(fname,chann_labels=['Left','Right']):
     F,T,SG[chann_labels[cc]] = sig.spectrogram(Container['TS']['Y'][nlims[0]:nlims[1],cc],nperseg=NFFT,noverlap=NFFT*0.5,window=sig.get_window('blackmanharris',NFFT),fs=422)
     
 
-def spot_check(fname,tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']):
+def spot_check(fname=[],tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']):
     ''' Spotcheck function
     tlims - In seconds. -1 implies end of the recording
     '''
-    
-    if 'expname' in globals():
-        curr_exp = expname[flist.index(fname)]
-    else:
-        curr_exp = 'Generic'
-        
-    #Container = DBSOsc.load_BR_feats(fname,snippet=False)
-    Container = dbo.load_BR_dict(fname,sec_offset=0)
-    
     NFFT = 2**10
     fs = 422 #hardcoded for brLFP for now
     
+    if 'flist' in globals():
+        curr_exp = flist.keys()
+    else:
+        curr_exp = 'Generic'
+        
+    for key in flist.keys():
+        #Container = DBSOsc.load_BR_feats(fname,snippet=False)
+        Container = dbo.load_BR_dict(flist[key]['fname'],sec_offset=0)
     
-    #%%
-#    # Try to do some inversions, this is very not important
-#    inv_try = [None] * 100
-#    # Try inverse tanh
-#    for cc,cs in enumerate(np.linspace(0.002,1,100)):
-#        inv_try[cc] = np.arctanh(Container['TS']['Y']/cs)
-#    
-#    #go to each and compute how much power there is in 32/64 Hz band and find the smallest
-#    #for cc in range(len(inv_try)):
-#     
-#    inv_x = inv_try[0]
-#    
-#    #What are our time limits?
+    
     nlims = np.array(tlims) * fs
     
     if tlims[1] == -1:
@@ -239,19 +197,15 @@ def spot_check(fname,tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']):
             
             plt.suptitle('Raw TS: ' + curr_exp)
         
-        
-      
-    
-    
-
-    #if you want to return the raw
-    #return {'TS':Container['TS']['Y'],'TF':{'SG':SG,'F':F,'T':T},'F':{'Pxx':Pxx,'F':Fpsd},'InvTS':inv_x}
-    #if you want to try to work with the inverse
     print('RETURNING INVERSE!!')
     return {'TS':Container,'TF':{'SG':SG,'F':F,'T':T},'F':{'Pxx':Pxx,'F':Fpsd}}
 
 
 
+
+#%%
+#Unit test for the methods above. TODO make this all more OOP
+    
 if __name__ == '__main__':
     patients = ['901']#,'903','905','906','907','908']
     #file chooser

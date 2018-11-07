@@ -1,1 +1,1 @@
-# Merge in Rehman's PAC library here
+#Init file for the submodule PyPAC

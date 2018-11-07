@@ -7,9 +7,9 @@ Created on Sat Mar 24 15:26:42 2018
 Redo of the Z_mismatch -> Gain Compression work
 """
 
-import sys
-sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
-import DBS_Osc as dbo
+#import sys
+#sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
+import DBSpace as dbo
 
 import numpy as np
 import allantools
@@ -408,10 +408,8 @@ class sim_amp:
         plt.subplot(3,2,2)
         bl_psd = dbo.gen_psd(bl_ts,polyord=4)
         stim_psd = dbo.gen_psd(stim_ts,polyord=4)
-        plt.plot(Frq,np.log10(bl_psd[0]))
-        plt.plot(Frq,np.log10(stim_psd[0]))
-        
-        
+        plt.plot(Frq,np.log10(bl_psd[0][0]))
+        plt.plot(Frq,np.log10(stim_psd[0][0]))
         
         #do band power now
         sg_avg = False

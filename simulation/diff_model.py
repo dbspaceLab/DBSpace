@@ -411,8 +411,6 @@ class sim_amp:
         plt.plot(Frq,np.log10(bl_psd[0][0]))
         plt.plot(Frq,np.log10(stim_psd[0][0]))
         
-        
-        
         #do band power now
         sg_avg = False
         if sg_avg:

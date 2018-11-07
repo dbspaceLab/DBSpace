@@ -27,7 +27,7 @@ import tkinter as tk
 import matplotlib.pyplot as plt
 
 # Flist will be all the files we want to spotcheck, with the key as the experiment/info and the fname as the file loaded in
-flist = {'DBS905_VSweep':{'fname':'/home/extend/MDD_Data/BR/905/Session_2015_10_13_Tuesday/Dbs905_2015_10_13_11_29_53__MR_0.txt'}}
+flist = {'DBS905_VSweep':{'fname':'/home/extend/MDD_Data/BR/905/Session_2015_09_29_Tuesday/Dbs905_2015_09_29_13_19_27__MR_0.txt'}}
 
 
 #%%
@@ -113,7 +113,6 @@ def grab_median(TFcont,bigmed,osc_feat,tlim=(880,900),title='',do_corr=True,band
         plt.title('Variance in PSD across time: ' + chann_label[cc])
     plt.subplot(2,2,4)
     plt.legend()
-        
     
 
     if band_scheme == 'Standard':
@@ -196,7 +195,8 @@ def spot_check(fname=[],tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']
             #plt.suptitle('Raw TS: ' + fname.split('/')[-1])
             
             plt.suptitle('Raw TS: ' + curr_exp)
-        
+    
+    #TODO strip out the inverses from spot_check. This is focused on just displaying as a tool. Can make a separate script that wraps spot_check with preprocessing steps
     print('RETURNING INVERSE!!')
     return {'TS':Container,'TF':{'SG':SG,'F':F,'T':T},'F':{'Pxx':Pxx,'F':Fpsd}}
 

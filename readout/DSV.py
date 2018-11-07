@@ -569,21 +569,50 @@ class ORegress:
             self.train_set = self.YFrame.file_meta
             self.valid_set = self.YFrame.file_meta
     
+    def collapse_weeks(self,inp):
+        #Input is a TUPLE, where the last element is the phase
+        dbo.all_phases
+        sorted_inp = {do_phase:np.array([(x,y) for x,y,phase in inp if phase == do_phase]) for do_phase in dbo.all_phases}
+        
+        return sorted_inp
+        
     # Simple helper function to display the distribution of oscillatory powers for all recordings of a given patient
     def plot_band_distributions(self,band='Alpha'):
-        pass
         fmeta = self.YFrame.file_meta
         pt_band_all = {pt:np.array([(rec['FeatVect'][band]['Left'],rec['FeatVect'][band]['Right']) for rec in fmeta if rec['Patient'] == pt]) for pt in dbo.all_pts}
         
         plt.figure()
         for pt in dbo.all_pts:
-            
             plt.subplot(1,2,1)
             plt.hist(pt_band_all[pt][:,0],label=pt,alpha=0.4)
             plt.subplot(1,2,2)
             plt.hist(pt_band_all[pt][:,1],label=pt,alpha=0.4)
         plt.legend()
-        plt.suptitle(band)            
+        plt.suptitle(band)
+        
+    def plot_timecourse(self,feat='Alpha'):
+        fmeta = self.YFrame.file_meta
+        pt_band_all = {pt:([(rec['FeatVect'][feat]['Left'],rec['FeatVect'][feat]['Right'],rec['Phase']) for rec in fmeta if rec['Patient'] == pt]) for pt in dbo.all_pts}
+        
+        #add a phase list here
+        
+        plt.figure()
+        for pt in dbo.all_pts:
+            plottable = self.collapse_weeks(pt_band_all[pt])
+            
+            mean_meas = np.array([np.mean(plottable[ph],axis=0) for ph in dbo.all_phases][4:])
+            #flattening code here should be taken back out into separate function, probably in DBSpace
+            
+            plt.subplot(3,2,1)
+
+            plt.plot(mean_meas[:,0],label=pt,alpha=1)
+            plt.ylim((-10,40))
+            plt.subplot(3,2,2)
+            plt.plot(mean_meas[:,1],label=pt,alpha=1)
+            plt.ylim((-10,40))
+        plt.legend()
+        plt.suptitle(feat)
+        
     def dsgn_O_C(self,pts,scale='HDRS17',week_avg=True,collapse_chann=True,ignore_flags=False,circ='',from_set='TRAIN',randomize=0.0):
         #hardcoded for now, remove later
         nchann = 2

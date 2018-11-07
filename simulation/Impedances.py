@@ -10,8 +10,8 @@ import sys
 #sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/IntegratedAnalysis/')
 sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
 #import DBSpace as dbs
-import DBS_Osc as dbo
-from DBS_Osc import nestdict
+import DBSpace as dbo
+from DBSpace import nestdict
 
 import ipdb
 

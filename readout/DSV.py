@@ -721,28 +721,7 @@ class ORegress:
         
         return O_dsgn, C_dsgn, label_dict
     
-    
-        
-        # #The below is for zscoring
-        # O_dsgn_prelim = []
-        # C_dsgn_prelim = []
-        # for pt in pts:
-        #     pt_matr = np.array([rr[0] for rr in obs_list if rr[2] == pt])
-        #     pt_clin = np.array([rr[1] for rr in obs_list if rr[2] == pt])
-            
-        #     pt_matr = stats.zscore(pt_matr,axis=0)
-        #     O_dsgn_prelim.append(pt_matr)
-        #     C_dsgn_prelim.append(pt_clin)
-        
-        # O_dsgn_prelim = np.concatenate([matr for matr in O_dsgn_prelim],0)
-        # C_dsgn_prelim = np.concatenate([matr for matr in C_dsgn_prelim],0)
-        # #O_dsgn_prelim = [item for sublist in O_dsgn_prelim for item in sublist]
-                
-        # try:
-        #     O_dsgn_intermed = np.array(O_dsgn_prelim).reshape((-1,5,2),order='C')
-        #     C_dsgn_intermed = np.array(C_dsgn_prelim).reshape((-1,1),order='C')
-        # except:
-        #     pdb.set_trace()
+
 
     def poly_subtr(self,inp_psd,polyord=4):
         #log10 in_psd first
@@ -1375,6 +1354,8 @@ class ORegress:
         ### Plotting and actual summary results
         corr_measures = self.Pred_vs_Meas_NEW(Cpred,Cval,labels_val,show_clin=show_clin,plot=do_plots)
         
+        
+        ### Now we go through and assess the algorithm performance
         pr_aucs = self.algo_perfs(Cpred,Cval,labels_val,do_plots,Crand=False)
         pr_null = self.null_algo(Cpred,Cval,labels_val)
         pr_oracle = self.oracle_algo(Cpred,Cval,labels_val)
@@ -1434,6 +1415,10 @@ class ORegress:
         
         #Return variable
         coeff_struct = defaultdict(dict)
+        #assert 1==2
+        #FORCED ERROR, there are issues with the labeling of stimulation changes and the weeks they're labeled.
+
+
 
         #self.Model.update({method:{'Performance':{'SpearCorr':spearcorr,'PearsCorr':pecorr,'Internal':0,'DProd':0}}})
         #self.Model['Performance'] = {'SpearCorr':spearcorr,'PearsCorr':pecorr,'Internal':0,'DProd':0}
@@ -1543,6 +1528,8 @@ class ORegress:
         #THESE TWO ARE THE SAME!!
         #print(method + ' model has ' + str(corrcoef) + ' correlation with real score (p < ' + str(pval) + ')')
         
+        
+        
         #PLOT the outlier points and their patient + phase
         outlier_phases = list(compress(labels['Phase'],outlier_mask))
         outlier_pt = list(compress(labels['Patient'],outlier_mask))
@@ -1550,54 +1537,59 @@ class ORegress:
         ##What weeks are the outliers in?
         outlier_week_num = [int(weeknum[-2:]) for weeknum in outlier_phases]
         
-        if plot:
-            plt.figure()
-            plt.hist(outlier_week_num)
         
-            #plotting work
-    
-            scatter_alpha = 0.2
-    
-                
-            plt.figure()
-            plt.scatter(Ctest[outlier_mask],Cpredictions[outlier_mask],alpha=scatter_alpha,color='gray')
-            for ii, txt in enumerate(outlier_phases):
-                plt.annotate(txt+'\n'+outlier_pt[ii],(Ctest[outlier_mask][ii],Cpredictions[outlier_mask][ii]),fontsize=12,color='gray')
-                
+        for change_after_step in [1,2,3,4]:
+            if plot:
+                plt.figure()
+                plt.hist(outlier_week_num)
             
-            #Plot all the inliers now
-            plt.scatter(Ctest[inlier_mask],Cpredictions[inlier_mask],alpha=scatter_alpha)
-            plt.plot(np.linspace(-x,x,2),np.linspace(-y,y,2),alpha=0.2,color='gray')
-            
-            #This is the regression line itself
-            plt.plot(line_x,line_y,color='green')
-            plt.axes().set_aspect('equal')
-            plt.annotate(s=str(100*np.sum(outlier_mask)/len(outlier_mask)) + '% outliers',xy=(-3,0),fontsize=12)
+                #plotting work
         
+                scatter_alpha = 0.2
         
-        #Finally, let's label the clinician's changes
-        #find out the points that the stim was changed
-        if plot:
-            if show_clin:
-                stim_change_list = self.CFrame.Stim_Change_Table()
-                ostimchange = []
-                
-                for ii in range(Ctest.shape[0]):
-                    if (labels['Patient'][ii],labels['Phase'][ii]) in stim_change_list:                
-                        ostimchange.append(ii)
-                
-                for ii in ostimchange:
-                    plt.annotate(labels['Patient'][ii] + ' ' + labels['Phase'][ii],(Ctest[ii],Cpredictions[ii]),fontsize=12,color='red')
                     
-                plt.scatter(Ctest[ostimchange],Cpredictions[ostimchange],alpha=scatter_alpha,color='red',marker='^',s=130)
+                plt.figure()
+                plt.scatter(Ctest[outlier_mask],Cpredictions[outlier_mask],alpha=scatter_alpha,color='gray')
+                for ii, txt in enumerate(outlier_phases):
+                    plt.annotate(txt+'\n'+outlier_pt[ii],(Ctest[outlier_mask][ii],Cpredictions[outlier_mask][ii]),fontsize=12,color='gray')
+                    
+                
+                #Plot all the inliers now
+                plt.scatter(Ctest[inlier_mask],Cpredictions[inlier_mask],alpha=scatter_alpha)
+                plt.plot(np.linspace(-x,x,2),np.linspace(-y,y,2),alpha=0.2,color='gray')
+                
+                #This is the regression line itself
+                plt.plot(line_x,line_y,color='green')
+                plt.axes().set_aspect('equal')
+                plt.annotate(s=str(100*np.sum(outlier_mask)/len(outlier_mask)) + '% outliers',xy=(-3,0),fontsize=12)
             
-            plt.xlabel(self.test_MEAS)
-            plt.ylabel('Predicted')
-            #plt.xlim((-4,4))
-            #plt.ylim((-4,4))
-            #plt.title('All Observations')
-            sns.despine()
             
+            #%%
+            #Finally, let's label the clinician's changes
+            #find out the points that the stim was changed
+                if show_clin:
+                    stim_change_list = self.CFrame.Stim_Change_Table()
+                    ostimchange = []
+                    
+                    # FInd the stimchange locations
+                    for ii in range(Ctest.shape[0]):
+                        if (labels['Patient'][ii],labels['Phase'][ii]) in stim_change_list:                
+                            ostimchange.append(ii)
+                    #Anotate the stim change locations
+                    
+                    for ii in ostimchange:
+                        plt.annotate(labels['Patient'][ii] + ' ' + labels['Phase'][ii],(Ctest[ii],Cpredictions[ii]),fontsize=12,color='red')
+                        if ii + change_after_step < len(labels['Patient']):
+                            plt.annotate(labels['Patient'][ii+change_after_step] + ' ' + labels['Phase'][ii+change_after_step],(Ctest[ii+change_after_step],Cpredictions[ii+change_after_step]),fontsize=12,color='green')
+                        
+                    plt.scatter(Ctest[ostimchange],Cpredictions[ostimchange],alpha=scatter_alpha,color='red',marker='^',s=130)
+                    plt.scatter(Ctest[np.array(ostimchange)+change_after_step],Cpredictions[np.array(ostimchange)+change_after_step],alpha=1,color='green',marker='o',s=130)
+                
+                plt.xlabel(self.test_MEAS)
+                plt.ylabel('Predicted')
+                
+                sns.despine()
+                
         print('There are ' + str(sum(outlier_mask)/len(outlier_mask)*100) + '% outliers')
         
         return coeff_struct
@@ -1697,6 +1689,7 @@ class ORegress:
         Cmeas = Cmeas.reshape(-1,1)
         Cpred = Cpred.reshape(-1,1)
         #now make one that has, per observation, the MINIMUM
+        
         Cmin = np.min(np.hstack((Cmeas,Cpred)),axis=1).reshape(-1,1)
         Coff = np.abs(Cpred - Cmeas) * np.sin(np.pi/4)
         tpfn_plot = False

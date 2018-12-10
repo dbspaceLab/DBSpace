@@ -67,7 +67,6 @@ def plot_3d_scalp(band,fig,n=1,clims=(0,0),label='generic',animate=False,unwrap=
     egipos = mne.channels.read_montage(fname)
     etrodes = egipos.pos
     
-    pdb.set_trace()
     #gotta normalize the color
     #band = np.tanh(band / 10) #5dB seems to be reasonable
     

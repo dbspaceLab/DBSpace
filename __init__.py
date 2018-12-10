@@ -11,11 +11,12 @@ Copyright (C) 2018 Vineet Ravi Tiruvadi
 This is the primary file with the methods needed for the rest of the libraries. Used to be called "DBS_Osc" or "DBSOsc".
     
 """
-
+print('Using DBSpace LATEST')
 import numpy as np
 import pandas as pd
 from collections import defaultdict
 import scipy.signal as sig
+import random
 
 # IF you want to do OR related analyses, this needs to be uncommented
 #from brpylib import NsxFile
@@ -27,12 +28,10 @@ plt.rcParams['image.cmap'] = 'jet'
 
 np.seterr(divide='raise')
 
-#Definitions for oscillatory features -> Oscillatory Vector
-#band_dict = {'Delta':(1,4), 'Theta':(4,8), 'Alpha':(8,14), 'Beta*':(14,20), 'Beta+':(25,30), 'Gamma1':(30,50), 'Gamma2':(50,80), 'Gamma3':(80,100), 'Stim':(128,132)}
-#band_order = ['Delta','Theta','Alpha','Beta*','Beta+','Gamma1','Gamma2','Gamma3','Stim']
-
 all_pts = ['901','903','905','906','907','908']
 
+# This is our map for the electrodes that each patient has for ONTarget and OFFTarget
+Etrode_map = {'OnT':{'901':(2,1),'903':(2,2),'905':(2,1),'906':(2,2),'907':(1,1),'908':(2,1)},'OffT':{'901':(1,2),'903':(1,1),'905':(1,2),'906':(1,1),'907':(2,2),'908':(1,2)}}
 
 #%%
 # BlackRock Methods
@@ -79,6 +78,7 @@ def gen_T(inpX,Fs=422,nfft=2**10):
 #gen_psd has gotten super complicated.... need to check if it still works with DSV and Regression stuff
     
 def gen_psd(inpX,Fs=422,nfft=2**10,polyord=0):
+    print('Youre calling GEN PSD!!')
     #inp X is going to be assumed to be a dictionary with different keys for different channels
     outPSD = defaultdict(dict)
     outPoly = defaultdict(dict)
@@ -89,12 +89,16 @@ def gen_psd(inpX,Fs=422,nfft=2**10,polyord=0):
         fmatr = np.zeros((inpX[chann].shape[-1],int(nfft/2)+1))
         polysub = np.zeros((inpX[chann].shape[-1],polyord+1))
         
-        for seg in range(inpX[chann].shape[-1]):
-            
-            psd = F_Domain(inpX[chann][:,seg].squeeze(),Fs=Fs,nfft=nfft)['Pxx']
-            
+        if inpX[chann].ndim > 1:
+            for seg in range(inpX[chann].shape[-1]):
                 
-            fmatr[seg,:] = psd
+                psd = F_Domain(inpX[chann][:,seg].squeeze(),Fs=Fs,nfft=nfft)['Pxx']
+                
+                    
+                fmatr[seg,:] = psd
+        else:
+            psd = F_Domain(inpX[chann],Fs=Fs,nfft=nfft)['Pxx']
+            fmatr = psd
                     
         outPSD[chann] = fmatr.squeeze()
 
@@ -208,10 +212,13 @@ def poly_SG(inSG,fVect,order=4):
     
     
 
-def gen_SG(inpX,Fs=422,nfft=2**10,plot=False):
+def gen_SG(inpX,Fs=422,nfft=2**10,plot=False,overlap=True):
     outSG = defaultdict(dict)
     for chann in inpX.keys():
-        outSG[chann] = TF_Domain(inpX[chann])
+        if overlap==True:
+            outSG[chann] = TF_Domain(inpX[chann])
+        else:
+            outSG[chann] = TF_Domain(inpX[chann],noverlap=0,nperseg=422*2)
     
     if plot:
         plot_TF(outSG,chs=inpX.keys())
@@ -316,6 +323,25 @@ def plot_TF(TFR,chs=['Left','Right']):
         plt.pcolormesh(aTFR['T'],aTFR['F'],10*np.log10(aTFR['SG']))
         plt.xlabel('Time')
         plt.ylabel('Frequency')
+
+
+'''
+This function plots the median/mean across time of the TF representation to get the Frequency representation
+Slightly different than doing the Welch directly
+
+'''
+def plot_F_fromTF(TFR,chs=['Left','Right']):
+    plt.figure()
+    for cc,chann in enumerate(chs):
+        plt.subplot(1,len(chs),cc+1)
+        aTFR = TFR[chann]
+        
+        for ss in range(aTFR['SG'].shape[1]):
+            plt.plot(aTFR['F'],10*np.log10(aTFR['SG'])[:,ss],alpha=0.1)
+            
+        plt.plot(aTFR['F'],np.median(10*np.log10(aTFR['SG']),axis=1))
+        plt.xlabel('Frequency')
+        plt.ylabel('Power')
         
 
 def plot_T(Tser):
@@ -461,6 +487,17 @@ def nestdict():
     
 def block_detrend():
     pass
+
+
+
+def jk_median(inX,niter=100):
+    #assume first dim is SEGMENTS/OBSERVATIONS
+    med_vec = []
+    for ii in range(niter):
+        choose_idxs = random.sample(range(0,inX.shape[0]),np.floor(inX.shape[0]/2).astype(np.int))
+        med_vec.append(np.median(inX[choose_idxs,:],axis=0))
+        
+    return np.array(med_vec)
 
 
 #%%

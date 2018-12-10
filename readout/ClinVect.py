@@ -363,7 +363,19 @@ class CFrame:
         full_table = [[(self.do_pts[rr],ph) for ph in row] for rr,row in enumerate(bump_phases)]
         
         full_table = [item for sublist in full_table for item in sublist]
+        
+        # This returns ALL stim change locations
+        
+        #TODO do B-- filtering here
+        
         return full_table
+    
+    '''
+    TODO
+    Here we make a scatter plot that plots MEAS 1 vs MEAS 2, with the stim changes labeled
+    '''
+    def plot_meas_vs_meas_Vchanges(self):
+        pass
     
 
 ''' Unit Test for CFrame '''

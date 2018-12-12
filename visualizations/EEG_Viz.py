@@ -33,30 +33,19 @@ def return_adj_net(dist_thresh = 3):
     
     return mask
 
-def DEPRplot_flat_scalp(band,clims=(0,0),unwrap=True):
-    #get coords
-    egipos = mne.channels.read_montage('/home/virati/Dropbox/GSN-HydroCel-257.sfp')
-    etrodes = egipos.pos
+def get_coords(scale=2,montage='dense'):
+    if montage == 'dense':
+        fname = '/home/virati/Dropbox/GSN-HydroCel-257.sfp'
+    elif montage == 'standard':
+        fname = '/home/virati/Dropbox/standard_postfixed.elc'
     
-    cm = plt.cm.get_cmap('jet')
+    egipos = mne.channels.read_montage(fname)
+    etrodes = scale*egipos.pos
     
-    if clims == (0,0):
-        #clims = (np.min(band),np.max(band))
-        clims = (0,257)
+    return etrodes
     
-    #flatten coords
-    flat_etrodes = np.copy(etrodes)
-    flat_etrodes[:,2] = flat_etrodes[:,2] - np.max(flat_etrodes[:,2]) + 0.01
-    
-    if unwrap:
-        flat_etrodes[:,0] = flat_etrodes[:,0] * -2*(flat_etrodes[:,2]) - 10*np.exp(flat_etrodes[:,2])
-        flat_etrodes[:,1] = flat_etrodes[:,1] * -2*(flat_etrodes[:,2]) - 10*np.exp(flat_etrodes[:,2])
-    
-    plt.figure()
-    sc = plt.scatter(flat_etrodes[:,0],flat_etrodes[:,1],c=np.arange(257),vmin=clims[0],vmax=clims[1],cmap=cm)
-    plt.colorbar(sc)
 
-def plot_3d_scalp(band,fig,n=1,clims=(0,0),label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense'):
+def plot_3d_locs(band,ax,n=1,scale=2,clims=(0,0),label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense'):
     #fig = plt.figure()
     
     if montage == 'dense':
@@ -65,7 +54,55 @@ def plot_3d_scalp(band,fig,n=1,clims=(0,0),label='generic',animate=False,unwrap=
         fname = '/home/virati/Dropbox/standard_postfixed.elc'
     
     egipos = mne.channels.read_montage(fname)
-    etrodes = egipos.pos
+    etrodes = scale*egipos.pos
+    
+    #gotta normalize the color
+    #band = np.tanh(band / 10) #5dB seems to be reasonable
+    
+    cm = plt.cm.get_cmap('jet')
+    
+    if clims == (0,0):
+        clims = (np.min(band),np.max(band))
+    
+    linewidths = np.ones_like(etrodes[:,0])
+    linewidths[highlight] = 5
+    sc = ax.scatter(etrodes[:,0],etrodes[:,1],etrodes[:,2],color='#ffffff',s=100,linewidth=3,alpha=0.1,edgecolors='k')
+ 
+    ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    # Get rid of the spines                         
+    ax.w_xaxis.line.set_color((1.0, 1.0, 1.0, 0.0)) 
+    ax.w_yaxis.line.set_color((1.0, 1.0, 1.0, 0.0))
+    ax.w_zaxis.line.set_color((1.0, 1.0, 1.0, 0.0))
+    #ax.xlim((-10,10))
+    ax.set_xticks([])     
+    ax.set_yticks([])     
+    ax.set_zticks([])
+    
+    ims = []
+    plt.title(label)
+    
+    print('Animation: ' + str(animate))
+    if animate:
+        
+        for angl in range(0,360,10):
+            print('Animating frame ' + str(angl))
+            ax.view_init(azim=angl)
+            strangl = '000' + str(angl)
+            plt.savefig('/tmp/'+ label + '_' + strangl[-3:] + '.png')
+            time.sleep(.3)
+
+def plot_3d_scalp(band,fig,n=1,clims=(0,0),scale=1,label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense'):
+    #fig = plt.figure()
+    
+    if montage == 'dense':
+        fname = '/home/virati/Dropbox/GSN-HydroCel-257.sfp'
+    elif montage == 'standard':
+        fname = '/home/virati/Dropbox/standard_postfixed.elc'
+    
+    egipos = mne.channels.read_montage(fname)
+    etrodes = scale * egipos.pos
     
     #gotta normalize the color
     #band = np.tanh(band / 10) #5dB seems to be reasonable
@@ -82,7 +119,10 @@ def plot_3d_scalp(band,fig,n=1,clims=(0,0),label='generic',animate=False,unwrap=
         flat_etrodes[:,0] = flat_etrodes[:,0] * -10*(flat_etrodes[:,2] + 3*1/(flat_etrodes[:,2] - 0.6) + 0.5)
         flat_etrodes[:,1] = flat_etrodes[:,1] * -10*(flat_etrodes[:,2] + 3*1/(flat_etrodes[:,2] - 0.6) + 0.5)
         
-        ax = fig.add_subplot(1,1,n)
+        if fig == []:
+            ax = fig.add_subplot(1,1,n)
+        else:
+            ax = fig
         
         linewidths = 1 * np.ones_like(flat_etrodes[:,0])
         linewidths[highlight] = 3
@@ -109,7 +149,10 @@ def plot_3d_scalp(band,fig,n=1,clims=(0,0),label='generic',animate=False,unwrap=
         plt.title(label)
         
     else:
-        ax = fig.add_subplot(1,1,n,projection='3d')
+        if fig == []:
+            ax = fig.add_subplot(1,1,n,projection='3d')
+        else:
+            ax = fig
         linewidths = np.ones_like(etrodes[:,0])
         linewidths[highlight] = 5
         sc = ax.scatter(etrodes[:,0],etrodes[:,1],10*etrodes[:,2],c=band,vmin=clims[0],vmax=clims[1],s=300,cmap=cm,linewidth=linewidths)

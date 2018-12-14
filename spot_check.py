@@ -143,6 +143,7 @@ def spot_check(fname=[],tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']
     ''' Spotcheck function
     tlims - In seconds. -1 implies end of the recording
     '''
+    
     NFFT = 2**10
     fs = 422 #hardcoded for brLFP for now
     
@@ -151,9 +152,7 @@ def spot_check(fname=[],tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']
     else:
         curr_exp = 'Generic'
         
-    for key in flist.keys():
-        #Container = DBSOsc.load_BR_feats(fname,snippet=False)
-        Container = dbo.load_BR_dict(flist[key]['fname'],sec_offset=0)
+    Container = dbo.load_BR_dict(fname,sec_offset=0)
     
     
     nlims = np.array(tlims) * fs
@@ -190,7 +189,7 @@ def spot_check(fname=[],tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']
                 plt.subplot(2,1,2)
                 plt.pcolormesh(T,F,10*np.log10(SG[side]),rasterized=True)
                 #plt.clim((-200,-100))
-                plt.title('Channel ' + chann_label[cc])
+                plt.title('Channel ' + chann_labels[cc])
                 
             #plt.suptitle('Raw TS: ' + fname.split('/')[-1])
             

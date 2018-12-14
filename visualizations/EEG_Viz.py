@@ -33,7 +33,7 @@ def return_adj_net(dist_thresh = 3):
     
     return mask
 
-def get_coords(scale=2,montage='dense'):
+def get_coords(scale=1,montage='dense'):
     if montage == 'dense':
         fname = '/home/virati/Dropbox/GSN-HydroCel-257.sfp'
     elif montage == 'standard':
@@ -42,10 +42,12 @@ def get_coords(scale=2,montage='dense'):
     egipos = mne.channels.read_montage(fname)
     etrodes = scale*egipos.pos
     
+    etrodes[:,2] = etrodes[:,2]
+    
     return etrodes
     
 
-def plot_3d_locs(band,ax,n=1,scale=2,clims=(0,0),label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense'):
+def plot_3d_locs(band,ax,n=1,scale=1,clims=(0,0),label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense'):
     #fig = plt.figure()
     
     if montage == 'dense':
@@ -93,7 +95,7 @@ def plot_3d_locs(band,ax,n=1,scale=2,clims=(0,0),label='generic',animate=False,u
             plt.savefig('/tmp/'+ label + '_' + strangl[-3:] + '.png')
             time.sleep(.3)
 
-def plot_3d_scalp(band,fig,n=1,clims=(0,0),scale=1,label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense'):
+def plot_3d_scalp(band,fig,n=1,clims=(0,0),scale=1,label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense',alpha=1):
     #fig = plt.figure()
     
     if montage == 'dense':
@@ -127,7 +129,7 @@ def plot_3d_scalp(band,fig,n=1,clims=(0,0),scale=1,label='generic',animate=False
         linewidths = 1 * np.ones_like(flat_etrodes[:,0])
         linewidths[highlight] = 3
         #below changes can be: linewidth to only do the highlights, or fixed at 2 or something
-        sc = plt.scatter(flat_etrodes[:,0],flat_etrodes[:,1],c=band,vmin=clims[0],vmax=clims[1],s=300,cmap=cm,alpha=0.5,linewidth=linewidths,marker='o')
+        sc = plt.scatter(flat_etrodes[:,0],flat_etrodes[:,1],c=band,vmin=clims[0],vmax=clims[1],s=300,cmap=cm,alpha=alpha,linewidth=linewidths,marker='o')
         #this adds x's over the highlights
         #plt.scatter(flat_etrodes[:,0],flat_etrodes[:,1],c=None,vmin=clims[0],vmax=clims[1],s=300,cmap=cm,alpha=1,linewidth=linewidths,marker='x')
         
@@ -155,7 +157,8 @@ def plot_3d_scalp(band,fig,n=1,clims=(0,0),scale=1,label='generic',animate=False
             ax = fig
         linewidths = np.ones_like(etrodes[:,0])
         linewidths[highlight] = 5
-        sc = ax.scatter(etrodes[:,0],etrodes[:,1],10*etrodes[:,2],c=band,vmin=clims[0],vmax=clims[1],s=300,cmap=cm,linewidth=linewidths)
+        #REMOVED a 10* z component here, I think it was originally added to help visualization
+        sc = ax.scatter(etrodes[:,0],etrodes[:,1],etrodes[:,2],c=band,vmin=clims[0],vmax=clims[1],s=300,cmap=cm,linewidth=linewidths,alpha=alpha)
     
         try:plt.colorbar(sc)
         except: pdb.set_trace()

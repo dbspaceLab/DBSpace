@@ -21,7 +21,7 @@ v_files = {'IF-300':'/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_201
 
 
 band_approach = 'Corrected'
-do_calc = 'mean'
+do_calc = 'median'
 
 do_side = 'Left'
 
@@ -43,8 +43,9 @@ preproc_flows = [['Pxx','Osc'],['Pxx_corr','Osc_corr']]
 do_feats = {'Standard':['Delta','Theta','Alpha','Beta','Gamma'],'Corrected':['Delta','Theta','Alpha','Beta*','Gamma1']}
 
 for gel,fname in v_files.items():
-    _ = spot_check(fname,tlims=(0,-1),plot_sg=False)
+    _ = spot_check(fname,tlims=(0,-1),plot_sg=True)
     
+    # Go to each voltage in the sweep
     for stim_v,iv in stim_vs.items():
         exp_results[stim_v] = spot_check(fname,tlims=iv,plot_sg=False)
         
@@ -72,19 +73,21 @@ for gel,fname in v_files.items():
         #Finally, we're just going to do the Gain Compression Ratio
         exp_results[stim_v]['GCratio'],_ = dbo.calc_feats(exp_results[stim_v]['F']['Pxx'],exp_results[stim_v]['F']['F'],modality='lfp',dofeats=['GCratio'],compute_method=do_calc)
 
+
+    #go to each preprocessing flow
     for plot_proc in preproc_flows:
-                
         plt.figure()
         for v_stim in do_stimvs:
             plt.subplot(2,1,1)
-            plt.plot(exp_results[v_stim]['F']['F'],10*np.log10(exp_results[v_stim]['F'][plot_proc[0]][do_side]))
+            plt.plot(exp_results[v_stim]['F']['F'],10*np.log10(exp_results[v_stim]['F'][plot_proc[0]][do_side]),linewidth=3)
             #plt.plot(exp_results[v_stim]['F']['F'],exp_results[v_stim]['F']['PolyItself']) #This seems to be doing something weird even in the left channel, should check
             plt.subplot(2,2,3)
-            plt.plot(exp_results[v_stim]['Osc']['Basis'],exp_results[v_stim][plot_proc[1]]['State'][:,side_idx[do_side]])
+            plt.plot(exp_results[v_stim]['Osc']['Basis'],exp_results[v_stim][plot_proc[1]]['State'][:,side_idx[do_side]],linewidth=3)
             if plot_proc[0][-4:] == 'corr':
                 plt.ylim((-10,10))
             else:
-                plt.ylim((-125,-105))
+                pass
+                plt.ylim((-70,-45))
             
             
             plt.subplot(2,2,4)
@@ -93,16 +96,3 @@ for gel,fname in v_files.items():
         plt.legend(do_stimvs)
         plt.suptitle(gel + str(plot_proc) + do_side + '| Bands: ' + band_approach + ' Calc: ' + do_calc)
         
-#%%
-
-#plt.figure()
-#for v_stim in do_stimvs:
-#    plt.scatter(1,exp_results[v_stim]['GCratio'][side_idx[do_side]])
-
-
-## NEED TO KEEP TRACK OF ALL CORRECTIONS
-# We have polynomial subtraction, built into code above
-# we have oscillatory window shifting, which is NOT built in
-# we have median vs mean computation of the oscillatory band power
-# anything else?
-# recomended is: polynomial subtraction, oscillatory shifts, and MEDIAN computation

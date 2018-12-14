@@ -20,8 +20,8 @@ v_files = {'IF-300':'/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_201
            'SA-100':'/home/virati/MDD_Data/Benchtop/VRT_Impedance_RB/Session_2018_04_24_Tuesday/demo_2018_04_24_17_32_09__MR_0.txt'}
 
 
-band_approach = 'Corrected'
-do_calc = 'median'
+band_approach = 'Standard'
+do_calc = 'mean'
 
 do_side = 'Left'
 
@@ -40,7 +40,7 @@ exp_results = nestdict()
 
 
 preproc_flows = [['Pxx','Osc'],['Pxx_corr','Osc_corr']]
-do_feats = {'Standard':['Delta','Theta','Alpha','Beta','Gamma'],'Corrected':['Delta','Theta','Alpha','Beta*','Gamma1']}
+do_feats = {'Standard':['Delta','Theta','Alpha','Beta','Gamma'],'Adjusted':['Delta','Theta','Alpha','Beta*','Gamma1']}
 
 for gel,fname in v_files.items():
     _ = spot_check(fname,tlims=(0,-1),plot_sg=True)
@@ -80,18 +80,26 @@ for gel,fname in v_files.items():
         for v_stim in do_stimvs:
             plt.subplot(2,1,1)
             plt.plot(exp_results[v_stim]['F']['F'],10*np.log10(exp_results[v_stim]['F'][plot_proc[0]][do_side]),linewidth=3)
+            plt.xlim((0,70))
+            if plot_proc[0][-4:] == 'corr':
+                plt.ylim((-40,40))
+            else:
+                pass
+                plt.ylim((-90,-10))
             #plt.plot(exp_results[v_stim]['F']['F'],exp_results[v_stim]['F']['PolyItself']) #This seems to be doing something weird even in the left channel, should check
             plt.subplot(2,2,3)
             plt.plot(exp_results[v_stim]['Osc']['Basis'],exp_results[v_stim][plot_proc[1]]['State'][:,side_idx[do_side]],linewidth=3)
+            
             if plot_proc[0][-4:] == 'corr':
-                plt.ylim((-10,10))
+                plt.ylim((-20,20))
             else:
                 pass
-                plt.ylim((-70,-45))
+                plt.ylim((-70,-30))
             
             
             plt.subplot(2,2,4)
             plt.scatter(v_stim,exp_results[v_stim]['GCratio'][side_idx[do_side]])
+            plt.ylim((0.8,2.2))
             
         plt.legend(do_stimvs)
         plt.suptitle(gel + str(plot_proc) + do_side + '| Bands: ' + band_approach + ' Calc: ' + do_calc)

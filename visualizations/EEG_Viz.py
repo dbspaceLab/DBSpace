@@ -19,6 +19,8 @@ import pylab
 
 from mpl_toolkits.mplot3d import Axes3D
 
+from mayavi.mlab import *
+
 def return_adj_net(dist_thresh = 3):
     egipos = mne.channels.read_montage('/tmp/GSN-HydroCel-257.sfp')
     etrodes = egipos.pos
@@ -33,7 +35,7 @@ def return_adj_net(dist_thresh = 3):
     
     return mask
 
-def get_coords(scale=1,montage='dense'):
+def get_coords(scale,montage='dense'):
     if montage == 'dense':
         fname = '/home/virati/Dropbox/GSN-HydroCel-257.sfp'
     elif montage == 'standard':
@@ -50,14 +52,8 @@ def get_coords(scale=1,montage='dense'):
 def plot_3d_locs(band,ax,n=1,scale=1,clims=(0,0),label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense'):
     #fig = plt.figure()
     
-    if montage == 'dense':
-        fname = '/home/virati/Dropbox/GSN-HydroCel-257.sfp'
-    elif montage == 'standard':
-        fname = '/home/virati/Dropbox/standard_postfixed.elc'
-    
-    egipos = mne.channels.read_montage(fname)
-    etrodes = scale*egipos.pos
-    
+    etrodes = get_coords(scale=scale)
+
     #gotta normalize the color
     #band = np.tanh(band / 10) #5dB seems to be reasonable
     
@@ -189,3 +185,34 @@ def plot_3d_scalp(band,fig,n=1,clims=(0,0),scale=1,label='generic',animate=False
                 time.sleep(.3)
 
 ## DO UNIT TEST HERE
+
+
+def plot_maya(band, rad= [],color=[0.,0.,0.]):
+    if not rad:
+        rad = 20* np.ones_like(band[:,2])
+        #rad = np.random.normal(size=band[:,2].shape)
+    
+    points3d(band[:,0],band[:,1],band[:,2], rad,color=color,colormap="copper", scale_factor=.25,opacity=0.2)
+
+def plot_maya_scalp(band,n=1,clims=(0,0),scale=1,label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense',alpha=1):
+    
+    if montage == 'dense':
+        fname = '/home/virati/Dropbox/GSN-HydroCel-257.sfp'
+    elif montage == 'standard':
+        fname = '/home/virati/Dropbox/standard_postfixed.elc'
+    
+    egipos = mne.channels.read_montage(fname)
+    etrodes = scale * egipos.pos
+    
+    #gotta normalize the color
+    #band = np.tanh(band / 10) #5dB seems to be reasonable
+
+    
+    if clims == (0,0):
+        clims = (np.min(band),np.max(band))
+    
+    linewidths = np.ones_like(etrodes[:,0])
+    linewidths[highlight] = 5
+    #REMOVED a 10* z component here, I think it was originally added to help visualization
+    
+    points3d(etrodes[:,0],etrodes[:,1],etrodes[:,2], 20* np.ones_like(etrodes[:,2]), colormap="copper", scale_factor=.25,opacity=0.2)

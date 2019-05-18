@@ -91,7 +91,7 @@ def plot_3d_locs(band,ax,n=1,scale=1,clims=(0,0),label='generic',animate=False,u
             plt.savefig('/tmp/'+ label + '_' + strangl[-3:] + '.png')
             time.sleep(.3)
 
-def plot_3d_scalp(band,fig,n=1,clims=(0,0),scale=1,label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense',alpha=1):
+def plot_3d_scalp(band,infig=[],n=1,clims=(0,0),scale=1,label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense',alpha=1,marker_scale=5):
     #fig = plt.figure()
     
     if montage == 'dense':
@@ -117,12 +117,13 @@ def plot_3d_scalp(band,fig,n=1,clims=(0,0),scale=1,label='generic',animate=False
         flat_etrodes[:,0] = flat_etrodes[:,0] * -10*(flat_etrodes[:,2] + 3*1/(flat_etrodes[:,2] - 0.6) + 0.5)
         flat_etrodes[:,1] = flat_etrodes[:,1] * -10*(flat_etrodes[:,2] + 3*1/(flat_etrodes[:,2] - 0.6) + 0.5)
         
-        if fig == []:
+        if infig == []:
+            fig=plt.figure()
             ax = fig.add_subplot(1,1,n)
         else:
-            ax = fig
+            ax = infig
         
-        linewidths = 1 * np.ones_like(flat_etrodes[:,0])
+        linewidths = marker_scale * np.ones_like(flat_etrodes[:,0])
         linewidths[highlight] = 3
         #below changes can be: linewidth to only do the highlights, or fixed at 2 or something
         sc = plt.scatter(flat_etrodes[:,0],flat_etrodes[:,1],c=band,vmin=clims[0],vmax=clims[1],s=300,cmap=cm,alpha=alpha,linewidth=linewidths,marker='o')
@@ -147,10 +148,12 @@ def plot_3d_scalp(band,fig,n=1,clims=(0,0),scale=1,label='generic',animate=False
         plt.title(label)
         
     else:
-        if fig == []:
+        if infig == []:
+            fig = plt.figure()
             ax = fig.add_subplot(1,1,n,projection='3d')
         else:
-            ax = fig
+            ax = infig #infig.add_subplot(1,1,n,projection='3d')
+            
         linewidths = np.ones_like(etrodes[:,0])
         linewidths[highlight] = 5
         #REMOVED a 10* z component here, I think it was originally added to help visualization
@@ -186,15 +189,57 @@ def plot_3d_scalp(band,fig,n=1,clims=(0,0),scale=1,label='generic',animate=False
 
 ## DO UNIT TEST HERE
 
-
-def plot_maya(band, rad= [],color=[0.,0.,0.]):
+'''
+This function takes in COORDINATES and plots dots at those COORDINATES
+'''
+def plot_coords(band, active_mask=[],rad= [],color=[0.,0.,0.],plot_overlay = True,alpha=0.8):
     if not rad:
-        rad = 20* np.ones_like(band[:,2])
+        rad = np.zeros_like(band[:,2])
+        rad[active_mask] = 20
+        rad2 = 20*np.ones_like(rad)
+        rad2[active_mask] = 0
+        #rad = np.random.normal(size=band[:,2].shape)
+        
+    #figure(bgcolor=(1,1,1))
+    nodes = points3d(band[:,0],band[:,1],band[:,2], rad,color=color, scale_factor=2,opacity=alpha)
+    nodes.glyph.scale_mode = 'scale_by_vector'
+    
+    if plot_overlay:
+        points3d(band[:,0],band[:,1],band[:,2], rad2,color=(0.,0.,0.),colormap="copper", scale_factor=.25,opacity=alpha/2)
+
+def plot_tracts(band, active_mask=[],rad= [],color=[0.,0.,0.]):
+    if not rad:
+        rad = np.zeros_like(band[:,2])
+        rad[active_mask] = 20
+        rad2 = 20*np.ones_like(rad)
+        rad2[active_mask] = 0
         #rad = np.random.normal(size=band[:,2].shape)
     
-    points3d(band[:,0],band[:,1],band[:,2], rad,color=color,colormap="copper", scale_factor=.25,opacity=0.2)
+    plot3d(band[:,0],band[:,1],band[:,2],color=color,opacity=0.8)
+    
+def maya_band_display(band,montage='dense'):
+    if montage == 'dense':
+        fname = '/home/virati/Dropbox/GSN-HydroCel-257.sfp'
+    elif montage == 'standard':
+        fname = '/home/virati/Dropbox/standard_postfixed.elc'
+    
+    egipos = mne.channels.read_montage(fname)
+    etrodes = egipos.pos
+    
+    
+    head = points3d(0,0,0,scale_factor=15)
+    nodes = points3d(etrodes[:,0],etrodes[:,1],etrodes[:,2], scale_factor=2)
+    nodes.glyph.scale_mode = 'scale_by_vector'
+    
+    #Have to bring band from (-1,1) to (0,1) for mayavi color bullshit
+    band_norm = band / 2
+    band_norm += 1/2
 
-def plot_maya_scalp(band,n=1,clims=(0,0),scale=1,label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense',alpha=1):
+    #This sets the colors for the nodes themselves to the band  changes after normalization into [0,1]
+    nodes.mlab_source.dataset.point_data.scalars = (band_norm)
+    show()
+    
+def plot_maya_scalp(band,n=1,clims=(0,0),color=(1.,0.,0.),scale=1,label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense',alpha=1):
     
     if montage == 'dense':
         fname = '/home/virati/Dropbox/GSN-HydroCel-257.sfp'
@@ -215,4 +260,5 @@ def plot_maya_scalp(band,n=1,clims=(0,0),scale=1,label='generic',animate=False,u
     linewidths[highlight] = 5
     #REMOVED a 10* z component here, I think it was originally added to help visualization
     
-    points3d(etrodes[:,0],etrodes[:,1],etrodes[:,2], 20* np.ones_like(etrodes[:,2]), colormap="copper", scale_factor=.25,opacity=0.2)
+    points3d(etrodes[:,0],etrodes[:,1],etrodes[:,2], 20*band, color=color, scale_factor=.25,opacity=0.2)
+    points3d(etrodes[:,0],etrodes[:,1],etrodes[:,2], 20*np.abs(1-band), color=(1.,1.,1.), scale_factor=.25,opacity=0.2)

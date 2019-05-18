@@ -169,7 +169,7 @@ def gen_coher(inpX,Fs=422,nfft=2**10,polyord=0):
     
 #This function takes a PSD and subtracts out the PSD's fourth order polynomial fit
     #I THINK this is only used in EEG cortical signatures
-def poly_subtr(inpPSD,fVect,order=4):
+def poly_subtr(inpPSD,fVect,order=5):
     #What's our feature/frequency vector?
     fix_psd = defaultdict()
     for chann in inpPSD.keys():

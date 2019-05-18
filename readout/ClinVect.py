@@ -51,7 +51,7 @@ class CFrame:
     def __init__(self,incl_scales = ['HDRS17','MADRS','BDI','GAF'],norm_scales=False):
         #load in our JSON file
         #Import the data structure needed for the CVect
-        ClinVect = json.load(open('/home/virati/Dropbox/ClinVec.json'))
+        ClinVect = json.load(open('/home/virati/Dropbox/projects/Research/MDD-DBS/Data/ClinVec.json'))
         
         #Setup the clinical dictionary structure
         

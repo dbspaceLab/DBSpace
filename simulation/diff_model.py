@@ -294,6 +294,59 @@ class sim_amp:
             y_out += self.noise * np.random.normal(size=y_out.shape)
             
         return y_out
+    
+    def plot_amp_output(self,amp_type='linear'):
+        
+        #First we're going to get our differential amplifier output
+        diff_out = sig.decimate(diff_obj.V_out(Z1,Z3)['sim_1'],10)
+        Fs = diff_obj.Fs
+        
+        #Here we generate our recording, after the signal amplifier component
+        V_preDC = self.gen_recording(diff_obj,Z1,Z3)
+        
+        #now we're going to DOWNSAMPLE
+        #simple downsample, sicne the filter is handled elsewhere and we're trying to recapitulate the hardware
+        Vo = V_preDC[0::10]
+        
+        V_out = Vo
+        #Final filtering stage here, unclear why
+        #b,a = sig.butter(6,1/211,btype='high')
+        #V_out = sig.lfilter(b,a,Vo)
+      
+
+        
+        plt.figure()
+        #Plot the input and output voltages directly over time
+        
+        nperseg = 2**9
+        noverlap=2**9-50
+        
+        #plot histograms
+        bins = np.linspace(-5,5,100)
+        half_pt = np.int(diff_out.shape[0]/2)
+        plt.hist(diff_out[:half_pt],bins,alpha=0.9)
+        plt.hist(V_out[:half_pt],bins,alpha=0.9)
+        
+        plt.subplot(3,2,3)
+        #Here, we find the spectrogram of the output from the diff_amp, should not be affected at all by the gain, I guess...
+        #BUT the goal of this is to output a perfect amp... so maybe this is not ideal since the perfect amp still has the gain we want.
+        F,T,SGdiff = sig.spectrogram(self.sig_amp_gain*diff_out,nperseg=nperseg,noverlap=noverlap,window=sig.get_window('blackmanharris',nperseg),fs=4220/10)
+        plt.pcolormesh(T+diff_obj.tlims[0],F,10*np.log10(SGdiff),rasterized=True)
+        plt.clim(-120,0)
+        plt.ylim((0,200))
+        plt.title('Perfect Amp Output')
+        #plt.colorbar()
+        
+        plt.subplot(3,2,5)
+        t_beg = T+diff_obj.tlims[0] < -1
+        t_end = T+diff_obj.tlims[0] > 1
+        Pbeg = np.median(10*np.log10(SGdiff[:,t_beg]),axis=1)
+        Pend = np.median(10*np.log10(SGdiff[:,t_end]),axis=1)
+        plt.plot(F,Pbeg,color='black')
+        plt.plot(F,Pend,color='green')
+        plt.xlabel('Frequency (Hz)')
+        plt.ylabel('Power (dB)')
+        plt.ylim((-200,-20))
         
     def PAPER_plot_V_out(self,diff_obj,Z1,Z3):
         
@@ -358,7 +411,7 @@ class sim_amp:
         plt.plot(F,Pend,color='green')
         plt.xlabel('Frequency (Hz)')
         plt.ylabel('Power (dB)')
-        plt.ylim((-100,0))
+        plt.ylim((-200,-20))
         
         plt.subplot(3,2,4)
         F,T,SGout = sig.spectrogram(V_out,nperseg=nperseg,noverlap=noverlap,window=sig.get_window('blackmanharris',nperseg),fs=422)
@@ -435,16 +488,16 @@ class sim_amp:
 #%%
 
 if __name__ == '__main__':
-    diff_run = sim_diff(Ad=200,wform='moresine4',clock=True,stim_v=8)
+    diff_run = sim_diff(Ad=200,wform='moresine4',clock=True,stim_v=4)
     #diff_run.set_brain()
     #diff_run.set_stim(wform='ipg')
     
-    amp_run = sim_amp(family='tanh',noise=1e-6,sig_amp_gain=1)
+    amp_run = sim_amp(family='pwlinear',noise=1e-6,sig_amp_gain=1)
     
     #diff_run.plot_V_out(1000,1200)
     #diff_out = diff_run.V_out(1000,1100)['sim_1']
     Z1 = 1221
-    Z3 = 900
+    Z3 = 1200
     
     amp_run.PAPER_plot_V_out(diff_run,Z1,Z3)
     

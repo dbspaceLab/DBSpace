@@ -60,6 +60,19 @@ import copy
 def L1_dist(x,y):
     return np.sum(np.abs(a-b) for a,b in zip(x,y))
 
+def L2_dist(x,y):
+    return np.linalg.norm(x-y)
+
+def poly_subtr(fvect,inp_psd,polyord=4):
+    #log10 in_psd first
+    log_psd = 10*np.log10(inp_psd)
+    pfit = np.polyfit(fvect,log_psd,polyord)
+    pchann = np.poly1d(pfit)
+    
+    bl_correction = pchann(fvect)
+    
+    return 10**((log_psd - bl_correction)/10), pfit
+
 #%%            
         
 class PSD_EN:
@@ -138,6 +151,40 @@ class LFM:
     def F_C_Matrix(self):
         pass
 
+
+## NEW CLASS
+# This class is a wrapper over BRFrame that returns oscillatory states for every recording in every week
+class Osc_State:
+    # If each week only has one state, then it returns one state
+    # If each week has multiple states, it returns the distribution of states and the median state
+    def __init(self,BRFrame):
+        self.YFrame = BRFrame
+        
+
+# Our class for ondemand readout
+class ONDmd:
+    def __init__(self,BRFrame,ClinFrame,lim_freq=50):
+        self.YFrame = BRFrame
+        self.CFrame = ClinFrame
+    
+    def prepare_data(self,validation=0.3):
+        #set up our data by doing a feature extraction
+        rec_list = self.YFrame.file_meta
+        for rr in big_list:
+            feat_dict = {key:[] for key in dbo.feat_dict.keys()}
+            for featname,dofunc in dbo.feat_dict.items():
+                datac = {ch: poly_subtr(rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()} #THIS RETURNS a PSD, un-log transformed
+                
+                feat_dict[featname] = dofunc['fn'](datac,self.YFrame.data_basis,dofunc['param'])
+            rr.update({'FeatVect':feat_dict})
+            
+        # now split out our training and validation
+        self.train_set, self.valid_set = train_test_split(self.YFrame.file_meta, train_size=1-validation,shuffle=True)
+        
+    def link_training(self):
+        #now we're going to find the week associated with every training set recording
+        pdb.set_trace()
+            
 class DSV:
     def __init__(self, BRFrame,ClinFrame,lim_freq=50):
         #load in the BrainRadio DataFrame we want to work with
@@ -280,7 +327,7 @@ class DSV:
             
             plt.subplot(223);
             plt.plot(self.trunc_fvect,fix_pt_list[:146])
-            
+                
             plt.subplot(224);
             plt.plot(self.trunc_fvect,fix_pt_list[146:])
             
@@ -501,7 +548,7 @@ class DSV:
     
     #This is the rPCA based method that generates the actual clinical measure on DSV and adds it to our CVect
     def gen_D_latent(self):
-        pass    
+        pass
 
 
 class ORegress:
@@ -517,6 +564,17 @@ class ORegress:
         self.norm_func = stats.zscore
         #self.norm_func = dbo.unity
         
+    '''
+    state_roster
+    This function is meant to output an indexable dictionary where each week has associated with it all the recordings in it
+    This should also be able to output the median state for each week
+    '''
+    def state_roster(self):
+        #First, we'll generate the dictionary for each phase
+        pass
+        #full_roster = {phase:[rec for rec in ]}
+        
+        
     #This function will generate the full OSCILLATORY STATE for all desired observations/weeks
     def O_feat_extract(self):
         print('Extracting Oscillatory Features')
@@ -525,9 +583,10 @@ class ORegress:
         for rr in big_list:
             feat_dict = {key:[] for key in dbo.feat_dict.keys()}
             for featname,dofunc in dbo.feat_dict.items():
+                pdb.set_trace()
                 #Choose the zero index of the poly_subtr return because we are not messing with the polynomial vector itself
                 #rr['data'] is NOT log10 transformed, so makes no sense to do the poly subtr
-                datacontainer = {ch: self.poly_subtr(rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()} #THIS RETURNS a PSD, un-log transformed
+                datacontainer = {ch: poly_subtr(inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()} #THIS RETURNS a PSD, un-log transformed
                 
                 feat_dict[featname] = dofunc['fn'](datacontainer,self.YFrame.data_basis,dofunc['param'])
             rr.update({'FeatVect':feat_dict})
@@ -571,7 +630,7 @@ class ORegress:
     
     def collapse_weeks(self,inp):
         #Input is a TUPLE, where the last element is the phase
-        dbo.all_phases
+        #dbo.all_phases
         sorted_inp = {do_phase:np.array([(x,y) for x,y,phase in inp if phase == do_phase]) for do_phase in dbo.all_phases}
         
         return sorted_inp
@@ -589,27 +648,49 @@ class ORegress:
             plt.hist(pt_band_all[pt][:,1],label=pt,alpha=0.4)
         plt.legend()
         plt.suptitle(band)
-        
-    def plot_timecourse(self,feat='Alpha'):
+    
+    def ret_timecourse(self,feat='Alpha'):
         fmeta = self.YFrame.file_meta
         pt_band_all = {pt:([(rec['FeatVect'][feat]['Left'],rec['FeatVect'][feat]['Right'],rec['Phase']) for rec in fmeta if rec['Patient'] == pt]) for pt in dbo.all_pts}
         
         #add a phase list here
         
-        plt.figure()
+        mean_meas = nestdict()
         for pt in dbo.all_pts:
             plottable = self.collapse_weeks(pt_band_all[pt])
             
-            mean_meas = np.array([np.mean(plottable[ph],axis=0) for ph in dbo.all_phases][4:])
+            mean_meas[pt] = np.array([np.mean(plottable[ph],axis=0) for ph in dbo.all_phases][4:])
             #flattening code here should be taken back out into separate function, probably in DBSpace
+        
+        return mean_meas
+    
+    def plot_timecourse(self,feat='Alpha',plot_log=False,ylim=[]):
+        mean_meas = self.ret_timecourse(feat=feat)
+        plt.figure()
+        
+        if not plot_log:
+            plot_fn = dbo.unity
+        else:
+            plot_fn = np.log10
             
+        for pt in dbo.all_pts:
             plt.subplot(3,2,1)
-
-            plt.plot(mean_meas[:,0],label=pt,alpha=1)
-            plt.ylim((-10,40))
+            
+            plt.plot(plot_fn(mean_meas[pt][:,0]),label=pt,alpha=1)
+            #plt.ylim((-10,40))
+            if ylim:
+                plt.ylim(ylim)
+            else:
+                left_ylims = plt.ylim()
+            
             plt.subplot(3,2,2)
-            plt.plot(mean_meas[:,1],label=pt,alpha=1)
-            plt.ylim((-10,40))
+            plt.plot(plot_fn(mean_meas[pt][:,1]),label=pt,alpha=1)
+            
+            if ylim:
+                plt.ylim(ylim)
+            else:
+                plt.ylim(left_ylims)
+            
         plt.legend()
         plt.suptitle(feat)
         
@@ -721,21 +802,8 @@ class ORegress:
         
         return O_dsgn, C_dsgn, label_dict
     
-
-
-    def poly_subtr(self,inp_psd,polyord=4):
-        #log10 in_psd first
-        log_psd = 10*np.log10(inp_psd)
-        pfit = np.polyfit(self.YFrame.data_basis,log_psd,polyord)
-        pchann = np.poly1d(pfit)
-        
-        bl_correction = pchann(self.YFrame.data_basis)
-        
-        return 10**((log_psd - bl_correction)/10), pfit
-
     def O_models(self,plot=True,models=['RANSAC','RIDGE']):
-        sns.set_style("ticks")
-        
+        sns.set_style("ticks")        
         
         sides = ['Left','Right']
         sides_idxs = {'Left':np.arange(0,5),'Right':np.arange(5,10)}
@@ -819,7 +887,7 @@ class ORegress:
         #do some shuffling here and try to see how well the model does
         shuff_distr = self.shuffle_dprods(self.Model[method]['Model'],self.Model[method]['Otest'],self.Model[method]['Ctest'],numshuff=1000)
         #What's the similarity of the model output, or "actual_similarity"
-        act_sim = L1_dist(Cpredictions,Ctest)
+        act_sim = L2_dist(Cpredictions,Ctest)
         self.Model[method]['Performance']['DProd'] = {'Dot':act_sim,'Distr':shuff_distr,'Perfect':L1_dist(Ctest,np.zeros_like(Ctest)),'pval':0}
         self.Model[method]['Performance']['DProd']['pval'] = np.sum(np.abs(self.Model[method]['Performance']['DProd']['Distr']) > self.Model[method]['Performance']['DProd']['Dot'])/len(self.Model[method]['Performance']['DProd']['Distr'])
 

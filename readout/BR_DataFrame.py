@@ -44,13 +44,15 @@ class BR_Data_Tree():
         self.do_pts = do_pts
         self.fs = 422
         
-        #Where is the data?
+        #Where is the data? The big directory where the data is
         self.base_data_dir = '/home/virati/MDD_Data'
         
-        CVect = json.load(open('/home/virati/Dropbox/ClinVec.json'))['HAMDs']
+        # Load in our clinical vector object with the data from ClinVec.json
+        CVect = json.load(open('/home/virati/Dropbox/projects/Research/MDD-DBS/Data/ClinVec.json'))['HAMDs']
         clinvect = {pt['pt']: pt for pt in CVect}
         self.ClinVect = clinvect
         
+        # This is the flag to whether we want to preload the data
         self.preloadData = preload
         self.data_basis = []
         
@@ -58,7 +60,9 @@ class BR_Data_Tree():
         self.sec_end = 10
     
     def full_sequence(self,data_path=''):
+        # Here we build the dictionary with all of our phases and files
         self.build_phase_dict()
+        
         self.list_files()
         self.meta_files()
         self.Load_Data(path=data_path)
@@ -169,12 +173,11 @@ class BR_Data_Tree():
         return fname.split('BR')[1][1:4]
         
     def build_phase_dict(self):
-        #this is where the fun is....
+        # In this method we go in and map the date of our sessions to the phase that the patient was in
+        # TODO a checkpoint here so we can see the mapping between weeks/dates and phases and validate
         
         #CONVENTION DECIDED: if a recording is taken between week C04 and C05 -> it belongs to C05 since the clinical questionaiires ask about the LAST 7 days
         
-        #Extract the whole big thing for a given patient
-        #phdate_dict['DBS901'][phase] = date
         phdate_dict = defaultdict(dict)
         
         for pt in self.do_pts:
@@ -280,7 +283,7 @@ class BR_Data_Tree():
             
         else:
             print('Loading data from...' + path)
-            self.file_meta = np.load(path)
+            self.file_meta = np.load(path,allow_pickle=True)
             self.preloadData = True
 
             
@@ -367,7 +370,7 @@ class BR_Data_Tree():
         #for rr in DataFrame.file_meta:
         #    plt.plot(rr['TD']['Left'])
         
-        def compute_feat(self):
+        def DEPRcompute_feat(self):
             print('Extracting Oscillatory Features')
             big_list = self.file_meta
             for rr in big_list:

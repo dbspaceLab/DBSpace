@@ -349,6 +349,7 @@ class sim_amp:
         plt.ylim((-200,-20))
         
     def PAPER_plot_V_out(self,diff_obj,Z1,Z3):
+        # Plot the output multipanel for the paper
         
         #First we're going to get our differential amplifier output
         diff_out = sig.decimate(diff_obj.V_out(Z1,Z3)['sim_1'],10)
@@ -374,7 +375,7 @@ class sim_amp:
         plt.plot(self.tvect,diff_out,label='Input Voltage')
         plt.plot(self.tvect,V_out,label='Output Voltage')
         plt.legend()
-        plt.ylim((-6,16))
+        plt.ylim((-1e-3,1e-3))
         
         nperseg = 2**9
         noverlap=2**9-50
@@ -430,7 +431,7 @@ class sim_amp:
         plt.plot(F,Pend,color='green')
         plt.xlabel('Frequency (Hz)')
         plt.ylabel('Power (dB)')
-        plt.ylim((-105,0))
+        plt.ylim((-200,-20))
         plt.suptitle('Zdiff = ' + str(np.abs(Z1 - Z3)))
         
         
@@ -496,7 +497,7 @@ if __name__ == '__main__':
     
     #diff_run.plot_V_out(1000,1200)
     #diff_out = diff_run.V_out(1000,1100)['sim_1']
-    Z1 = 1221
+    Z1 = 1350
     Z3 = 1200
     
     amp_run.PAPER_plot_V_out(diff_run,Z1,Z3)

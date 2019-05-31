@@ -38,14 +38,33 @@ def nearest(items,pivot):
 #THIS CLASS IS ONLY FOR GENERATING THE FRAME
 #The frame is supposed to only go from Raw Rec -> PSDs, this can later be passed to analysis classes
 #Split out anything else into separate classes where the object this generates can go in
-class BR_Data_Tree():
-    
-    def __init__(self,do_pts=['901','903','905','906','907','908'],preload=False):
+class BR_Data_Tree:
+    data_root_dir = '/home/virati/MDD_Data' #Where is the raw data?
+    im_root_dir = '/home/virati' #the root directory for intermediate file
+
+    def __init__(self,do_pts=['901','903','905','906','907','908'],preload=False,preFrame=''):
+        #Fix this and don't really make it accessible; we'll stick with a single intermediate file unless you really want to change it
+
         self.do_pts = do_pts
         self.fs = 422
-        
-        #Where is the data? The big directory where the data is
-        self.base_data_dir = '/home/virati/MDD_Data'
+
+
+        if preFrame == '':
+            print('Generating the dataframe...')
+            self.generate_data_tree()
+            #Save it now
+            self.Save_Frame()
+            #Now just dump us out so we can do whatever we need to with the file above
+
+        else:
+            # IF we're loading in a preframe, we're probably doing a bigger analysis
+
+            print('Loading in PreFrame...' + self.root_dir + '/' + preFrame)
+            self.im_file = self.root_dir + '/' + preFrame
+            self.
+
+        self.intermediate_file = intermediate_file
+
         
         # Load in our clinical vector object with the data from ClinVec.json
         CVect = json.load(open('/home/virati/Dropbox/projects/Research/MDD-DBS/Data/ClinVec.json'))['HAMDs']
@@ -54,28 +73,43 @@ class BR_Data_Tree():
         
         # This is the flag to whether we want to preload the data
         self.preloadData = preload
-        self.data_basis = []
+        self.data_basis = defaultdict()
         
         #how many seconds to take from the chronic recordings
         self.sec_end = 10
-    
-    def full_sequence(self,data_path=''):
+
+        if 1: self.default_sequence()
+    def generate_data_tree(self):
+        # The main method to GENERATE our data tree by crawling the BR folder structure
+        pass
+
+    def default_sequence(self):
         # Here we build the dictionary with all of our phases and files
         self.build_phase_dict()
         
+        #Here we go through all of our files in the dictionaries and put them into our database
         self.list_files()
         self.meta_files()
-        self.Load_Data(path=data_path)
+        
+        #Load in our data (timeseries)
+        self.Load_Data(prebuilt=self.intermediate_file,domain='F')
         #now go in and remove anything with a bad flag
         self.Remove_BadFlags()
         
+        # Go in and compute recording fidelity measures for all recordings
         self.Check_GC()
         
         #take out the phases that don't exist, and any other stuff, but so far that's all this does
         self.prune_meta()
+        self.check_empty_phases()
+
         #in case the meta-data isn't properly updated from the loaded in deta
         print('Data Loaded')
-        
+
+    def gc_roster(self):
+        #Generate a roster for the GC of all recordings
+        roster = [dbo.check_gc(rr) for rr in self.file_meta]
+
     def Check_GC(self):
         #do just the key features
         #get the stim-related and gc related measures
@@ -85,7 +119,7 @@ class BR_Data_Tree():
             gc_results = {key:0 for key in gc_measures}
             for meas in gc_measures:
                 dofunc = dbo.feat_dict[meas]
-                gc_results[meas] = dofunc['fn'](rr['Data'],self.data_basis,dofunc['param'])
+                gc_results[meas] = dofunc['fn'](rr['Data'],self.data_basis['F'],dofunc['param'])
         
             # let's do some logic to find out if GC is happening
             isgc = (gc_results['nFloor']['Left'] < -8 or gc_results['nFloor']['Right'] < -8) and (gc_results['SHarm']['Left'] / gc_results['THarm']['Left'] < 1 or gc_results['SHarm']['Right'] / gc_results['THarm']['Right'] < 1)
@@ -214,7 +248,9 @@ class BR_Data_Tree():
         #pdb.set_trace()
         
     def meta_files(self,mode='Chronic'):
-        #file_meta = {} * len(self.file_list)
+        # Here we're loading in the files that are in the MODE that we want
+        # So far, the primary mode here is CHRONIC which consists of ambulatory recordings using the PC+S
+        
         if not self.preloadData:
             file_meta = [{} for _ in range(len(self.file_list))]
         else:
@@ -222,7 +258,6 @@ class BR_Data_Tree():
         
         for ff,filen in enumerate(self.file_list):
             #we're going to to each and every file now and give it its metadata
-            
             
             #Here, we're going to extract the DATE
             file_dateinfo = self.extract_date(filen)
@@ -255,20 +290,21 @@ class BR_Data_Tree():
         
         self.file_meta = new_meta
             
-    def Load_Data(self,domain='F',path=''):
-        #this function will return a feature matrix that will be useful for subsequent analysis
-        #check if we're consistent
-        if self.preloadData == True and path == '':
+    def Load_Data(self,domain='F',prebuilt=''):
+        #This is the main function that loads in our FEATURES
+        
+        # Do we want to preload the data from an already made file? This checks internal consistency
+        if self.preloadData == True and prebuilt == '':
             raise Exception('INCONSISTENT LOADING: Preload Flag is True but no Path Specified')
         
         if domain == 'F':
-            self.data_basis = np.linspace(0,self.fs/2,2**9+1)
+            self.data_basis[domain] = np.linspace(0,self.fs/2,2**9+1)
         elif domain == 'T':
-            self.data_basis = np.linspace(0,self.sec_end)
+            self.data_basis[domain] = np.linspace(0,self.sec_end)
         
         
             
-        if path == '':
+        if prebuilt == '':
             for rr in self.file_meta:
                 #load in the file
                 print('Loading in ' + rr['Filename'])
@@ -282,16 +318,16 @@ class BR_Data_Tree():
             self.preloadData = False
             
         else:
-            print('Loading data from...' + path)
-            self.file_meta = np.load(path,allow_pickle=True)
+            print('Loading data from...' + self.data_path)
+            self.file_meta = np.load(self.data_path,allow_pickle=True)
             self.preloadData = True
 
             
-    def Save_Frame(self,path = '/tmp/'):
-        print('Saving File Metastructure... ' + path)
+    def Save_Frame(self,name_addendum=''):
+        print('Saving File Metastructure in ' + self.root_dir + '...')
         
-        np.save(path + 'Chronic_Frame.npy',self.file_meta)
-            
+        np.save(self.root_dir + '/Chronic_Frame' + name_addendum + '.npy',self.file_meta)
+
             
     def load_file(self,fname,load_intv=(0,-1),domain='T'):
         #call the DBSOsc br_load_method
@@ -319,10 +355,11 @@ class BR_Data_Tree():
             #The return from gen_psd is a dictionary eg: {'Left':{'F','PSD'},'Right':{'F','PSD'}}
             F = dbo.gen_psd(X)
             
-            
                 
             return F
-    #PLOTTING FUNCTIONS FOR THE BRFRAME
+        
+#%%
+    # Plotting methods in the class
     
     def plot_file_PSD(self,fname=''):
         if fname != '':
@@ -361,35 +398,6 @@ class BR_Data_Tree():
         [plt.plot(fvect,np.log10(rr['Data']['Left']),alpha=0.1) for rr in DataFrame.file_meta if rr['Patient'] == '901' and rr['Circadian'] == 'day']
         plt.title('Day')
         
-        
-        #%%
-        #test = [rr for rr in DataFrame.file_meta if rr['Patient'] == '902']
-        
-        
-        #%%
-        #for rr in DataFrame.file_meta:
-        #    plt.plot(rr['TD']['Left'])
-        
-        def DEPRcompute_feat(self):
-            print('Extracting Oscillatory Features')
-            big_list = self.file_meta
-            for rr in big_list:
-                feat_dict = {key:[] for key in dbo.feat_dict.keys()}
-                for featname,dofunc in dbo.feat_dict.items():
-                    #Choose the zero index of the poly_subtr return because we are not messing with the polynomial vector itself
-                    #rr['data'] is NOT log10 transformed, so makes no sense to do the poly subtr
-                    datacontainer = {ch: self.poly_subtr(rr['Data'][ch])[0] for ch in rr['Data'].keys()} #THIS RETURNS a PSD, un-log transformed
-                    
-                    try:
-                        feat_dict[featname] = dofunc['fn'](datacontainer,self.data_basis,dofunc['param'])
-                    except:
-                        pdb.set_trace()
-                rr.update({'FeatVect':feat_dict})
-       
-        
-        def plot_feat(self,feat_name='Stim'):
-            #plot the feat of interest here!!!!
-            pass
             
 if __name__ == '__main__':
     #Unit Test
@@ -401,7 +409,7 @@ if __name__ == '__main__':
     #Load in preloaded file
     #DataFrame.full_sequence(data_path='/tmp/Chronic_Frame.npy')
     #DataFrame.full_sequence(data_path='/home/virati/Chronic_Frame.npy')
-    DataFrame.full_sequence()
+    #DataFrame.full_sequence()
     DataFrame.Save_Frame()
     
     #plot the PSDs for a specific phase

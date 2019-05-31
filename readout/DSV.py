@@ -50,12 +50,12 @@ sns.set_style("white")
 import time
 import copy
 
-#%%
-#OLD ELASTIC NET METHODS HERE
-
 
 #%%
 #general methods here
+
+def unity(x):
+    return x
 
 def L1_dist(x,y):
     return np.sum(np.abs(a-b) for a,b in zip(x,y))
@@ -74,8 +74,9 @@ def poly_subtr(fvect,inp_psd,polyord=4):
     return 10**((log_psd - bl_correction)/10), pfit
 
 #%%            
-        
-class PSD_EN:
+
+class FSpect_Readout: # This is the ELASTIC NET - FULL SPECTRUM class
+    
     def __init__(self,cv=True,alphas=np.linspace(0.7,0.8,10),alpha=0.5):
 
         if cv:
@@ -132,60 +133,137 @@ class PSD_EN:
         self.performance['PearsonR'] = stats.pearsonr(self.norm_func(Y_Pred),self.norm_func(Y_true))
         self.performance['SpearmanR'] = stats.spearmanr(self.norm_func(Y_Pred),self.norm_func(Y_true))
 
+class RO:
+    #Parent readout class
 
-#Class for the 'Linear Frequency Model'
-# This model is PATIENT SPECIFIC and is not meant to be a generalized model, rather a METHODOLOGY
-class LFM:
-    def __init__(self,BRFrame,ClinFrame,patient='901',lim_freq=50):
-        print('Returning Recording List for ' + patient)
+    def __init__(self,BRFrame,ClinFrame,pts):
         self.YFrame = BRFrame
         self.CFrame = ClinFrame
-        self.patient = patient
+        self.pts = pts
         
-        #general parameters here
-        
-        
-        # Split out the dataset to train and validate
-        self.Patient_Data = BRFrame.grab_recs(reqs={'Patient':['901']})
 
-    def F_C_Matrix(self):
+    def vectorize_set(self,dataset):
         pass
 
-
-## NEW CLASS
-# This class is a wrapper over BRFrame that returns oscillatory states for every recording in every week
-class Osc_State:
-    # If each week only has one state, then it returns one state
-    # If each week has multiple states, it returns the distribution of states and the median state
-    def __init(self,BRFrame):
-        self.YFrame = BRFrame
-        
-
-# Our class for ondemand readout
-class ONDmd:
-    def __init__(self,BRFrame,ClinFrame,lim_freq=50):
-        self.YFrame = BRFrame
-        self.CFrame = ClinFrame
     
-    def prepare_data(self,validation=0.3):
-        #set up our data by doing a feature extraction
-        rec_list = self.YFrame.file_meta
+    def default_run(self):
+        #This method captures the default run used to generate the figures from the paper
+        self.split_validation_set()
+        self.vectorize_set(self.train_set)
+        self.train_model()
+        self.validate_model() #Gives us accuracy measurements
+        self.validate_controller(policy='BINARY')
+    
+    def train_model(self):
+        #We have a feature vector consisting of recordings and clinicals
+        #N obs x F feats + N obs of clin
+        
+       self.learned_model = self.regress_function(X,Y)
+    
+    def validate_model(self):
+        
+        summary_stats = self.prediction_accuracy(X_v,Y_v)
+        
+    def validate_controller(self):
+        pass
+        
+    def split_validation_set(self,split=True):
+        train_size = 0.5 #This is done just to maximize the chance of having a recording from all weeks, while minimizing the training set size      
+        self.train_set, self.valid_set = train_test_split(self.YFrame.file_meta,train_size=train_size,shuffle=True)
+    
+    def regress_function(self,X,Y):
+        pass
+
+class DMD_RO(RO): # This is our ondemand readout
+    # By default, it only runs on a single patient
+    # can have an option to run on all patients, but easier to put in the LFM model
+    def __init__(self,BRFrame,ClinFrame,pts=['901','903','905','906','907','908'],lim_freq=50):
+        super().__init__(BRFrame,ClinFrame,pts)
+            
+    def vectorize_set(self,dataset):
+        # This might have to be defined uniquely in each specific model type (below)
+        #Whatever the dataset is, vectorize is so we have X|Y
+        dsgn = [a['Data']['Osc'] for a in dataset]
+        pdb.set_trace()
+        #Find the phase for each recording, bring that phase into the matrix
+        c_dsgn = [self.ClinFrame[pt] for pt in self.pts]
+        
+class SCC_RO(RO): # This is the depression-level model on oscillatory features
+    # This is the primary readout class for us to do the DEPRESSION/SCIENTIFIC READOUT approach
+    def __init__(self,BRFrame,CFrame):
+        super().__init__(BRFrame,CFrame)
+        
+        self.dsgn_shape_params = ['logged','polyrem']#,'detrendX','detrendY','zscoreX','zscoreY']
+        
+        self.Model = {}
+        
+        self.norm_func = stats.zscore
+        
+        self.do_pts = ['901','903','905','906','907','908']
+        self.clin_measure = 'HDRS17'
+        
+        self.do_detrend = 'Block'
+        self.regression = 'ENR_O'
+        
+    def train_model(self):
+        self.split_validation_set(split=True)
+        self.extract_feats()
+    
+    def extract_feats(self):
+        print('Extracting Oscillatory Features')
+
+        big_list = self.YFrame.file_meta
+        fvect = self.YFrame.data_basis['F']
         for rr in big_list:
             feat_dict = {key:[] for key in dbo.feat_dict.keys()}
             for featname,dofunc in dbo.feat_dict.items():
-                datac = {ch: poly_subtr(rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()} #THIS RETURNS a PSD, un-log transformed
+                #pdb.set_trace()
+                #Choose the zero index of the poly_subtr return because we are not messing with the polynomial vector itself
+                #rr['data'] is NOT log10 transformed, so makes no sense to do the poly subtr
+                datacontainer = {ch: poly_subtr(fvect=fvect,inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()} #THIS RETURNS a PSD, un-log transformed
                 
-                feat_dict[featname] = dofunc['fn'](datac,self.YFrame.data_basis,dofunc['param'])
+                feat_dict[featname] = dofunc['fn'](datacontainer,self.YFrame.data_basis['F'],dofunc['param'])
             rr.update({'FeatVect':feat_dict})
             
-        # now split out our training and validation
-        self.train_set, self.valid_set = train_test_split(self.YFrame.file_meta, train_size=1-validation,shuffle=True)
+    def pt_CV(self):
+        all_pairs = list(itertools.combinations(self.do_pts,3))
+        num_pairs = len(list(all_pairs))
         
-    def link_training(self):
-        #now we're going to find the week associated with every training set recording
-        pdb.set_trace()
+        coeff_runs = [0] * num_pairs
+        summ_stats_runs  = [0] * num_pairs
+        
+        all_model_pairs = list(all_pairs)
+        #%%
+    
+        for run,pt_pair in enumerate(all_model_pairs):
+            print(pt_pair)
+            analysis.O_regress(method=rmethod,doplot=False,avgweeks=True,ignore_flags=False,circ='day',scale=test_scale,lindetrend=do_detrend,train_pts=pt_pair)
+            coeff_runs[run] = analysis.O_models(plot=False,models=[rmethod])
+            summ_stats_runs[run] = analysis.Clinical_Summary(rmethod,plot_indiv=False,ranson=dorsac,doplot=False)
+    
+        self.model.coeffs = coeff_runs
+        
+    def plot_stats(self):
+        pass
+    
+    def model_coeffs(self):
+        coeff_runs = self.model.coeffs
+        
+        left_coeffs = np.array([cc['Left'] for cc in coeff_runs])
+        right_coeffs = np.array([cc['Right'] for cc in coeff_runs])
+        
+        if do_plot: plot_coeffs(left_coeffs,right_coeffs)
+        
+        return left_coeffs, right_coeffs
             
-class DSV:
+    
+
+
+
+
+
+
+class DSV: # This is the old DSV class
     def __init__(self, BRFrame,ClinFrame,lim_freq=50):
         #load in the BrainRadio DataFrame we want to work with
         self.YFrame = BRFrame
@@ -550,9 +628,8 @@ class DSV:
     def gen_D_latent(self):
         pass
 
-
-class ORegress:
-    def __init__(self,BRFrame,inCFrame):
+class ORegress: # This is the old linear regression on oscillatory features module
+    def __init__(self,BRFrame,inCFrame,basic_setup=True):
         self.YFrame = BRFrame
         
         #Load in the clinical dataframe we will work with
@@ -563,7 +640,12 @@ class ORegress:
         
         self.norm_func = stats.zscore
         #self.norm_func = dbo.unity
-        
+        if basic_setup: self.default_setup()
+
+    def default_setup(self):
+        self.split_validation_set(do_split = True)
+        self.O_feat_extract()
+
     '''
     state_roster
     This function is meant to output an indexable dictionary where each week has associated with it all the recordings in it
@@ -580,15 +662,16 @@ class ORegress:
         print('Extracting Oscillatory Features')
         #print(dbo.feat_dict)
         big_list = self.YFrame.file_meta
+        fvect = self.YFrame.data_basis['F']
         for rr in big_list:
             feat_dict = {key:[] for key in dbo.feat_dict.keys()}
             for featname,dofunc in dbo.feat_dict.items():
-                pdb.set_trace()
+                #pdb.set_trace()
                 #Choose the zero index of the poly_subtr return because we are not messing with the polynomial vector itself
                 #rr['data'] is NOT log10 transformed, so makes no sense to do the poly subtr
-                datacontainer = {ch: poly_subtr(inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()} #THIS RETURNS a PSD, un-log transformed
+                datacontainer = {ch: poly_subtr(fvect=fvect,inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()} #THIS RETURNS a PSD, un-log transformed
                 
-                feat_dict[featname] = dofunc['fn'](datacontainer,self.YFrame.data_basis,dofunc['param'])
+                feat_dict[featname] = dofunc['fn'](datacontainer,self.YFrame.data_basis['F'],dofunc['param'])
             rr.update({'FeatVect':feat_dict})
             
     def plot_feat_scatters(self,week_avg=False,patients='all'):
@@ -895,10 +978,6 @@ class ORegress:
         #print('Shuffle: IP similarity is:' + str(self.Model[method]['Performance']['DProd']['Dot']) + ' | Percentage of surrogate IPs larger: ' + str(np.sum(np.abs(self.Model[method]['Performance']['DProd']['Distr']) > self.Model[method]['Performance']['DProd']['Dot'])/len(self.Model[method]['Performance']['DProd']['Distr'])) + '|| Perfect: ' + str(self.Model[method]['Performance']['DProd']['Perfect']))
         #plt.figure();plt.hist(self.Model[method]['Performance']['DProd']['Distr'])
         return copy.deepcopy(self.Model[method]['Performance']['DProd'])
-        
-
-    def new_regress(self,method):
-        pass
 
     #Method for the actual oscillatory regression
     #TODO Need to split this out into the regression method and then the 'test-train' scheme method

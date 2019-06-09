@@ -29,6 +29,7 @@ import os
 import datetime
 import glob
 import json
+import pickle
 
 #This function is a general function that finds the "nearest" object to the pivot
 #Used in this module for finding the nearest datetime
@@ -39,51 +40,39 @@ def nearest(items,pivot):
 #The frame is supposed to only go from Raw Rec -> PSDs, this can later be passed to analysis classes
 #Split out anything else into separate classes where the object this generates can go in
 class BR_Data_Tree:
-    data_root_dir = '/home/virati/MDD_Data' #Where is the raw data?
-    im_root_dir = '/home/virati' #the root directory for intermediate file
-
-    def __init__(self,do_pts=['901','903','905','906','907','908'],preload=False,preFrame=''):
+    data_root_dir = '/home/virati/MDD_Data/' #Where is the raw data?
+    im_root_dir = '/home/virati/Dropbox/Data/' #the root directory for intermediate file
+    sec_end = 10
+    def __init__(self,preFrame,do_pts=['901','903','905','906','907','908']):
         #Fix this and don't really make it accessible; we'll stick with a single intermediate file unless you really want to change it
 
         self.do_pts = do_pts
         self.fs = 422
 
+        # Load in our clinical vector object with the data from ClinVec.json
+        CVect = json.load(open('/home/virati/Dropbox/projects/Research/MDD-DBS/Data/ClinVec.json'))['HAMDs']
+        clinvect = {pt['pt']: pt for pt in CVect}
+        self.ClinVect = clinvect
 
-        if preFrame == '':
+        self.data_basis = defaultdict()
+
+
+        if preFrame == 'GENERATE':
             print('Generating the dataframe...')
-            self.generate_data_tree()
+            self.generate_sequence()
             #Save it now
             self.Save_Frame()
             #Now just dump us out so we can do whatever we need to with the file above
 
         else:
             # IF we're loading in a preframe, we're probably doing a bigger analysis
+            self.preFrame_file = self.im_root_dir + preFrame
+            print('Loading in PreFrame...' + self.preFrame_file)
+            self.Import_Frame(self.preFrame_file)
 
-            print('Loading in PreFrame...' + self.root_dir + '/' + preFrame)
-            self.im_file = self.root_dir + '/' + preFrame
-            self.
-
-        self.intermediate_file = intermediate_file
-
-        
-        # Load in our clinical vector object with the data from ClinVec.json
-        CVect = json.load(open('/home/virati/Dropbox/projects/Research/MDD-DBS/Data/ClinVec.json'))['HAMDs']
-        clinvect = {pt['pt']: pt for pt in CVect}
-        self.ClinVect = clinvect
-        
-        # This is the flag to whether we want to preload the data
-        self.preloadData = preload
-        self.data_basis = defaultdict()
-        
         #how many seconds to take from the chronic recordings
-        self.sec_end = 10
 
-        if 1: self.default_sequence()
-    def generate_data_tree(self):
-        # The main method to GENERATE our data tree by crawling the BR folder structure
-        pass
-
-    def default_sequence(self):
+    def generate_sequence(self):
         # Here we build the dictionary with all of our phases and files
         self.build_phase_dict()
         
@@ -92,7 +81,7 @@ class BR_Data_Tree:
         self.meta_files()
         
         #Load in our data (timeseries)
-        self.Load_Data(prebuilt=self.intermediate_file,domain='F')
+        self.Load_Data(domain='F')
         #now go in and remove anything with a bad flag
         self.Remove_BadFlags()
         
@@ -250,11 +239,9 @@ class BR_Data_Tree:
     def meta_files(self,mode='Chronic'):
         # Here we're loading in the files that are in the MODE that we want
         # So far, the primary mode here is CHRONIC which consists of ambulatory recordings using the PC+S
-        
-        if not self.preloadData:
-            file_meta = [{} for _ in range(len(self.file_list))]
-        else:
-            file_meta = self.file_meta
+
+        file_meta = [{} for _ in range(len(self.file_list))]
+
         
         for ff,filen in enumerate(self.file_list):
             #we're going to to each and every file now and give it its metadata
@@ -289,46 +276,40 @@ class BR_Data_Tree:
         new_meta = [rr for rr in self.file_meta if rr['Phase'] != None]
         
         self.file_meta = new_meta
-            
-    def Load_Data(self,domain='F',prebuilt=''):
+
+    def Import_Frame(self,preBuilt):
+        print('Loading data from...' + self.im_root_dir)
+        self.file_meta = np.load(self.preFrame_file,allow_pickle=True)
+
+    def Load_Data(self,domain='F'):
         #This is the main function that loads in our FEATURES
-        
-        # Do we want to preload the data from an already made file? This checks internal consistency
-        if self.preloadData == True and prebuilt == '':
-            raise Exception('INCONSISTENT LOADING: Preload Flag is True but no Path Specified')
-        
+        # This function should ALWAYS crawl the file structure and bring in the raw data
+        # Use Import_Data to bring in an intermediate file
+
         if domain == 'F':
             self.data_basis[domain] = np.linspace(0,self.fs/2,2**9+1)
         elif domain == 'T':
             self.data_basis[domain] = np.linspace(0,self.sec_end)
-        
-        
+
+        for rr in self.file_meta:
+            #load in the file
+            print('Loading in ' + rr['Filename'])
+            precheck_data = self.load_file(rr['Filename'],domain=domain)
             
-        if prebuilt == '':
-            for rr in self.file_meta:
-                #load in the file
-                print('Loading in ' + rr['Filename'])
-                precheck_data = self.load_file(rr['Filename'],domain=domain)
-                
-                if precheck_data['Left'].all() != 0 and precheck_data['Right'].all() != 0:
-                    rr.update({'Data':precheck_data})
-                else:
-                    rr.update({'BadFlag':True})
-                    
-            self.preloadData = False
-            
-        else:
-            print('Loading data from...' + self.data_path)
-            self.file_meta = np.load(self.data_path,allow_pickle=True)
-            self.preloadData = True
+            if precheck_data['Left'].all() != 0 and precheck_data['Right'].all() != 0:
+                rr.update({'Data':precheck_data})
+            else:
+                rr.update({'BadFlag':True})
+
 
             
     def Save_Frame(self,name_addendum=''):
-        print('Saving File Metastructure in ' + self.root_dir + '...')
-        
-        np.save(self.root_dir + '/Chronic_Frame' + name_addendum + '.npy',self.file_meta)
+        print('Saving File Metastructure in ' + self.im_root_dir + '...')
+        #np.save(self.im_root_dir + '/Chronic_Frame' + name_addendum + '.npy',self.file_meta)
 
-            
+        #Try pickling below
+        pickle.dump(self,open('/tmp/Chronic_Frame' + name_addendum + '.pickle',"wb"))
+
     def load_file(self,fname,load_intv=(0,-1),domain='T'):
         #call the DBSOsc br_load_method
         #should be 1:1 from file_meta to ts_data
@@ -360,7 +341,6 @@ class BR_Data_Tree:
         
 #%%
     # Plotting methods in the class
-    
     def plot_file_PSD(self,fname=''):
         if fname != '':
             psd_interest = [(rr['Data']['Left'],rr['Data']['Right']) for rr in DataFrame.file_meta if rr['Filename'] == fname]
@@ -401,15 +381,5 @@ class BR_Data_Tree:
             
 if __name__ == '__main__':
     #Unit Test
-    DataFrame = BR_Data_Tree()
-    #DataFrame.list_files()
-    #DataFrame.build_phase_dict()
-    #DataFrame.meta_files()
-    
-    #Load in preloaded file
-    #DataFrame.full_sequence(data_path='/tmp/Chronic_Frame.npy')
-    #DataFrame.full_sequence(data_path='/home/virati/Chronic_Frame.npy')
-    #DataFrame.full_sequence()
-    DataFrame.Save_Frame()
-    
-    #plot the PSDs for a specific phase
+    # Generate our dataframe
+    DataFrame = BR_Data_Tree(preFrame='GENERATE')

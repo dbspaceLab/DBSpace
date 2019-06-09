@@ -15,13 +15,14 @@ from sklearn import metrics
 from sklearn.metrics import roc_curve
 from sklearn.metrics import precision_recall_curve, average_precision_score, auc
 
+import warnings
 from collections import defaultdict
 import itertools as itt
 from itertools import compress
 
 import json
 
-import pdb
+import ipdb
 
 import numpy as np
 import scipy.stats as stats
@@ -50,7 +51,6 @@ sns.set_style("white")
 import time
 import copy
 
-
 #%%
 #general methods here
 
@@ -64,93 +64,66 @@ def L2_dist(x,y):
     return np.linalg.norm(x-y)
 
 def poly_subtr(fvect,inp_psd,polyord=4):
+    # This function takes in a raw PSD, Log transforms it, poly subtracts, and then returns the unloged version.
     #log10 in_psd first
-    log_psd = 10*np.log10(inp_psd)
-    pfit = np.polyfit(fvect,log_psd,polyord)
-    pchann = np.poly1d(pfit)
-    
-    bl_correction = pchann(fvect)
-    
+    try:
+        log_psd = 10*np.log10(inp_psd)
+        pfit = np.polyfit(fvect,log_psd,polyord)
+        pchann = np.poly1d(pfit)
+        
+        bl_correction = pchann(fvect)
+    except Exception as e:
+        print(e)
+        ipdb.set_trace()
+        
     return 10**((log_psd - bl_correction)/10), pfit
 
 #%%            
-
-class FSpect_Readout: # This is the ELASTIC NET - FULL SPECTRUM class
-    
-    def __init__(self,cv=True,alphas=np.linspace(0.7,0.8,10),alpha=0.5):
-
-        if cv:
-            print('Running ENet CV')
-            #This works great!
-            #l_ratio = np.linspace(0.2,0.5,20)
-            #alpha_list = np.linspace(0.7,0.9,10)
-            
-            #play around here
-            #THIS WORKS WELL#l_ratio = np.linspace(0.2,0.3,20)
-            #l_ratio = np.linspace(0.3,0.5,30)
-            l_ratio = np.linspace(0.2,0.5,30)
-            alpha_list = alphas
-            
-            
-            #self.ENet = ElasticNetCV(cv=10,tol=0.01,fit_intercept=True,l1_ratio=np.linspace(0.1,0.1,20),alphas=np.linspace(0.1,0.15,20))
-            self.ENet = ElasticNetCV(l1_ratio=l_ratio,alphas=alpha_list,cv=15,tol=0.001,normalize=True,positive=False,copy_X=True,fit_intercept=True)
-        else:
-            raise ValueError
-            alpha = 0.12
-            print('Running Normal ENet w/ alpha ' + str(alpha))
-            self.ENet = ElasticNet(alpha=alpha,l1_ratio=0.1,max_iter=1000,normalize=True,positive=False,fit_intercept=True,precompute=True,copy_X=True)
-            
-        self.performance = {'Train_Error':0,'Test_Error':0}
-        
-            
-    def Train(self,X,Y):
-        #get the shape of the X and Y
-        try:
-            assert X.shape[0] == Y.shape[0]
-        except:
-            ipdb.set_trace()
-        
-        self.n_obs = Y.shape[0]
-        
-        self.ENet.fit(X,Y.reshape(-1))
-        
-        #do a predict to see what the fit is for
-        Y_train_pred = self.ENet.predict(X).reshape(-1,1)
-        
-        self.train_Ys = (Y_train_pred,Y)
-        
-        self.performance['Train_Error'] = self.ENet.score(X,Y)
-        print('ENet CV Params: Alpha: ' + str(self.ENet.alpha_) + ' l ratio: ' + str(self.ENet.l1_ratio_))
-    
-    def Test(self,X,Y_true):
-        
-        assert X.shape[0] == Y_true.shape[0]
-        
-        Y_Pred = self.ENet.predict(X).reshape(-1,1)
-        
-        self.Ys = (Y_Pred,Y_true)
-        self.performance['Test_Error'] = self.ENet.score(X,Y_true)
-        self.performance['PearsonR'] = stats.pearsonr(self.norm_func(Y_Pred),self.norm_func(Y_true))
-        self.performance['SpearmanR'] = stats.spearmanr(self.norm_func(Y_Pred),self.norm_func(Y_true))
-
 class RO:
     #Parent readout class
 
-    def __init__(self,BRFrame,ClinFrame,pts):
+    def __init__(self,BRFrame,ClinFrame,pts,clin_measure='HDRS17'):
         self.YFrame = BRFrame
         self.CFrame = ClinFrame
         self.pts = pts
-        
+        self.c_meas = clin_measure
+        self.fvect = self.YFrame.data_basis
 
     def vectorize_set(self,dataset):
-        pass
+        #First, we're going to go through all the recordings and pull out the patients we want
 
+        pt_lim = [rec for rec in dataset if rec['Patient'] in self.pts]
+        # Now, we want to limit it only to the daytime recordings
+        day_pt_lim = [rec for rec in pt_lim if rec['Circadian'] == 'day']
+        # The DATA entry in each recording is NOT log transformed
+        # Now, go through each recording and extract the features we want.
+        self.feature_extract(day_pt_lim)
+        
+        #Now, go in and associate each recording with their respective clinical score
+        c_score = [self.CFrame.clin_dict['DBS'+rec['Patient']][rec['Phase']][self.c_meas] for rec in day_pt_lim]
+        
+        #so, basically.... now we have every recording with its associated c_score....
+        out_matrix = [(day_pt_lim)]
+        
+        self.day_pt_lim = day_pt_lim
+        
+        print('test')
     
+    def feature_extract(self,rec_list):
+        #This function will be different for different classes
+        feat_list = [(poly_subtr(self.fvect,rec['Data']['Left']),poly_subtr(self.fvect,rec['Data']['Right'])) for rec in rec_list]
+        
+
     def default_run(self):
         #This method captures the default run used to generate the figures from the paper
         self.split_validation_set()
+
+        #Here we want to vectorize our training set
         self.vectorize_set(self.train_set)
+
+        #Once our training set is vectorized, we want to train the model
         self.train_model()
+
         self.validate_model() #Gives us accuracy measurements
         self.validate_controller(policy='BINARY')
     
@@ -179,14 +152,7 @@ class DMD_RO(RO): # This is our ondemand readout
     # can have an option to run on all patients, but easier to put in the LFM model
     def __init__(self,BRFrame,ClinFrame,pts=['901','903','905','906','907','908'],lim_freq=50):
         super().__init__(BRFrame,ClinFrame,pts)
-            
-    def vectorize_set(self,dataset):
-        # This might have to be defined uniquely in each specific model type (below)
-        #Whatever the dataset is, vectorize is so we have X|Y
-        dsgn = [a['Data']['Osc'] for a in dataset]
-        pdb.set_trace()
-        #Find the phase for each recording, bring that phase into the matrix
-        c_dsgn = [self.ClinFrame[pt] for pt in self.pts]
+        
         
 class SCC_RO(RO): # This is the depression-level model on oscillatory features
     # This is the primary readout class for us to do the DEPRESSION/SCIENTIFIC READOUT approach
@@ -260,11 +226,13 @@ class SCC_RO(RO): # This is the depression-level model on oscillatory features
 
 
 
-
+#%%
+# OLD METHODS< WILL BE DEPRECATED SOON
 
 
 class DSV: # This is the old DSV class
     def __init__(self, BRFrame,ClinFrame,lim_freq=50):
+        warnings.warn("deprecated", DeprecationWarning)
         #load in the BrainRadio DataFrame we want to work with
         self.YFrame = BRFrame
         
@@ -630,6 +598,7 @@ class DSV: # This is the old DSV class
 
 class ORegress: # This is the old linear regression on oscillatory features module
     def __init__(self,BRFrame,inCFrame,basic_setup=True):
+        warnings.warn("deprecated", DeprecationWarning)
         self.YFrame = BRFrame
         
         #Load in the clinical dataframe we will work with
@@ -806,7 +775,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         
         ###THIS IS NEW
         #generate our stack of interest, with all the flags and all
-        import pdb
+        
         #pdb.set_trace()
         try: pt_dict_flags = {pt:{phase:[rec for rec in fmeta if rec['Patient'] == pt and rec['Phase'] == phase] for phase in ePhases} for pt in pts}
         except: pdb.set_trace()
@@ -1125,12 +1094,16 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         Cpredictions = (self.Model[method]['Cpredictions'].reshape(-1,1))
         Ctest = (self.Model[method]['Ctest'].reshape(-1,1))
 
-        
         #Do the stats here
-        self.Model[method]['Performance']['PearsCorr'] = stats.pearsonr(Cpredictions.reshape(-1,1),Ctest.astype(float).reshape(-1,1))
-        self.Model[method]['Performance']['SpearCorr'] = stats.spearmanr(Cpredictions.reshape(-1,1),Ctest.astype(float))
-        self.Model[method]['Performance']['Permutation'] = self.shuffle_summary(method)
-        
+        try:
+            pass
+            self.Model[method]['Performance']['PearsCorr'] = stats.pearsonr(Cpredictions.astype(float).reshape(-1,),Ctest.astype(float).reshape(-1,))
+            self.Model[method]['Performance']['SpearCorr'] = stats.spearmanr(Cpredictions.astype(float).reshape(-1,),Ctest.astype(float).reshape(-1,))
+            self.Model[method]['Performance']['Permutation'] = self.shuffle_summary(method)
+        except Exception as e:
+            print(e)
+            pdb.set_trace()
+
         #Then we do Spearman's R
         print('Spearmans R: ' + str(self.Model[method]['Performance']['SpearCorr']))
         print('Pearsons R: ' + str(self.Model[method]['Performance']['PearsCorr']))
@@ -1929,4 +1902,63 @@ class ORegress: # This is the old linear regression on oscillatory features modu
                 plt.legend()
         
         return algo_avg_prec, pr_curves
+    
+class FSpect_Readout: # This is the ELASTIC NET - FULL SPECTRUM class
+    
+    def __init__(self,cv=True,alphas=np.linspace(0.7,0.8,10),alpha=0.5):
+
+        if cv:
+            print('Running ENet CV')
+            #This works great!
+            #l_ratio = np.linspace(0.2,0.5,20)
+            #alpha_list = np.linspace(0.7,0.9,10)
+            
+            #play around here
+            #THIS WORKS WELL#l_ratio = np.linspace(0.2,0.3,20)
+            #l_ratio = np.linspace(0.3,0.5,30)
+            l_ratio = np.linspace(0.2,0.5,30)
+            alpha_list = alphas
+            
+            
+            #self.ENet = ElasticNetCV(cv=10,tol=0.01,fit_intercept=True,l1_ratio=np.linspace(0.1,0.1,20),alphas=np.linspace(0.1,0.15,20))
+            self.ENet = ElasticNetCV(l1_ratio=l_ratio,alphas=alpha_list,cv=15,tol=0.001,normalize=True,positive=False,copy_X=True,fit_intercept=True)
+        else:
+            raise ValueError
+            alpha = 0.12
+            print('Running Normal ENet w/ alpha ' + str(alpha))
+            self.ENet = ElasticNet(alpha=alpha,l1_ratio=0.1,max_iter=1000,normalize=True,positive=False,fit_intercept=True,precompute=True,copy_X=True)
+            
+        self.performance = {'Train_Error':0,'Test_Error':0}
+        
+            
+    def Train(self,X,Y):
+        #get the shape of the X and Y
+        try:
+            assert X.shape[0] == Y.shape[0]
+        except:
+            ipdb.set_trace()
+        
+        self.n_obs = Y.shape[0]
+        
+        self.ENet.fit(X,Y.reshape(-1))
+        
+        #do a predict to see what the fit is for
+        Y_train_pred = self.ENet.predict(X).reshape(-1,1)
+        
+        self.train_Ys = (Y_train_pred,Y)
+        
+        self.performance['Train_Error'] = self.ENet.score(X,Y)
+        print('ENet CV Params: Alpha: ' + str(self.ENet.alpha_) + ' l ratio: ' + str(self.ENet.l1_ratio_))
+    
+    def Test(self,X,Y_true):
+        
+        assert X.shape[0] == Y_true.shape[0]
+        
+        Y_Pred = self.ENet.predict(X).reshape(-1,1)
+        
+        self.Ys = (Y_Pred,Y_true)
+        self.performance['Test_Error'] = self.ENet.score(X,Y_true)
+        self.performance['PearsonR'] = stats.pearsonr(self.norm_func(Y_Pred),self.norm_func(Y_true))
+        self.performance['SpearmanR'] = stats.spearmanr(self.norm_func(Y_Pred),self.norm_func(Y_true))
+
             

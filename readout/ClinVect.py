@@ -195,7 +195,7 @@ class CFrame:
                 #self.clin_dict[pt][ph_lut[phph]]['DSC']= new_scores[phph]
                 self.clin_dict['DBS'+pat][ph_lut[phph]]['DSC'] = DSC_scores[phph]/3
             '''
-    
+    '''Plot whatever scale we want to'''
     def plot_scale(self,scale='HDRS17',pts='all'):
         if pts == 'all':
             pts = dbo.all_pts
@@ -218,6 +218,7 @@ class CFrame:
         pt_tcourse = {rr:self.clin_dict['DBS'+pt][rr] for rr in self.clin_dict['DBS'+pt]}
         return pt_tcourse
     
+    '''this returns to us a big dictionary with all our scales'''
     def c_dict(self):
         clindict = self.clin_dict
         #This will generate a dictionary with each key being a scale, but each value being a matrix for all patients and timepoints
@@ -369,6 +370,17 @@ class CFrame:
         #TODO do B-- filtering here
         
         return full_table
+    
+    def week_labels(self):
+        week_labels = ['A04','A03','A02','A01','B01','B02','B03','B04']
+        for ii in range(24):
+            if ii < 10:
+                ii_label = '0' + str(ii)
+            else:
+                ii_label = str(ii)
+                
+            week_labels.append('C' + ii_label)
+        return week_labels
     
     '''
     TODO

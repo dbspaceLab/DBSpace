@@ -20,6 +20,7 @@ import pylab
 from mpl_toolkits.mplot3d import Axes3D
 
 from mayavi.mlab import *
+import mayavi.mlab as mlab
 
 def return_adj_net(dist_thresh = 3):
     egipos = mne.channels.read_montage('/tmp/GSN-HydroCel-257.sfp')
@@ -49,6 +50,7 @@ def get_coords(scale,montage='dense'):
     return etrodes
     
 
+#This function is to plot vector data for each channel at the channel's coordinates
 def plot_3d_locs(band,ax,n=1,scale=1,clims=(0,0),label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense'):
     #fig = plt.figure()
     
@@ -91,6 +93,7 @@ def plot_3d_locs(band,ax,n=1,scale=1,clims=(0,0),label='generic',animate=False,u
             plt.savefig('/tmp/'+ label + '_' + strangl[-3:] + '.png')
             time.sleep(.3)
 
+# The goal of this is to plot the bands on the scalp
 def plot_3d_scalp(band,infig=[],n=1,clims=(0,0),scale=1,label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense',alpha=1,marker_scale=5):
     #fig = plt.figure()
     
@@ -193,21 +196,29 @@ def plot_3d_scalp(band,infig=[],n=1,clims=(0,0),scale=1,label='generic',animate=
 This function takes in COORDINATES and plots dots at those COORDINATES
 '''
 def plot_coords(band, active_mask=[],rad= [],color=[0.,0.,0.],plot_overlay = True,alpha=0.8):
-    if not rad:
-        rad = np.zeros_like(band[:,2])
-        rad[active_mask] = 20
-        rad2 = 20*np.ones_like(rad)
-        rad2[active_mask] = 0
-        #rad = np.random.normal(size=band[:,2].shape)
+    if active_mask == []:
+        active_mask = np.ones_like(band[:,-1]).astype(np.bool)
+        rad_factor = 10
+    else:
+        band = band[active_mask,:]
+        rad_factor = 20
         
+    if not rad:
+        #rad = np.zeros_like(band[:,2])
+        #rad[active_mask] = 20
+        rad = rad_factor*np.ones_like(band[:,-1])
+        #rad[active_mask] = 0
+        #rad = np.random.normal(size=band[:,2].shape)
+
+    
     #figure(bgcolor=(1,1,1))
-    nodes = points3d(band[:,0],band[:,1],band[:,2], rad,color=color, scale_factor=2,opacity=alpha)
+    nodes = points3d(band[:,0],band[:,1],band[:,2], rad,color=color, scale_factor=10,opacity=alpha)
     nodes.glyph.scale_mode = 'scale_by_vector'
     
     if plot_overlay:
-        points3d(band[:,0],band[:,1],band[:,2], rad2,color=(0.,0.,0.),colormap="copper", scale_factor=.25,opacity=alpha/2)
+        points3d(band[:,0],band[:,1],band[:,2], rad2,color=(0.,0.,0.),colormap="copper", scale_factor=.4,opacity=alpha/2)
 
-def plot_tracts(band, active_mask=[],rad= [],color=[0.,0.,0.]):
+def plot_tracts(band, active_mask=[],rad= [],color=[0.,0.,0.],alpha=1):
     if not rad:
         rad = np.zeros_like(band[:,2])
         rad[active_mask] = 20
@@ -215,7 +226,8 @@ def plot_tracts(band, active_mask=[],rad= [],color=[0.,0.,0.]):
         rad2[active_mask] = 0
         #rad = np.random.normal(size=band[:,2].shape)
     
-    plot3d(band[:,0],band[:,1],band[:,2],color=color,opacity=0.8)
+    #plot3d(band[:,0],band[:,1],band[:,2],color=color,opacity=0.8)
+    points3d(band[:,0],band[:,1],band[:,2], rad2,color=color,colormap="copper", scale_factor=.4,opacity=alpha/2)
     
 def maya_band_display(band,montage='dense'):
     if montage == 'dense':
@@ -223,11 +235,15 @@ def maya_band_display(band,montage='dense'):
     elif montage == 'standard':
         fname = '/home/virati/Dropbox/standard_postfixed.elc'
     
+    mlab.figure(bgcolor=(1.0,1.0,1.0))
+    
     egipos = mne.channels.read_montage(fname)
     etrodes = egipos.pos
     
     
+    # Make a single sphere for the head
     head = points3d(0,0,0,scale_factor=15)
+    # Setup electrodes as spheres around head
     nodes = points3d(etrodes[:,0],etrodes[:,1],etrodes[:,2], scale_factor=2)
     nodes.glyph.scale_mode = 'scale_by_vector'
     
@@ -237,7 +253,7 @@ def maya_band_display(band,montage='dense'):
 
     #This sets the colors for the nodes themselves to the band  changes after normalization into [0,1]
     nodes.mlab_source.dataset.point_data.scalars = (band_norm)
-    show()
+    #show()
     
 def plot_maya_scalp(band,n=1,clims=(0,0),color=(1.,0.,0.),scale=1,label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense',alpha=1):
     

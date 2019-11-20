@@ -14,6 +14,7 @@ from sklearn.model_selection import train_test_split
 from sklearn import metrics
 from sklearn.metrics import roc_curve
 from sklearn.metrics import precision_recall_curve, average_precision_score, auc
+from sklearn.metrics import roc_auc_score
 
 import warnings
 from collections import defaultdict
@@ -64,11 +65,13 @@ def L2_dist(x,y):
     return np.linalg.norm(x-y)
 
 def poly_subtr(fvect,inp_psd,polyord=4):
+    #fvect HAS to be a vector function
     # This function takes in a raw PSD, Log transforms it, poly subtracts, and then returns the unloged version.
     #log10 in_psd first
+    log_psd = 10*np.log10(inp_psd)
+    pfit = np.polyfit(fvect,log_psd,polyord)
     try:
-        log_psd = 10*np.log10(inp_psd)
-        pfit = np.polyfit(fvect,log_psd,polyord)
+
         pchann = np.poly1d(pfit)
         
         bl_correction = pchann(fvect)
@@ -88,46 +91,58 @@ class RO:
         self.pts = pts
         self.c_meas = clin_measure
         self.fvect = self.YFrame.data_basis
-
+        
+    def clin_extract(self):
+        for rr in self.active_list:
+            rr.update({'ClinVect': self.CFrame.clin_dict['DBS'+rr['Patient']][rr['Phase']][self.c_meas]})
+            
     def vectorize_set(self,dataset):
         #First, we're going to go through all the recordings and pull out the patients we want
-
-        pt_lim = [rec for rec in dataset if rec['Patient'] in self.pts]
-        # Now, we want to limit it only to the daytime recordings
-        day_pt_lim = [rec for rec in pt_lim if rec['Circadian'] == 'day']
-        # The DATA entry in each recording is NOT log transformed
         # Now, go through each recording and extract the features we want.
-        self.feature_extract(day_pt_lim)
-        
-        #Now, go in and associate each recording with their respective clinical score
-        c_score = [self.CFrame.clin_dict['DBS'+rec['Patient']][rec['Phase']][self.c_meas] for rec in day_pt_lim]
+        self.feature_extract() #This function works directly with the list and data to populate the feature/state vectors
+        self.clin_extract()
         
         #so, basically.... now we have every recording with its associated c_score....
-        out_matrix = [(day_pt_lim)]
-        
-        self.day_pt_lim = day_pt_lim
-        
-        print('test')
+        #The output of this should be a (Feats x Channs) x NRECS matrix
     
-    def feature_extract(self,rec_list):
-        #This function will be different for different classes
-        feat_list = [(poly_subtr(self.fvect,rec['Data']['Left']),poly_subtr(self.fvect,rec['Data']['Right'])) for rec in rec_list]
-        
+    def extract_feats(self):
+        print('Extracting Oscillatory Features')
 
+        big_list = self.YFrame.file_meta
+        fvect = self.YFrame.data_basis['F']
+        for rr in big_list:
+            feat_dict = {key:[] for key in dbo.feat_dict.keys()}
+            for featname,dofunc in dbo.feat_dict.items():
+                #pdb.set_trace()
+                #Choose the zero index of the poly_subtr return because we are not messing with the polynomial vector itself
+                #rr['data'] is NOT log10 transformed, so makes no sense to do the poly subtr
+                datacontainer = {ch: poly_subtr(fvect=fvect,inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()} #THIS RETURNS a PSD, un-log transformed
+                
+                feat_dict[featname] = dofunc['fn'](datacontainer,self.YFrame.data_basis['F'],dofunc['param'])
+            rr.update({'FeatVect':feat_dict})
+            
+    def feature_extract(self):
+        pass
+
+    def filter_recs(self,dataset):
+        pdb.set_trace()
+        self.active_list = [rr for rr in self.train_set if rr['Circ'] == 'day']
+    
     def default_run(self):
         #This method captures the default run used to generate the figures from the paper
         self.split_validation_set()
-
+        self.filter_recs(dataset=self.train_set)
         #Here we want to vectorize our training set
         self.vectorize_set(self.train_set)
 
         #Once our training set is vectorized, we want to train the model
-        self.train_model()
+        self.train_model(self.train_set)
 
-        self.validate_model() #Gives us accuracy measurements
+        self.validate_model(self.valid_set) #Gives us accuracy measurements
         self.validate_controller(policy='BINARY')
     
     def train_model(self):
+        #By this point, we assume we have an active matrix of the data from the recordings of interest
         #We have a feature vector consisting of recordings and clinicals
         #N obs x F feats + N obs of clin
         
@@ -152,6 +167,34 @@ class DMD_RO(RO): # This is our ondemand readout
     # can have an option to run on all patients, but easier to put in the LFM model
     def __init__(self,BRFrame,ClinFrame,pts=['901','903','905','906','907','908'],lim_freq=50):
         super().__init__(BRFrame,ClinFrame,pts)
+
+        #out_matrix = [(day_pt_lim)]
+    
+    def filter_recs(self,dataset):
+        pt_lim = [rec for rec in dataset if rec['Patient'] in self.pts and rec['Circadian'] == 'day']
+        # Now, we want to limit it only to the daytime recordings
+        #day_pt_lim = [rec for rec in pt_lim if rec['Circadian'] == 'day']
+        # The DATA entry in each recording is NOT log transformed
+        self.filtered_list = pt_lim
+        
+    def feature_extract(self):
+        rec_list = self.filtered_list
+        #This function will be different for different classes
+        # For readability, and compatibility with the dofunc approach, we'll do this by looping through each recording
+        for rr in rec_list:
+            feat_dict = {key:[] for key in dbo.feat_dict.keys()}
+            for featname,dofunc in dbo.feat_dict.items():
+                datacontainer = {ch: poly_subtr(fvect=self.fvect['F'],inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()} #THIS RETURNS a PSD, un-log transformed
+                feat_dict[featname] = dofunc['fn'](datacontainer,self.YFrame.data_basis['F'],dofunc['param'])
+            rr.update({'FeatVect':feat_dict})
+            
+        #The below is a cleanup of the above, but requires some refactoring of the oscillatory feature extraction system
+        #feat_list = [(poly_subtr(self.fvect['F'],rec['Data']['Left']),poly_subtr(self.fvect['F'],rec['Data']['Right'])) for rec in rec_list]
+        #for featname,dofunc in dbo.feat_dict.items():
+        #    datacontainer = {ch: poly_subtr(fvect=fvect,inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()} #THIS RETURNS a PSD, un-log transformed
+        #    feat_dict = dofunc[]
+        #       feat_dict[featname] = dofunc['fn'](datacontainer,self.YFrame.data_basis['F'],dofunc['param'])
+
         
         
 class SCC_RO(RO): # This is the depression-level model on oscillatory features
@@ -174,22 +217,6 @@ class SCC_RO(RO): # This is the depression-level model on oscillatory features
     def train_model(self):
         self.split_validation_set(split=True)
         self.extract_feats()
-    
-    def extract_feats(self):
-        print('Extracting Oscillatory Features')
-
-        big_list = self.YFrame.file_meta
-        fvect = self.YFrame.data_basis['F']
-        for rr in big_list:
-            feat_dict = {key:[] for key in dbo.feat_dict.keys()}
-            for featname,dofunc in dbo.feat_dict.items():
-                #pdb.set_trace()
-                #Choose the zero index of the poly_subtr return because we are not messing with the polynomial vector itself
-                #rr['data'] is NOT log10 transformed, so makes no sense to do the poly subtr
-                datacontainer = {ch: poly_subtr(fvect=fvect,inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()} #THIS RETURNS a PSD, un-log transformed
-                
-                feat_dict[featname] = dofunc['fn'](datacontainer,self.YFrame.data_basis['F'],dofunc['param'])
-            rr.update({'FeatVect':feat_dict})
             
     def pt_CV(self):
         all_pairs = list(itertools.combinations(self.do_pts,3))
@@ -199,7 +226,6 @@ class SCC_RO(RO): # This is the depression-level model on oscillatory features
         summ_stats_runs  = [0] * num_pairs
         
         all_model_pairs = list(all_pairs)
-        #%%
     
         for run,pt_pair in enumerate(all_model_pairs):
             print(pt_pair)
@@ -223,7 +249,9 @@ class SCC_RO(RO): # This is the depression-level model on oscillatory features
         return left_coeffs, right_coeffs
             
     
-
+class controller_analysis:
+    def __init__(self):
+        pass
 
 
 #%%
@@ -295,7 +323,6 @@ class DSV: # This is the old DSV class
             
         #if we want to reshape, do it here!
         #F_dsgn,C_dsgn = self.shape_F_C(X_dsgn,Y_dsgn,self.dsgn_shape_params)
-        
         
         return F_dsgn, 100*C_dsgn
 
@@ -1025,6 +1052,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         
         #Generate the predicted clinical states
         Cpredictions = regmodel.predict(Otest)
+        Cscore = regmodel.score(Otest)
         
         #reshape to vector
         Ctest = Ctest.reshape(-1,1)
@@ -1041,6 +1069,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
 
         #what if we do a final "logistic" part here...
         self.Model[method]['Model'] = regmodel
+        self.Model[method]['Score'] = Cscore
         if finalWrite:
             self.Model['FINAL']['Model'] = copy.deepcopy(regmodel)
         self.Model[method]['OTrain'] = Otrain
@@ -1429,6 +1458,49 @@ class ORegress: # This is the old linear regression on oscillatory features modu
                     
         return copy.deepcopy(self.Model[method]['Performance'])
 
+    def binary_classif(self,method,scale='HDRS17',do_detrend='None',do_plots=False,randomize=0.0,show_clin=True,do_pts=['901','903','905','906','907','908']):
+        Oval,Cval_base,labels_val = self.dsgn_O_C(do_pts,week_avg=True,circ='day',ignore_flags=True,scale=scale,from_set='VALIDATION',randomize=randomize)
+        
+        Cpred_base = self.Model[method]['Model'].predict(Oval)
+        self.Model['RANDOM']['Cpred'] = self.Model['RANDOM']['Model'].predict(Oval)
+        
+        Cval = copy.deepcopy(Cval_base)
+        Cpred = copy.deepcopy(Cpred_base)
+        
+        ## Normalize here
+        Cval = self.norm_func(Cval)
+        Cpred = self.norm_func(Cpred)
+        
+        
+        ### Do we want to plot the scatter here?
+        
+        ### DETREND CODE HERE
+        if do_detrend == 'None':
+            pass
+        elif do_detrend == 'Block':
+            #go through each patient and detrend for each BLOCK
+            try:
+                for pp,pt in enumerate(do_pts):
+                    cval_block = Cval[28*pp:28*(pp+1)]
+                    Cval[28*pp:28*(pp+1)] = sig.detrend(cval_block,axis=0,type='linear')
+                    cpred_block = Cpred[28*pp:28*(pp+1)]
+                    Cpred[28*pp:28*(pp+1)] = sig.detrend(cpred_block,axis=0,type='linear')
+            except Exception as e:
+                print(e)
+                pdb.set_trace()
+        
+        elif do_detrend == 'All':
+            Cval = sig.detrend(Cval,axis=0,type='constant')
+            Cpred = sig.detrend(Cpred,axis=0,type='constant')
+        
+        # First, we'll split the HDRS17 in half
+        Cval_binarized = Cval > 0
+        fpr,tpr,thresholds = metrics.roc_curve(Cval_binarized,Cpred)
+        roc_curve = (fpr,tpr,thresholds)
+        auc = roc_auc_score(Cval_binarized,Cpred)
+        
+        return auc, roc_curve
+    
     def Model_Validation(self,method,scale='HDRS17',do_detrend='None',do_plots=False,randomize=0.0,show_clin=True,do_pts=['901','903','905','906','907','908']):
         #This function does the final model validation on the held out validation set
         Oval,Cval_base,labels_val = self.dsgn_O_C(do_pts,week_avg=True,circ='day',ignore_flags=True,scale=scale,from_set='VALIDATION',randomize=randomize)
@@ -1439,6 +1511,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         
         Cpred_base = self.Model[method]['Model'].predict(Oval)
         self.Model['RANDOM']['Cpred'] = self.Model['RANDOM']['Model'].predict(Oval)
+    
         
         Cval = copy.deepcopy(Cval_base)
         Cpred = copy.deepcopy(Cpred_base)
@@ -1557,8 +1630,6 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         
         #Plot individually
         for pt in test_pts:
-            
-            
             #check if the sizes are right
             try:
                 assert len(Cpredictions) == len(labels['Patient'])
@@ -1582,7 +1653,6 @@ class ORegress: # This is the old linear regression on oscillatory features modu
                 
    
         x,y = (1,1)
-        
         
         ###
         #sweep threshold
@@ -1615,8 +1685,6 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         assesslr = linear_model.RANSACRegressor(base_estimator=linear_model.LinearRegression(fit_intercept=False),residual_threshold=1) #0.15 residual threshold works great!
         #Maybe flip this? Due to paper: https://www.researchgate.net/publication/230692926_How_to_Evaluate_Models_Observed_vs_Predicted_or_Predicted_vs_Observed
         assesslr.fit(Ctest,Cpredictions)
-        
-        
         line_x = np.linspace(-1,1,20).reshape(-1,1)
         line_y = assesslr.predict(line_x)
         
@@ -1648,8 +1716,6 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         #THESE TWO ARE THE SAME!!
         #print(method + ' model has ' + str(corrcoef) + ' correlation with real score (p < ' + str(pval) + ')')
         
-        
-        
         #PLOT the outlier points and their patient + phase
         outlier_phases = list(compress(labels['Phase'],outlier_mask))
         outlier_pt = list(compress(labels['Patient'],outlier_mask))
@@ -1657,58 +1723,64 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         ##What weeks are the outliers in?
         outlier_week_num = [int(weeknum[-2:]) for weeknum in outlier_phases]
         
-        
-        for change_after_step in [1,2,3,4]:
-            if plot:
-                plt.figure()
-                plt.hist(outlier_week_num)
+        if plot:
+            plt.figure()
+            sns.regplot(x=np.array(Ctest[inlier_mask]).squeeze(),y=np.array(Cpredictions[inlier_mask]).squeeze(),color='g')
+            #except Exception as error: print(error);ipdb.set_trace()
             
-                #plotting work
-        
-                scatter_alpha = 0.2
-        
-                    
-                plt.figure()
-                plt.scatter(Ctest[outlier_mask],Cpredictions[outlier_mask],alpha=scatter_alpha,color='gray')
-                for ii, txt in enumerate(outlier_phases):
-                    plt.annotate(txt+'\n'+outlier_pt[ii],(Ctest[outlier_mask][ii],Cpredictions[outlier_mask][ii]),fontsize=12,color='gray')
-                    
-                
-                #Plot all the inliers now
-                plt.scatter(Ctest[inlier_mask],Cpredictions[inlier_mask],alpha=scatter_alpha)
-                plt.plot(np.linspace(-x,x,2),np.linspace(-y,y,2),alpha=0.2,color='gray')
-                
-                #This is the regression line itself
-                plt.plot(line_x,line_y,color='green')
-                plt.axes().set_aspect('equal')
-                plt.annotate(s=str(100*np.sum(outlier_mask)/len(outlier_mask)) + '% outliers',xy=(-3,0),fontsize=12)
-            
-            
-            #%%
-            #Finally, let's label the clinician's changes
-            #find out the points that the stim was changed
-                if show_clin:
-                    stim_change_list = self.CFrame.Stim_Change_Table()
-                    ostimchange = []
-                    
-                    # FInd the stimchange locations
-                    for ii in range(Ctest.shape[0]):
-                        if (labels['Patient'][ii],labels['Phase'][ii]) in stim_change_list:                
-                            ostimchange.append(ii)
-                    #Anotate the stim change locations
-                    
-                    for ii in ostimchange:
-                        plt.annotate(labels['Patient'][ii] + ' ' + labels['Phase'][ii],(Ctest[ii],Cpredictions[ii]),fontsize=12,color='red')
-                        if ii + change_after_step < len(labels['Patient']):
-                            plt.annotate(labels['Patient'][ii+change_after_step] + ' ' + labels['Phase'][ii+change_after_step],(Ctest[ii+change_after_step],Cpredictions[ii+change_after_step]),fontsize=12,color='green')
-                        
-                    plt.scatter(Ctest[ostimchange],Cpredictions[ostimchange],alpha=scatter_alpha,color='red',marker='^',s=130)
-                    plt.scatter(Ctest[np.array(ostimchange)+change_after_step],Cpredictions[np.array(ostimchange)+change_after_step],alpha=1,color='green',marker='o',s=130)
-                
-                plt.xlabel(self.test_MEAS)
-                plt.ylabel('Predicted')
-                
-                sns.despine()
+        #I think here we start exploring structure across weeks...
+#        for change_after_step in [1,2,3,4]:
+#            if plot:
+#                plt.figure()
+#                plt.hist(outlier_week_num)
+#            
+#                #plotting work
+#        
+#                scatter_alpha = 0.2
+#        
+#                    
+#                plt.figure()
+#                plt.scatter(Ctest[outlier_mask],Cpredictions[outlier_mask],alpha=scatter_alpha,color='gray')
+#                for ii, txt in enumerate(outlier_phases):
+#                    plt.annotate(txt+'\n'+outlier_pt[ii],(Ctest[outlier_mask][ii],Cpredictions[outlier_mask][ii]),fontsize=12,color='gray')
+#                    
+#                
+#                #Plot all the inliers now
+#                plt.scatter(Ctest[inlier_mask],Cpredictions[inlier_mask],alpha=scatter_alpha)
+#                plt.plot(np.linspace(-x,x,2),np.linspace(-y,y,2),alpha=0.2,color='gray')
+#                
+#                #This is the regression line itself
+#                plt.plot(line_x,line_y,color='green')
+#                plt.axes().set_aspect('equal')
+#                plt.annotate(s=str(100*np.sum(outlier_mask)/len(outlier_mask)) + '% outliers',xy=(-3,0),fontsize=12)
+#            
+#            
+#            #%%
+#            #Finally, let's label the clinician's changes
+#            #find out the points that the stim was changed
+#                if show_clin:
+#                    stim_change_list = self.CFrame.Stim_Change_Table()
+#                    ostimchange = []
+#                    
+#                    # FInd the stimchange locations
+#                    for ii in range(Ctest.shape[0]):
+#                        if (labels['Patient'][ii],labels['Phase'][ii]) in stim_change_list:                
+#                            ostimchange.append(ii)
+#                    #Anotate the stim change locations
+#                    
+#                    for ii in ostimchange:
+#                        plt.annotate(labels['Patient'][ii] + ' ' + labels['Phase'][ii],(Ctest[ii],Cpredictions[ii]),fontsize=12,color='red')
+#                        if ii + change_after_step < len(labels['Patient']):
+#                            plt.annotate(labels['Patient'][ii+change_after_step] + ' ' + labels['Phase'][ii+change_after_step],(Ctest[ii+change_after_step],Cpredictions[ii+change_after_step]),fontsize=12,color='green')
+#                        
+#                    plt.scatter(Ctest[ostimchange],Cpredictions[ostimchange],alpha=scatter_alpha,color='red',marker='^',s=130)
+#                    #Unclear why the below errors now with an out of bound error
+#                    #plt.scatter(Ctest[np.array(ostimchange)+change_after_step],Cpredictions[np.array(ostimchange)+change_after_step],alpha=1,color='green',marker='o',s=130)
+#                
+#                plt.xlabel(self.test_MEAS)
+#                plt.ylabel('Predicted')
+#                
+#                sns.despine()
                 
         print('There are ' + str(sum(outlier_mask)/len(outlier_mask)*100) + '% outliers')
         

@@ -259,11 +259,13 @@ class controller_analysis:
 
 
 class DSV: # This is the old DSV class
-    def __init__(self, BRFrame,ClinFrame,lim_freq=50):
+    def __init__(self, BRFrame,ClinFrame,lim_freq=50,use_scale='HDRS17'):
         warnings.warn("deprecated", DeprecationWarning)
         #load in the BrainRadio DataFrame we want to work with
         self.YFrame = BRFrame
         
+        #which clinical measure do we use?
+        self.clin_scale = use_scale
         #Load in the clinical dataframe we will work with
         self.CFrame = ClinFrame
         self.dsgn_shape_params = ['logged']#,'detrendX','detrendY','zscoreX','zscoreY']
@@ -274,10 +276,12 @@ class DSV: # This is the old DSV class
         self.train_pts = ['901','903']
         self.test_pts = ['906','907','905','908']
     
-    def dsgn_F_C(self,pts,scale='HDRS17',week_avg=True):
+    def dsgn_F_C(self,pts,week_avg=True):
         #generate the X and Y needed for the regression
         fmeta = self.YFrame.file_meta
         ptcdict = self.CFrame.clin_dict
+        
+        scale = self.clin_scale
         
         if week_avg == False:
             print('Taking ALL Recordings')
@@ -307,7 +311,7 @@ class DSV: # This is the old DSV class
                 pt_list = np.squeeze(np.array(pt_list))
                 
                 #THIS IS WHERE SHAPING WILL HAPPEN
-                pt_list,polyvect = self.shape_PSD_stack(pt_list,plot=True,polyord=4)
+                pt_list,polyvect = self.OBSshape_PSD_stack(pt_list,plot=True,polyord=4)
                 
                 biglist.append(pt_list)
                 big_score.append(pt_score)
@@ -397,12 +401,13 @@ class DSV: # This is the old DSV class
             plt.plot(np.linspace(0,211,513),base_subtr[513:])
             plt.plot(np.linspace(0,211,513),pt_list[513:],alpha=0.2)
             
+            dyn_idx = self.trunc_fvect.shape[0]
             
             plt.subplot(223);
-            plt.plot(self.trunc_fvect,fix_pt_list[:146])
+            plt.plot(self.trunc_fvect,fix_pt_list[:dyn_idx])
                 
             plt.subplot(224);
-            plt.plot(self.trunc_fvect,fix_pt_list[146:])
+            plt.plot(self.trunc_fvect,fix_pt_list[dyn_idx:])
             
         return fix_pt_list,(pLeft,pRight)
             
@@ -429,7 +434,7 @@ class DSV: # This is the old DSV class
         self.train_F,self.train_C = self.dsgn_F_C(self.train_pts,week_avg=True)
         
         #setup our Elastic net here
-        Ealg = PSD_EN(cv=True,alphas=alpha_list)
+        Ealg = FSpect_Readout(cv=True,alphas=alpha_list)
         
         print("Training Elastic Net...")
         
@@ -437,7 +442,7 @@ class DSV: # This is the old DSV class
         
         #test phase
         
-        Ftest,Ctest = self.dsgn_F_C(self.test_pts,week_avg=True,scale=scale)
+        Ftest,Ctest = self.dsgn_F_C(self.test_pts,week_avg=True)
         print("Testing Elastic Net...")
         Ealg.Test(Ftest,Ctest)
         
@@ -1052,7 +1057,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         
         #Generate the predicted clinical states
         Cpredictions = regmodel.predict(Otest)
-        Cscore = regmodel.score(Otest)
+        Cscore = regmodel.score(Otest,Ctest)
         
         #reshape to vector
         Ctest = Ctest.reshape(-1,1)
@@ -1843,7 +1848,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         fake_change[fake_change_idxs] = 1
         
         precision,recall,_=precision_recall_curve(true_change,fake_change)
-        prauc = auc(precision,recall,reorder=True)
+        prauc = auc(recall, precision)
         avg_precision = average_precision_score(true_change,fake_change)
         
         return avg_precision
@@ -1860,7 +1865,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         oracle_change[stimchange] += 1
         
         precision,recall,_=precision_recall_curve(true_change,oracle_change)
-        prauc = auc(precision,recall,reorder=True)
+        prauc = auc(recall,precision)
         avg_precision = average_precision_score(true_change,oracle_change)
         
         return avg_precision
@@ -1990,7 +1995,7 @@ class FSpect_Readout: # This is the ELASTIC NET - FULL SPECTRUM class
             #l_ratio = np.linspace(0.3,0.5,30)
             l_ratio = np.linspace(0.2,0.5,30)
             alpha_list = alphas
-            
+            self.norm_func = unity
             
             #self.ENet = ElasticNetCV(cv=10,tol=0.01,fit_intercept=True,l1_ratio=np.linspace(0.1,0.1,20),alphas=np.linspace(0.1,0.15,20))
             self.ENet = ElasticNetCV(l1_ratio=l_ratio,alphas=alpha_list,cv=15,tol=0.001,normalize=True,positive=False,copy_X=True,fit_intercept=True)
@@ -2030,7 +2035,82 @@ class FSpect_Readout: # This is the ELASTIC NET - FULL SPECTRUM class
         
         self.Ys = (Y_Pred,Y_true)
         self.performance['Test_Error'] = self.ENet.score(X,Y_true)
-        self.performance['PearsonR'] = stats.pearsonr(self.norm_func(Y_Pred),self.norm_func(Y_true))
-        self.performance['SpearmanR'] = stats.spearmanr(self.norm_func(Y_Pred),self.norm_func(Y_true))
+        self.performance['SpearmanR'] = stats.spearmanr((Y_Pred),(Y_true))
+        #self.performance['PearsonR'] = stats.pearsonr(Y_Pred,Y_true)
+        #except: ipdb.set_trace()
+        
+class naive_readout:
+    mc_corrections = True
+    do_pts = ['901','903','905','906','907','908']
+    bands = ['Delta','Theta','Alpha','Beta*','Gamma1']
+    
+    def __init__(self,OBands_in,ClinFrame_in):
+        self.oscillatory_frame = OBands_in
+        self.clin_frame = ClinFrame_in
+        
+    def train_readout(self):
+        self.oscillatory_frame.feat_extract(do_corrections=self.mc_corrections)
+        
+        hdrs_info = self.clin_frame.min_max_weeks()
+        
+        week_distr = nestdict()
+        sig_stats = nestdict()
+        for pt in self.do_pts:
+            for ff in self.bands:
+                # if we want to compare max vs min hdrs
+                feats,sig_stats,week_distr[pt][ff] = self.oscillatory_frame.compare_states([hdrs_info[pt]['max']['week'],hdrs_info[pt]['min']['week']],feat=ff,circ='day',stat='ks')
+                # if we want to compare early vs late
+                #feats,sig_stats[pt][ff],week_distr[pt][ff] = feat_frame.compare_states(["C01","C24"],pt=pt,feat=ff,circ='day',stat='ks')
+        
+        self.week_distr = week_distr
+    
+    def aggr_distr(self,band='Alpha'):
+        depr_list = []
+        notdepr_list = []
+        aggr_week_distr = nestdict()
+        
+        for ff in band:
+            aggr_week_distr[ff] = {dz:{side:[item for sublist in [self.week_distr[pt][ff][side][dz] for pt in self.do_pts] for item in sublist] for side in ['Left','Right']} for dz in ['depr','notdepr']}
+    
+        return aggr_week_distr
+    
+    def depr_distr_cohort(self):
+        aggr_week_distr = self.aggr_distr(band=self.bands)
+        depr_list = []
+        notdepr_list = []
+        for side in ['Left','Right']:
+            for ff in self.bands:
+                depr_list.append(aggr_week_distr[ff]['depr'][side])
+                notdepr_list.append(aggr_week_distr[ff]['notdepr'][side])
 
+        #depr_list_flat = [item for sublist in depr_list for item in sublist]
+        #notdepr_list_flat = [item for sublist in notdepr_list for item in sublist]
+        
+        # Plot them all in same plot
+        plt.figure()
+        ax = sns.violinplot(data=depr_list,color='blue')
+        ax = sns.violinplot(data=notdepr_list,color='red',alpha=0.3)
+        _ = plt.setp(ax.collections,alpha=0.3)
+
+    def band_aggr_plot(self):
+        for ff in bands:
+            #aggr_week_distr[ff] = {dz:{side:[item for sublist in [week_distr[pt][ff][side][dz] for pt in pts] for item in sublist] for side in ['Left','Right']} for dz in ['depr','notdepr']}
+            aggr_week_distr = self.aggr_distr(band=ff)
+            
+            plt.figure()
+            for ss,side in enumerate(['Left','Right']):
+                
+                print(ff + ' ' + side)
+                
+                plt.subplot(1,2,ss+1)
+                ax = sns.violinplot(y=aggr_week_distr[ff]['depr'][side],alpha=0.2)
+                plt.setp(ax.collections,alpha=0.3)
+                ax = sns.violinplot(y=aggr_week_distr[ff]['notdepr'][side],color='red',alpha=0.2)
+                plt.setp(ax.collections,alpha=0.3)
+                print(stats.ks_2samp(np.array(aggr_week_distr[ff]['depr'][side]),np.array(aggr_week_distr[ff]['notdepr'][side])))
+                
+            plt.suptitle(ff + ' ' + ' min/max HDRS')
+
+
+        
             

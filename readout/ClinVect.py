@@ -11,6 +11,7 @@ import json
 from collections import defaultdict
 import numpy as np
 import sys
+sys.path.append('/home/virati/Dropbox/projects/libs/robust-pca/')
 import pdb
 
 import scipy.stats as stats
@@ -18,11 +19,13 @@ import scipy.signal as sig
 import scipy.io as sio
 
 #sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
-sys.path.append('/home/virati/Dropbox/projects/libs/robust-pca/')
-sys.path.append('/home/virati/Dropbox/projects/')
+
+#sys.path.append('/home/virati/Dropbox/projects/')
+
 #import rpcaADMM
 import r_pca
 import DBSpace as dbo
+from DBSpace import nestdict
 
 import matplotlib.pyplot as plt
 
@@ -54,7 +57,6 @@ class CFrame:
         ClinVect = json.load(open('/home/virati/Dropbox/projects/Research/MDD-DBS/Data/ClinVec.json'))
         
         #Setup the clinical dictionary structure
-        
         clin_dict = defaultdict(dict)
         #This populates the clinical dictionary structure
         for pp in range(len(ClinVect['HAMDs'])):
@@ -62,6 +64,7 @@ class CFrame:
             clin_dict[ab['pt']] = defaultdict(dict)
             for phph,phase in enumerate(ClinVect['HAMDs'][pp]['phases']):
                 for ss,scale in enumerate(incl_scales):
+                    
                     if norm_scales and scale != 'dates':
                         clin_dict[ab['pt']][phase][scale] = ab[scale][phph] / self.scale_max[scale]
                     elif scale != 'dates':
@@ -84,6 +87,7 @@ class CFrame:
                 ab = ClinVect['HAMDs'][pp]
                 if norm_scales:
                      DSS_dict[ab['pt']][scale] = np.array(ab[scale]) / self.scale_max[scale]
+                     DSS_dict[ab['pt']][scale+'raw'] = np.array(ab[scale])
                 else:
                      DSS_dict[ab['pt']][scale] = np.array(ab[scale])
                 
@@ -382,6 +386,26 @@ class CFrame:
             week_labels.append('C' + ii_label)
         return week_labels
     
+    
+    ''' Get the min and max weeks for each patient and the scale associated with that week'''
+    def min_max_weeks(self):
+        week_labels = self.week_labels()
+        hdrs_info = nestdict()
+        
+        for pt in self.do_pts:
+            pt_hdrs_traj = [a for a in self.DSS_dict['DBS'+pt]['HDRS17raw']][8:]
+            
+            hdrs_info[pt]['max']['index'] = np.argmax(pt_hdrs_traj)
+            hdrs_info[pt]['min']['index'] = np.argmin(pt_hdrs_traj)
+            hdrs_info[pt]['max']['week'] = week_labels[np.argmax(pt_hdrs_traj)+8]
+            hdrs_info[pt]['min']['week'] = week_labels[np.argmin(pt_hdrs_traj)+8]
+            
+            hdrs_info[pt]['max']['HDRSr'] = pt_hdrs_traj[hdrs_info[pt]['max']['index']]
+            hdrs_info[pt]['min']['HDRSr'] = pt_hdrs_traj[hdrs_info[pt]['min']['index']]
+            hdrs_info[pt]['traj']['HDRSr'] = pt_hdrs_traj
+            
+        return hdrs_info
+
     '''
     TODO
     Here we make a scatter plot that plots MEAS 1 vs MEAS 2, with the stim changes labeled

@@ -11,10 +11,10 @@ Linear Regression approaches will extend this class
 import sys
 
 sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
-import DBS_Osc as dbo
-from DBS_Osc import nestdict
+import DBSpace as dbo
+from DBSpace import nestdict
 
-from DBS_Osc import unity,displog
+from DBSpace import unity,displog
 import scipy.stats as stats
 
 import pdb
@@ -29,6 +29,118 @@ from collections import defaultdict
 sns.set_context('talk')
 sns.set(font_scale=4)
 sns.set_style('white')
+
+class naive_readout:
+    def __init__(self,feat_frame,ClinFrame):
+        self.feat_frame = feat_frame
+        
+        self.pts = ['901','903','905','906','907','908']
+        self.bands = ['Delta','Theta','Alpha','Beta*','Gamma1']
+        self.all_feats = ['L-' + band for band in bands] + ['R-' + band for band in bands]
+        
+        self.ClinFrame = ClinFrame
+        
+        self.circ = 'day'
+    
+    def find_pt_extremes(self):
+        hdrs_info = nestdict()
+        week_labels = ClinFrame.week_labels()
+        
+        for pt in self.pts:
+            pt_hdrs_traj = [a for a in ClinFrame.DSS_dict['DBS'+pt]['HDRS17raw']][8:]
+            
+            hdrs_info[pt]['max']['index'] = np.argmax(pt_hdrs_traj)
+            hdrs_info[pt]['min']['index'] = np.argmin(pt_hdrs_traj)
+            hdrs_info[pt]['max']['week'] = week_labels[np.argmax(pt_hdrs_traj)+8]
+            hdrs_info[pt]['min']['week'] = week_labels[np.argmin(pt_hdrs_traj)+8]
+            
+            hdrs_info[pt]['max']['HDRSr'] = pt_hdrs_traj[hdrs_info[pt]['max']['index']]
+            hdrs_info[pt]['min']['HDRSr'] = pt_hdrs_traj[hdrs_info[pt]['min']['index']]
+            hdrs_info[pt]['traj']['HDRSr'] = pt_hdrs_traj
+
+    def set_comparison_weeks(self,fix=[]):
+        #we do this on a per-patient basis
+        if fix == []:
+            return {pt:{'high':'C01','low':'C24'}}    
+        else:
+            return {pt:{'high':fix[0],'low':fix[1]}}
+    
+    
+        
+    def sig_bands(self,stats='ks',weeks=['C01','C24']):
+        self.ks_stats = nestdict()
+        self.week_distr = nestdict()
+        
+        for pt in self.pts:
+            for ff in self.bands:
+                print('Computing ' + ' ' + ff)
+                _,self.ks_stats[pt][ff],self.week_distr[pt][ff] = self.feat_frame.scatter_state(weeks=weeks,pt=pt,feat=ff,circ=self.circ,plot=False,plot_type='scatter',stat=stats)
+
+        self.K_weeks = weeks
+        self.K_stat_type = stats
+        self.K_stats = np.array([[[ks_stats[pt][band][side][0] for side in ['Left','Right']] for band in bands] for pt in pts]).reshape(6,-1,order='F')
+        self.P_val = np.array([[[ks_stats[pt][band][side][1] for side in ['Left','Right']] for band in bands] for pt in pts]).reshape(6,-1,order='F')
+        
+        #Do the change values here too
+        self.pre_feat_vals = np.array([[[self.week_distr[pt][band][side][self.K_weeks[0]] for side in ['Left','Right']] for band in self.bands] for pt in self.pts]).reshape(6,-1,order='F')
+        self.post_feat_vals = np.array([[[self.week_distr[pt][band][side][self.K_weeks[1]] for side in ['Left','Right']] for band in self.bands] for pt in self.pts]).reshape(6,-1,order='F')
+
+    def band_change(self,patient,band,plot=False):
+
+        pp = pts.index(patient)
+        ff = self.all_feats.index(band)
+        if plot:
+            plt.figure()
+            sns.violinplot(y=self.pre_feat_vals[pp,ff])
+            sns.violinplot(y=self.post_feat_vals[pp,ff],color='red',alpha=0.3)
+    
+        return (np.mean(post_feat_vals[pp,ff]) - np.mean(pre_feat_vals[pp,ff]))
+    
+    def band_change_analysis(self):
+        change_grid = np.zeros((len(self.pts),len(self.all_feats)))
+        for pp,pt in enumerate(self.pts):
+            for ff,freq in enumerate(self.all_feats):
+                change_grid[pp,ff] = self.band_change(pt,freq,plot=False)
+
+    def flat_ensemble_change(self,band):
+        ff = all_feats.index(band)
+        pre_flat_list = [item for sublist in pre_feat_vals[:,ff] for item in sublist]
+        post_flat_list = [item for sublist in post_feat_vals[:,ff] for item in sublist]
+        
+        return pre_flat_list, post_flat_list
+
+    def all_ensemble_change(self,plot=True):
+        pre_flat_list = []
+        post_flat_list = []
+        
+        for ff,freq in enumerate(self.all_feats):
+            pre_flat_list.append([item for sublist in self.pre_feat_vals[:,ff] for item in sublist])
+            post_flat_list.append([item for sublist in self.post_feat_vals[:,ff] for item in sublist])
+            
+        if plot:
+            plt.figure()
+            ax = sns.violinplot(data=pre_flat_list,color='blue')
+            ax = sns.violinplot(data=post_flat_list,color='red',alpha=0.3)
+            
+            
+            plt.setp(ax.collections,alpha=0.3)
+    
+    def get_ensemble_change(self,band,plot=True):
+        ff = self.all_feats.index(band)
+        pre_flat_list = [item for sublist in self.pre_feat_vals[:,ff] for item in sublist]
+        post_flat_list = [item for sublist in self.post_feat_vals[:,ff] for item in sublist]
+        if plot:
+            plt.figure()
+            ax = sns.violinplot(x=pre_flat_list)
+            ax = sns.violinplot(x=post_flat_list,color='red',alpha=0.3)
+            plt.title(band)
+            plt.xlim(-10,10)
+            plt.setp(ax.collections,alpha=0.3)
+        #do some stats here
+        stat_check = stats.ks_2samp(pre_flat_list,post_flat_list)
+        return {'diff':(np.mean(pre_flat_list) - np.mean(post_flat_list)),'var':(np.var(pre_flat_list) - np.var(post_flat_list)),'ks':stat_check}
+
+
 
 class OBands:
     def __init__(self,BRFrame):
@@ -53,11 +165,11 @@ class OBands:
                     datacontainer = {ch: rr['Data'][ch] for ch in rr['Data'].keys()}
                     #Do we want to do any preprocessing for the PSDs before we send it to the next round?
                     #Maybe a poly-fit subtraction?
-                    feat_dict[featname] = dofunc['fn'](datacontainer,self.BRFrame.data_basis,dofunc['param'])
+                    feat_dict[featname] = dofunc['fn'](datacontainer,self.BRFrame.data_basis['F'],dofunc['param'])
                 else:
                     pre_correction = {ch: rr['Data'][ch] for ch in rr['Data'].keys()}
-                    datacontainer,_ = dbo.poly_subtr(pre_correction,self.BRFrame.data_basis)
-                    feat_dict[featname] = dofunc['fn'](datacontainer,self.BRFrame.data_basis,dofunc['param'])
+                    datacontainer,_ = dbo.poly_subtr(pre_correction,self.BRFrame.data_basis['F'])
+                    feat_dict[featname] = dofunc['fn'](datacontainer,self.BRFrame.data_basis['F'],dofunc['param'])
                     
             rr.update({'FeatVect':feat_dict})
          
@@ -230,13 +342,72 @@ class OBands:
         
         
         print(pt_day_nite)
+    
+    
+    def set_states(self,default=True):
+        if default:
+            phases[pt]['high'] = 'C01'
+            phases[pt]['low'] = 'C24'
+        else:
+            pass
+        weeks = [high,low]
+        
+        
+    def compare_states(self,weeks,pt='all',feat='Alpha',circ='',plot=True,plot_type='scatter',stat='ks'):
+        #this assumes we've already populated the 'high' and 'low' values
+        #generate our data to visualize
+        if pt == 'all':
+            pt = dbo.all_pts
+            
+            
+        fmeta = self.BRFrame.file_meta
+        feats = {'Left':0,'Right':0}
+        
+        swap_key = {weeks[0]:'depr',weeks[1]:'notdepr'}
+        
+        if feat == 'fSlope' or feat == 'nFloor':
+            dispfunc = unity
+        else:
+            dispfunc = unity
+        
+        #do day and night here
+        if circ != '':
+            fdnmeta = [rr for rr in fmeta if rr['Circadian'] == circ]
+        else:
+            fdnmeta = fmeta
+        
+        feats['Left'] = [(dispfunc(rr['FeatVect'][feat]['Left']),rr['Phase']) for rr in fdnmeta if rr['Patient'] in pt and rr['Phase'] in weeks]
+        feats['Right'] = [(dispfunc(rr['FeatVect'][feat]['Right']),rr['Phase']) for rr in fdnmeta if rr['Patient'] in pt and rr['Phase'] in weeks]
 
-    def scatter_state(self,weeks='all',pt='all',feat='Alpha',circ='',plot=True,plot_type='scatter'):
+        outstats = defaultdict(dict)
+        weeks_osc_distr = {'Left':[],'Right':[]}
+        
+        for cc,ch in enumerate(['Left','Right']):
+            weekdistr = {swap_key[week]:[a for (a,b) in feats[ch] if b == week] for week in weeks}
+            if stat == 'ks':
+                outstats[ch] = stats.ks_2samp(weekdistr[swap_key[weeks[0]]],weekdistr[swap_key[weeks[1]]])
+            elif stat == 'ranksum':
+                outstats[ch] = stats.ranksums(weekdistr[swap_key[weeks[0]]],weekdistr[swap_key[weeks[1]]])
+            elif stat == 't':
+                outstats[ch] = stats.ttest_1samp(weekdistr[swap_key[weeks[0]]],weekdistr[swap_key[weeks[1]]])
+                
+            weeks_osc_distr[ch] = weekdistr
+        
+        return feats,outstats, weeks_osc_distr
+    
+    
+    def scatter_state(self,weeks='all',pt='all',feat='Alpha',circ='',plot=True,plot_type='scatter',stat='ks'):
         #generate our data to visualize
         if weeks == 'all':
             weeks = dbo.Phase_List('ephys')
         if pt == 'all':
             pt = dbo.all_pts
+            
+        #Swap key effort here
+        if 'C01' in weeks and 'C24' in weeks:
+            swap_key = {'C01':'Depr','C24':'NotDepr'}
+        else:
+            swap_key = {key:key for key in weeks}
         
         fmeta = self.BRFrame.file_meta
         feats = {'Left':0,'Right':0}
@@ -260,10 +431,20 @@ class OBands:
 
         outstats = defaultdict(dict)
         
+        weeks_osc_distr = {'Left':[],'Right':[]}
+        
         for cc,ch in enumerate(['Left','Right']):
             weekdistr = {week:[a for (a,b) in feats[ch] if b == week] for week in weeks}
-            #outstats[ch] = stats.ranksums(weekdistr[weeks[0]],weekdistr[weeks[1]])
-            outstats[ch] = stats.ks_2samp(weekdistr[weeks[0]],weekdistr[weeks[1]])
+            #
+            if stat == 'ks':
+                outstats[ch] = stats.ks_2samp(weekdistr[weeks[0]],weekdistr[weeks[1]])
+            elif stat == 'ranksum':
+                outstats[ch] = stats.ranksums(weekdistr[weeks[0]],weekdistr[weeks[1]])
+            elif stat == 't':
+                outstats[ch] = stats.ttest_1samp(weekdistr[weeks[0]],weekdistr[weeks[1]])
+                
+            weeks_osc_distr[ch] = weekdistr
+            
         #plot the figure
         if plot:
             plt.figure()
@@ -295,4 +476,4 @@ class OBands:
             plt.suptitle(feat + ' over weeks; ' + str(pt))
                     
         
-        return feats,outstats
+        return feats,outstats, weeks_osc_distr

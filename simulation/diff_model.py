@@ -210,7 +210,6 @@ class sim_diff:
         self.Vd_brain(Z1,Z3)
         
         #amplitudes should be determined HERE
-
         
         Vo = ((self.brain_component + self.x2_component) + (self.stim_component))
         
@@ -257,7 +256,8 @@ def hard_amp(xin,clip=1):
     return xhc
 
 class sim_amp:
-    def __init__(self,family='perfect',vmax=1,inscale=1e-3,tscale=(-10,10),noise=0,sig_amp_gain=1):
+    def __init__(self,diff_inst,family='perfect',vmax=1,inscale=1e-3,tscale=(-10,10),noise=0,sig_amp_gain=1):
+        self.diff_inst = diff_inst
         self.family = family
         self.inscale = inscale # This is a hack to bring the inside of the amp into whatever space we want, transform, and then bring it back out. It should really be removed...
         self.tscale = tscale
@@ -267,6 +267,11 @@ class sim_amp:
         self.set_T_func()
         
         self.noise = noise
+        
+        # Frequency domain analysis
+        self.nperseg = 2**9
+        self.noverlap=2**9-50
+        
         
     def set_T_func(self):
         if self.family == 'perfect':
@@ -286,7 +291,7 @@ class sim_amp:
     
     #BELOW IS THE MEASUREMENT PROCESS< NOISE
     def gen_recording(self,Z1,Z3):
-        diff_out=self.V_out(Z1,Z3)['sim_1']
+        diff_out = self.diff_inst.V_out(Z1,Z3)['sim_1']
         y_out = self.V_out(diff_out)
         
         #do we want to add noise?
@@ -349,90 +354,114 @@ class sim_amp:
         plt.ylim((-200,-20))
     
     def simulate(self,Z1,Z3):
-        diff_out = sig.decimate(self.V_out(Z1,Z3)['sim_1'],10)
-        Fs = self.Fs
+        diff_out = sig.decimate(self.diff_inst.V_out(Z1,Z3)['sim_1'],10)
+        Fs = self.diff_inst.Fs
         
         #Here we generate our recording, after the signal amplifier component
-        V_preDC = self.gen_recording(diff_obj,Z1,Z3)
+        V_preDC = self.gen_recording(Z1,Z3)
         
         #now we're going to DOWNSAMPLE
         #simple downsample, sicne the filter is handled elsewhere and we're trying to recapitulate the hardware
         Vo = V_preDC[0::10]
         
         self.sim_output_signal = Vo
+        self.diff_out = diff_out
         
+        nperseg = self.nperseg
+        noverlap = self.noverlap
+        
+        self.F,self.T,self.SGout = sig.spectrogram(self.sim_output_signal,nperseg=nperseg,noverlap=noverlap,window=sig.get_window('blackmanharris',nperseg),fs=422)
+        _,_,self.SGdiff = sig.spectrogram(self.sig_amp_gain*diff_out,nperseg=nperseg,noverlap=noverlap,window=sig.get_window('blackmanharris',nperseg),fs=4220/10)
     
     '''
     Plotting Functions
     '''
     def plot_time_dom(self):
         V_out = self.sim_output_signal
+        diff_out = self.diff_out
+        diff_obj = self.diff_inst
         
         plt.figure()
         #Plot the input and output voltages directly over time
-        plt.subplot(3,2,1)
-        plt.plot(self.tvect,diff_out,label='Input Voltage')
-        plt.plot(self.tvect,V_out,label='Output Voltage')
+        plt.plot(self.tvect,diff_out,label='Input Voltage',alpha=0.6)
+        plt.plot(self.tvect,V_out,label='Output Voltage',alpha=0.5)
         plt.legend()
         plt.ylim((-1e-3,1e-3))
         
-        nperseg = 2**9
-        noverlap=2**9-50
+    def plot_freq_dom(self):
+        V_out = self.sim_output_signal
+        diff_out = self.diff_out
+        diff_obj = self.diff_inst
         
-        #plot histograms
-        bins = np.linspace(-5,5,100)
+        SGdiff = self.SGdiff
+        SGout = self.SGout
         
-        plt.subplot(3,4,3)
-        half_pt = np.int(diff_out.shape[0]/2)
-        plt.hist(diff_out[:half_pt],bins,alpha=0.9)
-        plt.hist(V_out[:half_pt],bins,alpha=0.9)
+        nperseg = self.nperseg
+        noverlap =  self.noverlap
         
-        plt.subplot(3,4,4)
-        half_pt = np.int(diff_out.shape[0]/2)
-        plt.hist(diff_out[half_pt:],bins,alpha=0.4)
-        plt.hist(V_out[half_pt:],bins,alpha=0.4)
         
+        plt.figure()
+        
+
+        
+        plt.subplot(1,2,1)
+        t_beg = self.T+diff_obj.tlims[0] < -1
+        t_end = self.T+diff_obj.tlims[0] > 1
+        Pbeg = np.median(10*np.log10(SGdiff[:,t_beg]),axis=1)
+        Pend = np.median(10*np.log10(SGdiff[:,t_end]),axis=1)
+        plt.plot(self.F,Pbeg,color='black')
+        plt.plot(self.F,Pend,color='green')
+        plt.xlabel('Frequency (Hz)')
+        plt.ylabel('Power (dB)')
+        plt.ylim((-200,-20))
+        plt.title('Perfect Amp')
+        
+        plt.subplot(1,2,2)
+        t_beg = self.T+diff_obj.tlims[0] < -1
+        t_end = self.T+diff_obj.tlims[0] > 1
+        #Below we're just taking the median of the SG. Maybe do the Welch estimate on this?
+        Pbeg = np.median(10*np.log10(SGout[:,t_beg]),axis=1)
+        Pend = np.median(10*np.log10(SGout[:,t_end]),axis=1)
+        plt.plot(self.F,Pbeg,color='black')
+        plt.plot(self.F,Pend,color='green')
+        plt.xlabel('Frequency (Hz)')
+        plt.ylabel('Power (dB)')
+        plt.ylim((-200,-20))
+        plt.title('Realistic Amp')
+        #plt.suptitle('Zdiff = ' + str(np.abs(Z1 - Z3)))
+        
+        
+    
+    def plot_tf_dom(self):
+        
+        V_out = self.sim_output_signal
+        diff_out = self.diff_out
+        diff_obj = self.diff_inst
+        
+        SGout = self.SGout
+        SGdiff = self.SGdiff
+        
+        nperseg = self.nperseg
+        noverlap =  self.noverlap
+        
+        plt.figure()
         #Plot the T-F representation of both input and output
-        plt.subplot(3,2,3)
+        plt.subplot(2,2,1)
         #Here, we find the spectrogram of the output from the diff_amp, should not be affected at all by the gain, I guess...
         #BUT the goal of this is to output a perfect amp... so maybe this is not ideal since the perfect amp still has the gain we want.
-        F,T,SGdiff = sig.spectrogram(self.sig_amp_gain*diff_out,nperseg=nperseg,noverlap=noverlap,window=sig.get_window('blackmanharris',nperseg),fs=4220/10)
-        plt.pcolormesh(T+diff_obj.tlims[0],F,10*np.log10(SGdiff),rasterized=True)
+        
+        plt.pcolormesh(self.T+diff_obj.tlims[0],self.F,10*np.log10(SGdiff),rasterized=True)
         plt.clim(-120,0)
         plt.ylim((0,200))
         plt.title('Perfect Amp Output')
         #plt.colorbar()
         
-        plt.subplot(3,2,5)
-        t_beg = T+diff_obj.tlims[0] < -1
-        t_end = T+diff_obj.tlims[0] > 1
-        Pbeg = np.median(10*np.log10(SGdiff[:,t_beg]),axis=1)
-        Pend = np.median(10*np.log10(SGdiff[:,t_end]),axis=1)
-        plt.plot(F,Pbeg,color='black')
-        plt.plot(F,Pend,color='green')
-        plt.xlabel('Frequency (Hz)')
-        plt.ylabel('Power (dB)')
-        plt.ylim((-200,-20))
-        
-        plt.subplot(3,2,4)
-        F,T,SGout = sig.spectrogram(V_out,nperseg=nperseg,noverlap=noverlap,window=sig.get_window('blackmanharris',nperseg),fs=422)
+        plt.subplot(2,2,2)
         plt.clim(-120,0)
-        plt.pcolormesh(T+diff_obj.tlims[0],F,10*np.log10(SGout),rasterized=True)
+        plt.pcolormesh(self.T+diff_obj.tlims[0],self.F,10*np.log10(SGout),rasterized=True)
         plt.title('Imperfect Amp Output')
         #plt.colorbar()
         
-        plt.subplot(3,2,6)
-        t_beg = T+diff_obj.tlims[0] < -1
-        t_end = T+diff_obj.tlims[0] > 1
-        #Below we're just taking the median of the SG. Maybe do the Welch estimate on this?
-        Pbeg = np.median(10*np.log10(SGout[:,t_beg]),axis=1)
-        Pend = np.median(10*np.log10(SGout[:,t_end]),axis=1)
-        plt.plot(F,Pbeg,color='black')
-        plt.plot(F,Pend,color='green')
-        plt.xlabel('Frequency (Hz)')
-        plt.ylabel('Power (dB)')
-        plt.ylim((-200,-20))
-        plt.suptitle('Zdiff = ' + str(np.abs(Z1 - Z3)))
         
     
     def plot_osc_power(self):
@@ -496,7 +525,7 @@ class sim_amp:
         Fs = diff_obj.Fs
         
         #Here we generate our recording, after the signal amplifier component
-        V_preDC = self.gen_recording(diff_obj,Z1,Z3)
+        V_preDC = self.gen_recording(Z1,Z3)
         
         #now we're going to DOWNSAMPLE
         #simple downsample, sicne the filter is handled elsewhere and we're trying to recapitulate the hardware
@@ -633,15 +662,17 @@ if __name__ == '__main__':
     #diff_run.set_brain()
     #diff_run.set_stim(wform='ipg')
     
-    amp_run = sim_amp(family='pwlinear',noise=1e-6,sig_amp_gain=1)
+    amp_run = sim_amp(diff_run,family='tanh',noise=1e-6,sig_amp_gain=1)
     
     #diff_run.plot_V_out(1000,1200)
     #diff_out = diff_run.V_out(1000,1100)['sim_1']
-    Z1 = 1350
-    Z3 = 1200
+    Z1 = 1200
+    Z3 = 1300
     
     amp_run.simulate(Z1,Z3)
-    amp_run.plot()
+    amp_run.plot_time_dom()
+    amp_run.plot_freq_dom()
+    amp_run.plot_tf_dom()
     
     #amp_run.PAPER_plot_V_out(diff_run,Z1,Z3)
     

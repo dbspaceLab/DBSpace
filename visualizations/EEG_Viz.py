@@ -19,8 +19,9 @@ import pylab
 
 from mpl_toolkits.mplot3d import Axes3D
 
-from mayavi.mlab import *
 import mayavi.mlab as mlab
+#from mayavi.mlab import *
+
 
 def return_adj_net(dist_thresh = 3):
     egipos = mne.channels.read_montage('/tmp/GSN-HydroCel-257.sfp')

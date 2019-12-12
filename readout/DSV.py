@@ -1551,13 +1551,13 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         
         ### Plotting and actual summary results
         corr_measures = self.Pred_vs_Meas_NEW(Cpred,Cval,labels_val,show_clin=show_clin,plot=do_plots)
+        plt.suptitle('Actual Model')
         
         
         ### Now we go through and assess the algorithm performance
-        pr_aucs = self.algo_perfs(Cpred,Cval,labels_val,do_plots,Crand=False)
-        pr_null = self.null_algo(Cpred,Cval,labels_val)
-        pr_oracle = self.oracle_algo(Cpred,Cval,labels_val)
-        plt.suptitle('Actual Model')
+        pr_aucs = self.algo_perfs(Cpred,Cval,labels_val,do_plots,Crand=False) #Assess our performance
+        pr_null = self.null_algo(Cpred,Cval,labels_val) # Do null testing
+        pr_oracle = self.oracle_algo(Cpred,Cval,labels_val) #compare full knowledge
         
         return pr_aucs, (pr_null,pr_oracle), corr_measures
     
@@ -1657,7 +1657,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
                 sns.despine()
                 
    
-        x,y = (1,1)
+        #x,y = (1,1) # Don't know what this is...
         
         ###
         #sweep threshold

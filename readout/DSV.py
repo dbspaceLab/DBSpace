@@ -1731,6 +1731,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         if plot:
             plt.figure()
             sns.regplot(x=np.array(Ctest[inlier_mask]).squeeze(),y=np.array(Cpredictions[inlier_mask]).squeeze(),color='g')
+            plt.title('Single Trial RegPlot' + str(spear_r) + ' p:' + str(spear_p))
             #except Exception as error: print(error);ipdb.set_trace()
             
         #I think here we start exploring structure across weeks...
@@ -2112,5 +2113,14 @@ class naive_readout:
             plt.suptitle(ff + ' ' + ' min/max HDRS')
 
 
+
+class partial_readout:
+    def __init__(self):
+        pass
+    
+    def roc_analysis(self):
+        #we should have our model
+        # we should have our validation set
+        pass
         
             

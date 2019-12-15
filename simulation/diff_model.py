@@ -256,7 +256,7 @@ def hard_amp(xin,clip=1):
     return xhc
 
 class sim_amp:
-    def __init__(self,diff_inst,family='perfect',vmax=1,inscale=1e-3,tscale=(-10,10),noise=0,sig_amp_gain=1):
+    def __init__(self,diff_inst,family='perfect',vmax=1,inscale=1e-3,tscale=(-10,10),noise=0,sig_amp_gain=1,pre_amp_gain=1):
         self.diff_inst = diff_inst
         self.family = family
         self.inscale = inscale # This is a hack to bring the inside of the amp into whatever space we want, transform, and then bring it back out. It should really be removed...
@@ -272,6 +272,8 @@ class sim_amp:
         self.nperseg = 2**9
         self.noverlap=2**9-50
         
+        self.pre_amp_gain = pre_amp_gain
+        
         
     def set_T_func(self):
         if self.family == 'perfect':
@@ -285,7 +287,7 @@ class sim_amp:
     def V_out(self,V_in):
         self.tvect = np.linspace(self.tscale[0],self.tscale[1],V_in.shape[0]/10)
         #put some noise inside?
-        V_out = self.sig_amp_gain * self.inscale * self.Tfunc(V_in / self.inscale)
+        V_out = self.sig_amp_gain * self.inscale * self.Tfunc(self.pre_amp_gain * V_in / self.inscale)
         
         return V_out
     
@@ -314,12 +316,11 @@ class sim_amp:
         Vo = V_preDC[0::10]
         
         V_out = Vo
-        #Final filtering stage here, unclear why
+        #Final filtering stage here
         #b,a = sig.butter(6,1/211,btype='high')
         #V_out = sig.lfilter(b,a,Vo)
       
 
-        
         plt.figure()
         #Plot the input and output voltages directly over time
         
@@ -658,11 +659,11 @@ class sim_amp:
 #%%
 
 if __name__ == '__main__':
-    diff_run = sim_diff(Ad=200,wform='moresine4',clock=True,stim_v=4)
+    diff_run = sim_diff(Ad=500,wform='moresine4',clock=True,stim_v=6)
     #diff_run.set_brain()
     #diff_run.set_stim(wform='ipg')
     
-    amp_run = sim_amp(diff_run,family='tanh',noise=1e-6,sig_amp_gain=1)
+    amp_run = sim_amp(diff_run,family='tanh',noise=1e-6,sig_amp_gain=1,pre_amp_gain=1)
     
     #diff_run.plot_V_out(1000,1200)
     #diff_out = diff_run.V_out(1000,1100)['sim_1']

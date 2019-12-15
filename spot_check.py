@@ -32,8 +32,7 @@ import matplotlib.pyplot as plt
 
 #%%
 
-font = {'family' : 'normal',
-        'weight' : 'bold',
+font = {'weight' : 'bold',
         'size'   : 20}
 
 matplotlib.rc('font', **font)
@@ -195,8 +194,6 @@ def spot_check(fname=[],tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']
             
             plt.suptitle('Raw TS: ')
     
-    #TODO strip out the inverses from spot_check. This is focused on just displaying as a tool. Can make a separate script that wraps spot_check with preprocessing steps
-    print('RETURNING INVERSE!!')
     return {'TS':Container,'TF':{'SG':SG,'F':F,'T':T},'F':{'Pxx':Pxx,'F':Fpsd}}
 
 
@@ -218,8 +215,8 @@ if __name__ == '__main__':
     
     results = defaultdict(dict)
     
-    if flist == []:
-        flist = gui_file_select()
+    #if flist == []:
+    flist = gui_file_select()
             
     
     #Here, we do the actual spot_checking method

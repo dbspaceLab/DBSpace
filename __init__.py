@@ -78,7 +78,7 @@ def gen_T(inpX,Fs=422,nfft=2**10):
 #gen_psd has gotten super complicated.... need to check if it still works with DSV and Regression stuff
     
 def gen_psd(inpX,Fs=422,nfft=2**10,polyord=0):
-    print('Youre calling GEN PSD!!')
+    #print('Youre calling GEN PSD!!')
     #inp X is going to be assumed to be a dictionary with different keys for different channels
     outPSD = defaultdict(dict)
     outPoly = defaultdict(dict)

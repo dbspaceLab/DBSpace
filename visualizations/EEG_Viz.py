@@ -20,7 +20,7 @@ import pylab
 from mpl_toolkits.mplot3d import Axes3D
 
 import mayavi.mlab as mlab
-#from mayavi.mlab import *
+from mayavi.mlab import *
 
 
 def return_adj_net(dist_thresh = 3):

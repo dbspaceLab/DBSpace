@@ -328,7 +328,10 @@ class proc_dEEG:
             ONT_BL = self.osc_dict[pt]['OnT'][keys_oi['OnT'][0]]
             OFFT_BL = self.osc_dict[pt]['OffT'][keys_oi['OffT'][0]]
             
-            self.combined_BL[pt] = np.concatenate((ONT_BL,OFFT_BL),axis=0)
+            if pt != '905':
+                self.combined_BL[pt] = np.concatenate((ONT_BL,OFFT_BL),axis=0)
+            else:
+                self.combined_BL[pt] = ONT_BL
     
     def combined_bl_distr(self,band='Alpha'):
         band_idx = dbo.feat_order.index(band)
@@ -549,13 +552,8 @@ class proc_dEEG:
         plt.legend(['PC1','PC2','PC3','PC4','PC5'])
         plt.title('rPCA Components ' + source_label)
         
-
-        
-    
-    
     #%%
     #OLD STUFF
-    
     def train_simple(self):
         #Train our simple classifier that just finds the shortest distance
         self.signature = {'OnT':0,'OffT':0}
@@ -1627,7 +1625,7 @@ class proc_dEEG:
         
         #get the median power in each of the bands so we can get a weighed idea of which channels are most important
         var_pow = np.var(self.SVM_raw_stack,axis=0).reshape(-1,order='C')
-        
+        tot_var_bands = np.multiply(np.median(coeffs,axis=0).reshape(-1,order='C'),var_pow).reshape(257,5,order='C')
         tot_var = np.sum(np.multiply(np.median(coeffs,axis=0).reshape(-1,order='C'),var_pow).reshape(257,5,order='C'),axis=1)
         
         plt.figure()
@@ -1641,6 +1639,11 @@ class proc_dEEG:
         plt.figure()
         self.import_mask = np.abs(tot_var) > 0.10
         EEG_Viz.plot_3d_scalp(self.import_mask.astype(np.int),unwrap=True)  
+        
+        # Let's take a look at each band's distribution
+        plt.figure()
+        
+        sns.violinplot(y=tot_var_bands,positions=np.arange(5))
         
     # THE BELOW FUNCTION DOES NOT RUN, JUST HERE FOR REFERENCE AS THE SVM IS BEING RECODED ABOVE
     def OLDtrain_binSVM(self):

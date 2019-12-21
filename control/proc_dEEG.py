@@ -467,17 +467,21 @@ class proc_dEEG:
     '''
     def support_analysis(self,support_struct,pt='POOL',condit='OnT',voltage='3',band='Alpha'):
         #support_struct = pickle.load(open('/tmp/'+ pt + '_' + condit + '_' + voltage,'rb'))
-        medians = self.median_response(pt=pt)
+        if band == 'Alpha':
+            medians = self.median_response(pt=pt)['OnT'] #if we want to use the standard median Alpha change
+            band_i = dbo.feat_order.index(band)
+        elif band == 'rP0':    
+            medians = self.dyn_L.swapaxes(0,1) #if we want to use the 0th component of the dyn_rPCA eigenvector
+            band_i = 0
+            
         #medians = np.median(self.targ_response[pt][condit],axis=0)
         fig = plt.figure()
         #First, we'll plot what the medians actually are
-        band_i = dbo.feat_order.index(band)
-        EEG_Viz.plot_3d_scalp(medians['OnT'][:,band_i],fig,label='OnT Mean Response ' + band,unwrap=True,scale=10)
+        
+        EEG_Viz.plot_3d_scalp(medians[:,band_i],fig,label='OnT Mean Response ' + band,unwrap=True,scale=10)
         plt.suptitle(pt)
         
-        band_i = dbo.feat_order.index(band)
-        
-        full_distr = medians['OnT'][:,band_i]# - np.mean(medians['OnT'][:,band_i]) #this zeros the means of the distribution
+        full_distr = medians[:,band_i]# - np.mean(medians[:,band_i]) #this zeros the means of the distribution
         
         primary_distr = full_distr[support_struct['primary'] == 1]
         #now we'll circle where the primary nodes are
@@ -514,6 +518,7 @@ class proc_dEEG:
     
     def OnT_ctrl_dyn(self,pt='POOL',condit='OnT',do_plot=False):
         source_label = 'Dyn PCA'
+        
         response_stack = self.osc_bl_norm['POOL'][condit][:,:,2]
         # Focusing just on alpha
         response_stack = np.dot(response_stack.T,response_stack)
@@ -529,7 +534,7 @@ class proc_dEEG:
         svm_pca_coeffs = svm_pca.components_
         # ALL PLOTTING BELOW
         if do_plot:
-            for comp in range(2):
+            for comp in range(5):
                 fig = plt.figure()
                 EEG_Viz.plot_3d_scalp((L[comp,:]),fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
                 plt.title('rPCA Component ' + str(comp))
@@ -540,11 +545,12 @@ class proc_dEEG:
             plt.plot(svm_pca.explained_variance_ratio_)
             plt.ylim((0,1))
             plt.subplot(222)
-            plt.plot(np.mean(np.array(svm_pca_coeffs),axis=0))
+            plt.plot(np.array(svm_pca_coeffs)[0:4])
             plt.legend(['PC1','PC2','PC3','PC4','PC5'])
             plt.title('rPCA Components ' + source_label)
             
         self.dyn_pca = svm_pca
+        self.dyn_L = L
         
     #Dimensionality reduction of ONTarget response; for now rPCA
     def OnT_ctrl_modes(self,pt='POOL',data_source=[],do_plot=False):

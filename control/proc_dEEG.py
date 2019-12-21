@@ -512,22 +512,26 @@ class proc_dEEG:
         plt.legend(['Primary','','','Secondary'])
         plt.title(pt + ' ' + condit + ' ' + band)
     
-    def OnT_control_dyn(self,pt='POOL',condit='OnT',do_plot=False):
+    def OnT_ctrl_dyn(self,pt='POOL',condit='OnT',do_plot=False):
+        source_label = 'Dyn PCA'
         response_stack = self.osc_bl_norm['POOL'][condit][:,:,2]
         # Focusing just on alpha
+        response_stack = np.dot(response_stack.T,response_stack)
+        
+        #
         rpca = r_pca.R_pca(response_stack)
         L,S = rpca.fit()
         
         svm_pca = PCA()
         svm_pca.fit(L)
         
-        
-        svm_pca_coeffs.append(svm_pca.components_)
+        #pdb.set_trace()
+        svm_pca_coeffs = svm_pca.components_
         # ALL PLOTTING BELOW
         if do_plot:
             for comp in range(2):
                 fig = plt.figure()
-                EEG_Viz.plot_3d_scalp(L[:,comp],fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
+                EEG_Viz.plot_3d_scalp((L[comp,:]),fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
                 plt.title('rPCA Component ' + str(comp))
                 
             
@@ -539,6 +543,8 @@ class proc_dEEG:
             plt.plot(np.mean(np.array(svm_pca_coeffs),axis=0))
             plt.legend(['PC1','PC2','PC3','PC4','PC5'])
             plt.title('rPCA Components ' + source_label)
+            
+        self.dyn_pca = svm_pca
         
     #Dimensionality reduction of ONTarget response; for now rPCA
     def OnT_ctrl_modes(self,pt='POOL',data_source=[],do_plot=False):
@@ -562,7 +568,7 @@ class proc_dEEG:
         svm_pca.fit(L)
         #SVM_coeff_L = svm_pca.fit_transform(L)
         
-        svm_pca_coeffs.append(svm_pca.components_)
+        svm_pca_coeffs = svm_pca.components_
         
         # ALL PLOTTING BELOW
         if do_plot:
@@ -602,7 +608,7 @@ class proc_dEEG:
     
     def control_rotate(self,condits=['OnT','OffT']):
         #get our bases
-        control_bases = self.control_bases[0]
+        control_bases = self.control_bases
         control_modes = self.control_modes
         #Get our observations, ONT and OFFT alike
         obs_dict = self.dict_all_obs(condits=condits)

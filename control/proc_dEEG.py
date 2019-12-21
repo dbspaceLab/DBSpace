@@ -107,12 +107,11 @@ class proc_dEEG:
         self.polyorder = polyfix
         self.pretty = pretty_mode
         
+        self.label_map = {'OnT':1,'OffT':0}
         
-        #%% Load in the data
+        # Load in the data
         self.ts_data = self.load_data(pts)
         
-
-       
         self.eeg_locs = mne.channels.read_montage('/home/virati/Dropbox/GSN-HydroCel-257.sfp')
         
         # CHECK IF we're still using ANY of these
@@ -513,8 +512,36 @@ class proc_dEEG:
         plt.legend(['Primary','','','Secondary'])
         plt.title(pt + ' ' + condit + ' ' + band)
     
+    def OnT_control_dyn(self,pt='POOL',condit='OnT',do_plot=False):
+        response_stack = self.osc_bl_norm['POOL'][condit][:,:,2]
+        # Focusing just on alpha
+        rpca = r_pca.R_pca(response_stack)
+        L,S = rpca.fit()
+        
+        svm_pca = PCA()
+        svm_pca.fit(L)
+        
+        
+        svm_pca_coeffs.append(svm_pca.components_)
+        # ALL PLOTTING BELOW
+        if do_plot:
+            for comp in range(2):
+                fig = plt.figure()
+                EEG_Viz.plot_3d_scalp(L[:,comp],fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
+                plt.title('rPCA Component ' + str(comp))
+                
+            
+            plt.figure()
+            plt.subplot(221)
+            plt.plot(svm_pca.explained_variance_ratio_)
+            plt.ylim((0,1))
+            plt.subplot(222)
+            plt.plot(np.mean(np.array(svm_pca_coeffs),axis=0))
+            plt.legend(['PC1','PC2','PC3','PC4','PC5'])
+            plt.title('rPCA Components ' + source_label)
+        
     #Dimensionality reduction of ONTarget response; for now rPCA
-    def OnT_dr(self,pt='POOL',data_source=[]):
+    def OnT_ctrl_modes(self,pt='POOL',data_source=[],do_plot=False):
         
         if data_source == []:
             #First, get a bootstrapped estimate of the median
@@ -537,31 +564,89 @@ class proc_dEEG:
         
         svm_pca_coeffs.append(svm_pca.components_)
         
-        for comp in range(2):
-            fig = plt.figure()
-            EEG_Viz.plot_3d_scalp(L[:,comp],fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
-            plt.title('rPCA Component ' + str(comp))
+        # ALL PLOTTING BELOW
+        if do_plot:
+            for comp in range(2):
+                fig = plt.figure()
+                EEG_Viz.plot_3d_scalp(L[:,comp],fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
+                plt.title('rPCA Component ' + str(comp))
+                
             
+            plt.figure()
+            plt.subplot(221)
+            plt.plot(svm_pca.explained_variance_ratio_)
+            plt.ylim((0,1))
+            plt.subplot(222)
+            plt.plot(np.mean(np.array(svm_pca_coeffs),axis=0))
+            plt.legend(['PC1','PC2','PC3','PC4','PC5'])
+            plt.title('rPCA Components ' + source_label)
         
-        plt.figure();
-        plt.subplot(221)
-        plt.plot(svm_pca.explained_variance_ratio_)
-        plt.ylim((0,1))
-        plt.subplot(222)
-        plt.plot(np.mean(np.array(svm_pca_coeffs),axis=0))
-        plt.legend(['PC1','PC2','PC3','PC4','PC5'])
-        plt.title('rPCA Components ' + source_label)
+        self.SVM_model = svm_pca
+        #go ahead and dump our control bases into a separate structure
+        self.control_bases = svm_pca_coeffs
+        self.control_modes = L
+    
+    def dict_all_obs(self,condits=['OnT']):
+        full_stack = nestdict()
+        label_map = self.label_map
+        
+
+        for condit in condits:
+            full_stack[condit]['x'] = self.osc_bl_norm['POOL'][condit]
+            full_stack[condit]['g'] = [label_map[condit] for seg in self.osc_bl_norm['POOL'][condit]]
+            
+        # List comprehend version
+        #full_stack = {condit:}
+        
+        return full_stack
+    
+    def control_rotate(self,condits=['OnT','OffT']):
+        #get our bases
+        control_bases = self.control_bases[0]
+        control_modes = self.control_modes
+        #Get our observations, ONT and OFFT alike
+        obs_dict = self.dict_all_obs(condits=condits)
+        
+        trajectories = nestdict()
+        rotated_stack = nestdict()
+        for condit in condits:
+            rotated_stack[condit] = np.dot(obs_dict[condit]['x'],control_bases)
+            
+            for ii in range(2):
+                trajectories[condit][ii] = np.dot(rotated_stack[condit][:,:,ii].squeeze(),control_modes[:,ii].squeeze())
+        
+        # PLOTTING HERE
+        plt.figure()
+        #plt.subplot(121)
+        for ii in [0,-1]:
+            plt.scatter(trajectories['OnT'][0][ii],trajectories['OnT'][1][ii],cmap='jet',marker='s')
+        plt.scatter(trajectories['OnT'][0],trajectories['OnT'][1],cmap='jet')
+        #plt.plot(trajectories['OnT'][0],trajectories['OnT'][1],alpha=0.8)
+        plt.xlim([-100,100])
+        plt.ylim([-100,100])
+        
+        plt.figure()
+        #plt.subplot(122)
+        plt.scatter(trajectories['OnT'][0],trajectories['OnT'][1],c=np.linspace(0,1,trajectories['OnT'][0].shape[0]),cmap='jet',alpha=0.1)
+        #plt.plot(trajectories['OnT'][0],trajectories['OnT'][1],alpha=0.1)
+
+        for ii in [0,-1]:
+            plt.scatter(trajectories['OffT'][0][ii],trajectories['OffT'][1][ii],cmap='jet',marker='s')
+        plt.scatter(trajectories['OffT'][0],trajectories['OffT'][1],cmap='jet')
+        #plt.plot(trajectories['OffT'][0],trajectories['OffT'][1],alpha=0.8)
+        plt.xlim([-100,100])
+        plt.ylim([-100,100])
         
     #%%
     #OLD STUFF
-    def train_simple(self):
+    def OBStrain_simple(self):
         #Train our simple classifier that just finds the shortest distance
         self.signature = {'OnT':0,'OffT':0}
         self.signature['OnT'] = self.pop_osc_change['OnT'][dbo.feat_order.index('Alpha')] / np.linalg.norm(self.pop_osc_change['OnT'][dbo.feat_order.index('Alpha')])
         self.signature['OffT'] = self.pop_osc_change['OffT'][dbo.feat_order.index('Alpha')] / np.linalg.norm(self.pop_osc_change['OffT'][dbo.feat_order.index('Alpha')])
         
     
-    def test_simple(self):
+    def OBStest_simple(self):
         #go to our GMM stack and, for each segment, determine the distance to the two conditions
         
         #Set up our signature
@@ -589,7 +674,7 @@ class proc_dEEG:
     
 
     
-    def interval_stats(self,do_band='Alpha'):
+    def OBSinterval_stats(self,do_band='Alpha'):
         big_stack = self.osc_dict
         band_idx = dbo.feat_order.index(do_band)
         plag = nestdict()
@@ -1515,7 +1600,7 @@ class proc_dEEG:
     
     def train_binSVM(self,mask=False):
         self.bin_classif = nestdict()
-        label_map = {'OnT':1,'OffT':0}
+        label_map = self.label_map
         
         #num_segs = self.SVM_stack.shape[0]
         SVM_stack = np.concatenate([self.osc_bl_norm['POOL'][condit] for condit in self.condits],axis=0)

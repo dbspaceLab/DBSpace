@@ -74,11 +74,9 @@ def gen_T(inpX,Fs=422,nfft=2**10):
         
     return outT
 
-#ALERT    
-#gen_psd has gotten super complicated.... need to check if it still works with DSV and Regression stuff
-    
+''' gen_psd outputs a PSD, not a LogPSD '''
+''' This function WRAPS F_Domain'''
 def gen_psd(inpX,Fs=422,nfft=2**10,polyord=0):
-    #print('Youre calling GEN PSD!!')
     #inp X is going to be assumed to be a dictionary with different keys for different channels
     outPSD = defaultdict(dict)
     outPoly = defaultdict(dict)
@@ -117,58 +115,8 @@ def cmedian(inArray,axis=-1):
 def l2_pow(x):
     return np.sqrt(np.sum(x**2))
 
-# Make a coherence generation function
-def gen_coher(inpX,Fs=422,nfft=2**10,polyord=0):
-    print('Starting a coherence run...')
-    outPLV = nestdict()
-    outCSD = nestdict()
-    
-    #What's our goddamn fvector
-    fvect = np.linspace(0,Fs/2,nfft/2+1)
-
-    for chann_i in inpX.keys():
-        print(chann_i)
-        for chann_j in inpX.keys():
-            csd_ensemble = np.zeros((inpX[chann_i].shape[1],len(feat_order)),dtype=complex)
-            plv = np.zeros((inpX[chann_i].shape[1],len(feat_order)))
-                
-            for seg in range(inpX[chann_i].shape[1]):
-                #First we get the cross spectral density
-                csd_out = sig.csd(inpX[chann_i][:,seg],inpX[chann_j][:,seg],fs=Fs,nperseg=512)[1]
-                
-                #normalize the entire CSD for the total power in input signals
-                norm_ms_csd = np.abs(csd_out) / np.sqrt(l2_pow(inpX[chann_i][:,seg]) * l2_pow(inpX[chann_j][:,seg]))
-                
-                #Are we focusing on a band or doing the entire CSD?
-
-                for bb,band in enumerate(feat_order):
-                    #what are our bounds?
-                    band_bounds = feat_dict[band]['param']
-                    band_idxs =  np.where(np.logical_and(fvect >= band_bounds[0],fvect <= band_bounds[1]))
-                    csd_ensemble[seg,bb] = cmedian(csd_out[band_idxs])
-                    plv[seg,bb] = np.max(norm_ms_csd[band_idxs])
-                    
-                # Below brings in the entire csd, but this is dumb
-                #csd_ensemble[seg] = csd_out
-
-                #Compute the PLV
-                
-            # Here we find the median across segments
-            #outCSD[chann_i][chann_j] = cmedian(csd_ensemble,axis=0)
-            outCSD[chann_i][chann_j] = csd_ensemble
-            
-            #Compute the normalized coherence/PLV
-            outPLV[chann_i][chann_j] = plv
-            #outPLV[chann_i][chann_j] = np.median(plv,axis=0)
-            #if chann_j == 176: pdb.set_trace()
-            #if chann_i > 10: pdb.set_trace()
-            ## PLV abs EEG -> 
-            ## Coherence value
-            
-    return outCSD, outPLV
-    
 #This function takes a PSD and subtracts out the PSD's fourth order polynomial fit
-    #I THINK this is only used in EEG cortical signatures
+#I THINK this is only used in EEG cortical signatures
 def poly_subtr(inpPSD,fVect,order=5):
     #What's our feature/frequency vector?
     fix_psd = defaultdict()
@@ -211,7 +159,6 @@ def poly_SG(inSG,fVect,order=4):
     return out_sg
     
     
-
 def gen_SG(inpX,Fs=422,nfft=2**10,plot=False,overlap=True):
     outSG = defaultdict(dict)
     for chann in inpX.keys():
@@ -231,6 +178,7 @@ Single method that takes an inputX.channels dictionary and outputs the oscillato
 def osc_state(inpX):
     pass
 
+''' Return to us the power in an oscillatory feature'''
 def get_pow(Pxx,F,frange,cmode=np.median):
     #Pxx is a dictionary where the keys are the channels, the values are the [Pxx desired]
     #Pxx is assumed to NOT be log transformed, so "positive semi-def"
@@ -272,14 +220,10 @@ def get_pow(Pxx,F,frange,cmode=np.median):
         except Exception as e:
             print(e)
             pdb.set_trace()
-        
-        
-        
     
     #return is going to be a dictionary with same elements
-    
-    return out_feats
 
+    return out_feats
 
 
 def get_ratio(Pxx,F,f_r_set,cmode=np.median):
@@ -293,8 +237,10 @@ def get_ratio(Pxx,F,f_r_set,cmode=np.median):
     return ret_ratio
 
 
+'''Rotating into frequency-space'''
+''' WE USE THIS FOR EEG classifier analysis'''
 def F_Domain(timeser,nperseg=512,noverlap=128,nfft=2**10,Fs=422):
-    #pdb.set_trace()
+    
     #assert isinstance(timeser,dbs.timeseries)
     #Window size is about 1 second (512 samples is over 1 sec)
     
@@ -307,6 +253,7 @@ def F_Domain(timeser,nperseg=512,noverlap=128,nfft=2**10,Fs=422):
     return FreqReturn
 
 def TF_Domain(timeser,fs=422,nperseg=2**10,noverlap=2**10-50):
+    raise Exception
     #assert isinstance(timeser,dbs.timeseries)
     F,T,SG = sig.spectrogram(timeser,nperseg=nperseg,noverlap=noverlap,window=sig.get_window('blackmanharris',nperseg),fs=fs)
     
@@ -314,6 +261,9 @@ def TF_Domain(timeser,fs=422,nperseg=2**10,noverlap=2**10-50):
     
     return TFreqReturn
 
+'''
+F and TF domain plotting 
+'''
 def plot_TF(TFR,chs=['Left','Right']):
     plt.figure()
     for cc,chann in enumerate(chs):
@@ -325,11 +275,8 @@ def plot_TF(TFR,chs=['Left','Right']):
         plt.ylabel('Frequency')
 
 
-'''
-This function plots the median/mean across time of the TF representation to get the Frequency representation
-Slightly different than doing the Welch directly
-
-'''
+#This function plots the median/mean across time of the TF representation to get the Frequency representation
+#Slightly different than doing the Welch directly
 def plot_F_fromTF(TFR,chs=['Left','Right']):
     plt.figure()
     for cc,chann in enumerate(chs):
@@ -353,8 +300,7 @@ def plot_T(Tser):
         
         plt.xlabel('Time')
         
-    
-## BELOW THIS ARE THE STUDY RELATED FUNCTIONS/CLASSES
+''' Return the phases and the labels associated with them'''
 all_phases = ['A0'+str(num) for num in range(4,0,-1)] + ['B0' + str(num) for num in range(1,5)] + ['C0' + str(num) for num in range(1,10)] + ['C' + str(num) for num in range(10,25)]
 def Phase_List(exprs='all'):
     if exprs=='all':
@@ -366,7 +312,7 @@ def Phase_List(exprs='all'):
     elif exprs=='notherapy':
         return all_phases[0:8]
     
-    
+''' Function that retrieves the PSD slope'''
 def get_slope(Pxx,F,params):
     #method to get the fitted polynomial for the range desired
     frange = params['frange']
@@ -392,7 +338,11 @@ def get_slope(Pxx,F,params):
     
     #return is going to be a dictionary with same channel keys
     return out_feats
-    
+
+'''
+FEATURE DEFINITIONS HERE
+Important block, this is where we define our features
+'''
 #Variable definitions
 #Generalized Features
 #Need to regen this based off of the bands up there
@@ -458,17 +408,18 @@ def featDict_to_Matr(featDict):
     return ret_matr
 
 
+''' Function to plot bands since this has been annoying every time I've had to recode the thing from scratch'''
 def plot_bands(bandM,bandLabels):
-    ''' Function to plot bands since this has been annoying every time I've had to recode the thing from scratch'''
-    
     plt.figure()
     for cc in bandM:
         plt.bar(cc)
         plt.xticks(range(len(cc)))
         plt.xticklabels(bandLabels)
 
-#%%
-## SIMPLE FUNCTIONS
+'''
+SIMPLE FUNCTIONS
+Should probably be split off into a utils.py file...
+'''
 def unity(invar):
     return invar
 
@@ -476,20 +427,12 @@ def unity(invar):
 def displog(values):
     return 10*np.log10(values)
 
-
+''' Powerful structure that saves my ass'''
 def nestdict():
     return defaultdict(nestdict)
 
 
-#%% Function for chronic recordings
-    
-# Here, we get a series of observations for a patient and the patient name, we detrend in the blocks based on the phases
-    
-def block_detrend():
-    pass
-
-
-
+''' Using Jack-knife for the median calculation'''
 def jk_median(inX,niter=100):
     #assume first dim is SEGMENTS/OBSERVATIONS
     med_vec = []
@@ -499,10 +442,60 @@ def jk_median(inX,niter=100):
         
     return np.array(med_vec)
 
-
-#%%
+''' Higher order measures here'''
+# Make a coherence generation function
+def gen_coher(inpX,Fs=422,nfft=2**10,polyord=0):
+    print('Starting a coherence run...')
+    outPLV = nestdict()
+    outCSD = nestdict()
     
-''' PCA function for merging rPCA results into final DSC '''
+    #What's our goddamn fvector
+    fvect = np.linspace(0,Fs/2,nfft/2+1)
+
+    for chann_i in inpX.keys():
+        print(chann_i)
+        for chann_j in inpX.keys():
+            csd_ensemble = np.zeros((inpX[chann_i].shape[1],len(feat_order)),dtype=complex)
+            plv = np.zeros((inpX[chann_i].shape[1],len(feat_order)))
+                
+            for seg in range(inpX[chann_i].shape[1]):
+                #First we get the cross spectral density
+                csd_out = sig.csd(inpX[chann_i][:,seg],inpX[chann_j][:,seg],fs=Fs,nperseg=512)[1]
+                
+                #normalize the entire CSD for the total power in input signals
+                norm_ms_csd = np.abs(csd_out) / np.sqrt(l2_pow(inpX[chann_i][:,seg]) * l2_pow(inpX[chann_j][:,seg]))
+                
+                #Are we focusing on a band or doing the entire CSD?
+
+                for bb,band in enumerate(feat_order):
+                    #what are our bounds?
+                    band_bounds = feat_dict[band]['param']
+                    band_idxs =  np.where(np.logical_and(fvect >= band_bounds[0],fvect <= band_bounds[1]))
+                    csd_ensemble[seg,bb] = cmedian(csd_out[band_idxs])
+                    plv[seg,bb] = np.max(norm_ms_csd[band_idxs])
+                    
+                # Below brings in the entire csd, but this is dumb
+                #csd_ensemble[seg] = csd_out
+
+                #Compute the PLV
+                
+            # Here we find the median across segments
+            #outCSD[chann_i][chann_j] = cmedian(csd_ensemble,axis=0)
+            outCSD[chann_i][chann_j] = csd_ensemble
+            
+            #Compute the normalized coherence/PLV
+            outPLV[chann_i][chann_j] = plv
+            #outPLV[chann_i][chann_j] = np.median(plv,axis=0)
+            #if chann_j == 176: pdb.set_trace()
+            #if chann_i > 10: pdb.set_trace()
+            ## PLV abs EEG -> 
+            ## Coherence value
+            
+    return outCSD, outPLV
+    
+''' PCA function for merging rPCA results into final DSC 
+This is borrowed from online stackexchange somewhere, not the most efficient way to do it
+'''
 def simple_pca(data,numComps=None):
     m,n = data.shape
     data -= data.mean(axis=0)

@@ -14,7 +14,7 @@ from DBSpace import simple_pca
 from collections import defaultdict
 import mne
 from scipy.io import loadmat
-import pdb
+import ipdb
 import numpy as np
 
 import scipy.signal as sig
@@ -50,6 +50,15 @@ import sklearn
 from sklearn.metrics import confusion_matrix, roc_curve, auc, roc_auc_score
 from sklearn.model_selection import learning_curve, StratifiedKFold
 
+from sklearn.decomposition import FactorAnalysis, PCA
+import tensortools as tt
+from tensortools.operations import unfold as tt_unfold, khatri_rao
+import tensorly as tl
+from tensorly import unfold as tl_unfold
+from tensorly.decomposition import parafac
+
+# import some useful functions (they are available in utils.py)
+#from utils import *
 
 import pickle
 
@@ -131,7 +140,7 @@ class proc_dEEG:
     
     def standard_pipeline(self):
         self.extract_feats(polyorder=0)
-        self.pool_patients()
+        self.pool_patients() #pool all the DBS RESPONSE vectors
         
     def load_data(self,pts):
         ts_data = defaultdict(dict)
@@ -153,18 +162,20 @@ class proc_dEEG:
         
     def extract_feats(self,polyorder=4):
         pts = self.pts
-        feat_dict = defaultdict(dict)
+        
+        feat_dict = nestdict()
+        #feat_dict = defaultdict(dict)
         osc_dict = nestdict()
         
         for pt in pts:
-            feat_dict[pt] = defaultdict(dict)
+            #feat_dict[pt] = defaultdict(dict)
             
             for condit in self.condits:
-                feat_dict[pt][condit] = defaultdict(dict)
+                #feat_dict[pt][condit] = defaultdict(dict)
                 for epoch in keys_oi[condit]:
                     #find the mean for all segments
                     data_matr = self.ts_data[pt][condit][epoch] #should give us a big matrix with all the crap we care about
-                    data_dict = {ch:data_matr[ch,:,:].squeeze() for ch in range(data_matr.shape[0])} #transpose is done to make it segxtime
+                    data_dict = {ch:data_matr[ch,:,:].squeeze() for ch in range(data_matr.shape[0])} #transpose is done to make it seg x time
                     
                     #TODO check if this is in the right units
                     seg_psds = dbo.gen_psd(data_dict,Fs=self.fs,nfft=self.donfft,polyord=polyorder)
@@ -184,7 +195,7 @@ class proc_dEEG:
                         except Exception as e:
                             print('CRAP')
                             print(e)
-                            pdb.set_trace()
+                            ipdb.set_trace()
                     
                     #find the variance for all segments
                     feat_dict[pt][condit][epoch] = PSD_matr
@@ -194,8 +205,10 @@ class proc_dEEG:
         
         #THIS IS THE PSDs RAW, not log transformed
         self.feat_dict = feat_dict
+        #Below is the oscillatory power
         self.osc_dict = osc_dict
     
+    ''' This function sets the response vectors to the targets x patient'''
     def compute_response(self,do_pts=[],condits=['OnT','OffT']):
         if do_pts == []:
             do_pts = self.pts
@@ -213,10 +226,11 @@ class proc_dEEG:
                 
         self.targ_response = response
         
-    def train_SVM(self,mask=False):
+    def DEPRtrain_SVM(self,mask=False):
         #Bring in and flatten our stack
         SVM_stack = 1
-                
+    
+            
     def response_stats(self,band='Alpha',plot=False):
         band_idx = dbo.feat_order.index(band)
         response_diff_stats = {pt:[] for pt in self.pts}
@@ -278,23 +292,17 @@ class proc_dEEG:
             print(np.median(pool_OFFT_var))
             plt.suptitle('Pooled stats for ONT/OFFT consistency check')
     
-    
-    def BLWEIRDcompute_response(self,combine_baselines=True,plot=False):
-        if combine_baselines:
-            baseline = {pt:np.median(self.combined_BL[pt],axis=0) for pt in self.pts}
-        else:
-            baseline = {pt:np.median(self.osc_dict[pt][condit][keys_oi[condit][0]],axis=0) for pt in self.pts}
-            
-        self.osc_bl_norm = {pt:{condit:(self.osc_dict[pt][condit][keys_oi[condit][1]] - baseline[pt]) for condit in self.condits} for pt in self.pts}
-        
-        if plot:
-            plt.figure()
-            
-               
     def pool_patients(self):
+        print('Pooling Patient Observations')
         self.osc_bl_norm = {pt:{condit:self.osc_dict[pt][condit][keys_oi[condit][1]] - np.median(self.osc_dict[pt][condit][keys_oi[condit][0]],axis=0) for condit in self.condits} for pt in self.pts}
         self.osc_bl_norm['POOL'] = {condit:np.concatenate([self.osc_dict[pt][condit][keys_oi[condit][1]] - np.median(self.osc_dict[pt][condit][keys_oi[condit][0]],axis=0) for pt in self.pts]) for condit in self.condits}
    
+        self.osc_stim = nestdict()
+        self.osc_stim_ = {pt:{condit:10**(self.osc_dict[pt][condit][keys_oi[condit][1]]/10) for condit in self.condits} for pt in self.pts}
+        self.osc_stim['POOL'] = {condit:np.concatenate([10**(self.osc_dict[pt][condit][keys_oi[condit][1]]/10) for pt in self.pts]) for condit in self.condits}
+     
+        
+    
     #Median dimensionality reduction here; for now rPCA
     def distr_response(self,pt='POOL'):
         return {condit:self.osc_bl_norm[pt][condit] for condit in self.condits}
@@ -441,7 +449,7 @@ class proc_dEEG:
             plt.suptitle(pt)
     
     
-    def support_analysis(self,pt='POOL',condit='OnT',voltage='3',band='Alpha'):
+    def OBSsupport_analysis(self,pt='POOL',condit='OnT',voltage='3',band='Alpha'):
         support_struct = pickle.load(open('/tmp/'+ pt + '_' + condit + '_' + voltage,'rb'))
         distr = self.distr_response(pt=pt)
         #medians = np.median(self.targ_response[pt][condit],axis=0)
@@ -649,8 +657,6 @@ class proc_dEEG:
         plt.xlim([-100,100])
         plt.ylim([-100,100])
         
-    #%%
-    #OLD STUFF
     def OBStrain_simple(self):
         #Train our simple classifier that just finds the shortest distance
         self.signature = {'OnT':0,'OffT':0}
@@ -930,7 +936,7 @@ class proc_dEEG:
         
         
     
-    def gen_GMM_priors(self,condit='OnT',mask_chann=False,band='Alpha'):
+    def DEPRgen_GMM_priors(self,condit='OnT',mask_chann=False,band='Alpha'):
         #prior_change = self.pop_osc_mask[condit][dbo.feat_order.index(band)] * self.pop_osc_change[condit][dbo.feat_order.index(band)].reshape(-1,1)
         prior_change = self.pop_osc_change[condit][dbo.feat_order.index(band)].reshape(-1,1)
         if mask_chann:
@@ -943,7 +949,7 @@ class proc_dEEG:
         return prior_covar
         
     
-    def gen_GMM_Osc(self,GMM_stack):
+    def DEPRgen_GMM_Osc(self,GMM_stack):
         fvect = self.fvect
         
         feat_out = nestdict()
@@ -998,9 +1004,13 @@ class proc_dEEG:
         
         return segs_feats
 
-    def pop_meds(self):
+    def pop_meds(self,response=True):
         print('Doing Population Meds/Mads on Oscillatory RESPONSES w/ PCA')
-        dsgn_X = self.shape_GMM_dsgn(self.gen_GMM_Osc(self.gen_GMM_stack(stack_bl='normalize')['Stack']),band='All')
+        #THIS IS THE OLD WAY: #dsgn_X = self.shape_GMM_dsgn(self.gen_GMM_Osc(self.gen_GMM_stack(stack_bl='normalize')['Stack']),band='All')
+        if response:
+            dsgn_X = self.osc_bl_norm['POOL']
+        else:
+            dsgn_X = self.osc_stim['POOL']
         
         X_med = nestdict()
         X_mad = nestdict()
@@ -1059,7 +1069,7 @@ class proc_dEEG:
         self.ICA_x = ica.fit_transform(ICA_inX)
         
         
-    def gen_GMM_stack(self,stack_bl=''):
+    def DEPRgen_GMM_stack(self,stack_bl=''):
         state_stack = nestdict()
         state_labels = nestdict()
         
@@ -1101,7 +1111,7 @@ class proc_dEEG:
         return {'Stack':GMM_stack,'Labels':GMM_stack_labels}
     
     
-    def do_response_PCA(self):
+    def DEPRdo_response_PCA(self):
         pca = PCA()
         
         print("Using GMM Stack, which is baseline normalized within each patient")
@@ -1189,7 +1199,7 @@ class proc_dEEG:
                 pc.set_edgecolor(color[cc])
                 #pc.set_linecolor(color[cc])
                                  
-            plt.ylim((-0.5,0.5))
+            #plt.ylim((-0.5,0.5))
         
         
         for bb in range(5):
@@ -1579,9 +1589,6 @@ class proc_dEEG:
         
         #plt.figure()
         #plt.hist(SVM_coeff_L[:,0],bins=np.linspace(-0.05,0.05,100))
-        
-
-        
         for cc in range(2):
             fig=plt.figure()
             big_coeffs = np.where(np.abs(SVM_coeff_L[:,cc]) > 0.007)
@@ -1590,6 +1597,8 @@ class proc_dEEG:
             plt.title('Plotting component ' + str(cc))
             plt.suptitle(approach + ' rotated results')
     
+    
+    ''' Learning curve for the Binary SVM'''
     def learning_binSVM(self,mask=False):
         label_map = {'OnT':1,'OffT':0}
     
@@ -1606,38 +1615,71 @@ class proc_dEEG:
         plt.plot(tsize,np.mean(vscore,axis=1))
         plt.legend(['Training Score','Cross-validation Score'])
     
-    def analyse_binSVM(self):
-        #we'll analyse the coefficients of the binSVM here to get an idea of which channels are most informative
-        pass
-    
-    def train_binSVM(self,mask=False):
-        self.bin_classif = nestdict()
+    ''' The old method of generating a stack from our observations
+    May more convoluted, vestiges of code from attempts to do GMM classification
+    Need to phase this out completely
+    Except it gives results in $\gamma$ that make more sense superficially
+    '''
+    def OBS_SVM_dsgn(self,do_plot=False):
         label_map = self.label_map
         
-        #num_segs = self.SVM_stack.shape[0]
+        # PREEMPT WITH OLD WAY HERE
+        dsgn_X = self.shape_GMM_dsgn(self.gen_GMM_Osc(self.gen_GMM_stack(stack_bl='normalize')['Stack']),band='All')
+        ALLT_dsgn_X = np.concatenate([dsgn_X[c] for c in ['OnT','OffT']],axis=0)
+        
+        flat_dsgn_Y = np.concatenate([[c for a in dsgn_X[c]] for c in ['OnT','OffT']],axis=0) # attempt to handle labels
+        num_segs = ALLT_dsgn_X.shape[0]
+        flat_dsgn_X = ALLT_dsgn_X.reshape(num_segs,-1,order='C')
+        #dsgn_Y = np.concatenate([[label_map[condit] for seg in self.osc_bl_norm['POOL'][condit]] for condit in self.condits],axis=0)
+        flat_dsgn_X[flat_dsgn_X > 1e300] = 0
+        #ipdb.set_trace()
+        if do_plot:
+            #collapse along all segments and channels
+            plot_stack = flat_dsgn_X.swapaxes(0,2).reshape(5,-1,order='C')
+            plt.figure()
+            try: sns.violinplot(data=plot_stack,positions=np.arange(5))
+            except: ipdb.set_trace()
+        
+        return flat_dsgn_X, flat_dsgn_Y, num_segs
+    
+    ''' This function retrieves a design matrix from the pooled observations '''
+    def stack_dsgn(self,do_plot=False):
+        label_map = self.label_map
+        
+        # New method here...
         SVM_stack = np.concatenate([self.osc_bl_norm['POOL'][condit] for condit in self.condits],axis=0)
-        self.SVM_raw_stack = SVM_stack # for analysis/debug purposes
-        SVM_labels = np.concatenate([[label_map[condit] for seg in self.osc_bl_norm['POOL'][condit]] for condit in self.condits],axis=0)
         num_segs = SVM_stack.shape[0]
-        print(num_segs)
+        flat_dsgn_X = SVM_stack.reshape(num_segs,-1,order='C') #Here we're collapsing all the 5 Osc x 256 Chann features
+         
+        dsgn_Y = np.concatenate([[label_map[condit] for seg in self.osc_bl_norm['POOL'][condit]] for condit in self.condits],axis=0)
         
-        print('DOING BINARY')
+        
+        if do_plot:
+            #collapse along all segments and channels
+            plot_stack = dsgn_X['OnT'].swapaxes(0,2).reshape(5,-1,order='C')
+            plt.figure()
+            for ii in range(5):
+                sns.violinplot(data=plot_stack.T,positions=np.arange(5))
+        
+        self.SVM_raw_stack = SVM_stack
+        return flat_dsgn_X, dsgn_Y, num_segs
+                                    
+    ''' WIP SVM masked classifier where channels can be toggled '''
+    def masked_SVM(self):
         #generate a mask
-        if mask:
-            #what mask do we want?
-            #self.SVM_Mask = self.median_mask
-            self.SVM_Mask = np.zeros((257,)).astype(bool)
-            self.SVM_Mask[np.arange(216,239)] = True
-            
-            sub_X = self.SVM_stack[:,self.SVM_Mask,:]
-            dsgn_X = sub_X.reshape(num_segs,-1,order='C')
-        else:
-            # RESHAPE FLAG
-            dsgn_X = SVM_stack.reshape(num_segs,-1,order='C')
+    
+        #what mask do we want?
+        self.SVM_Mask = np.zeros((257,)).astype(bool)
+        self.SVM_Mask[np.arange(216,239)] = True
         
+        sub_X = self.SVM_stack[:,self.SVM_Mask,:]
+        dsgn_X = sub_X.reshape(num_segs,-1,order='C')
+
+    ''' Train our Binary SVM '''
+    def train_binSVM(self,mask=False):
+        self.bin_classif = nestdict()
         
-        ## OK, we're good right now
-        #We have labels and we have the stack itself, properly reshaped
+        dsgn_X, SVM_labels, num_segs = self.stack_dsgn()
         
         #Next, we want to split out a validation set
         Xtr,self.Xva,Ytr,self.Yva = sklearn.model_selection.train_test_split(dsgn_X,SVM_labels,test_size=0.7,shuffle=True,random_state=None)
@@ -1652,7 +1694,7 @@ class proc_dEEG:
         nfold = 10
         cv = StratifiedKFold(n_splits=nfold)
         for train,test in cv.split(Xtr,Ytr):
-            clf = svm.LinearSVC(penalty='l2',dual=False,C=1)
+            clf = svm.LinearSVC(penalty='l1',dual=False,C=1) #l2 works well here...
             mod_score = clf.fit(Xtr[train],Ytr[train]).score(Xtr[test],Ytr[test])
             outpred = clf.predict(Xtr[test])
             coeffs.append(clf.coef_)
@@ -1692,6 +1734,7 @@ class proc_dEEG:
         validation_accuracy = best_model['Model'].score(self.Xva,self.Yva)
         Ypred = best_model['Model'].predict(self.Xva)
         print(validation_accuracy)
+        
         plt.figure()
         plt.subplot(1,2,1)
         #confusion matrix here
@@ -1701,12 +1744,14 @@ class proc_dEEG:
         plt.xticks(np.arange(0,2),['OffT','OnT'])
         plt.colorbar()
         
-        plt.subplot(1,2,2)
+        plt.subplot(2,2,2)
         coeffs = np.array(best_model['Coeffs']).squeeze().reshape(self.cv_folding,257,5,order='C')
-        #pdb.set_trace()
         #plt.plot(coeffs,alpha=0.2)
         plt.plot(np.median(coeffs,axis=0))
         plt.title('Plotting Median Coefficients for CV-best Model performance')
+        
+        plt.subplot(2,2,4)
+        plt.plot(np.median(np.median(coeffs,axis=0),axis=0))
         
         self.SVM_coeffs = coeffs
     
@@ -1716,32 +1761,45 @@ class proc_dEEG:
         for ii in range(100):
             Xrs,Yrs = resample(self.Xva, self.Yva,100)
             valid_accuracy = best_model.score(Xva,Yva)
+            
+    '''Analysis of the binary SVM coefficients should be here'''    
+    def analyse_binSVM(self,use_all_CVs = False):
+        if use_all_CVs:
+            coeffs = self.SVM_coeffs #if we want it for all the folds
+            
+            #Below is if we want to weight by the feature amplitudes themselves; important since the Gamma coefficients are non-zero (with L2 regularization at least)
+            
+            #get the median power in each of the bands so we can get a weighed idea of which channels are most important
+            var_pow = np.var(self.SVM_raw_stack,axis=0).reshape(-1,order='C')
+            tot_var_bands = np.multiply(np.median(coeffs,axis=0).reshape(-1,order='C'),var_pow).reshape(257,5,order='C')
+            tot_var = np.sum(np.multiply(np.median(coeffs,axis=0).reshape(-1,order='C'),var_pow).reshape(257,5,order='C'),axis=1)
         
-    def analyse_binSVM(self):
-        coeffs = self.SVM_coeffs
-        
-        #get the median power in each of the bands so we can get a weighed idea of which channels are most important
-        var_pow = np.var(self.SVM_raw_stack,axis=0).reshape(-1,order='C')
-        tot_var_bands = np.multiply(np.median(coeffs,axis=0).reshape(-1,order='C'),var_pow).reshape(257,5,order='C')
-        tot_var = np.sum(np.multiply(np.median(coeffs,axis=0).reshape(-1,order='C'),var_pow).reshape(257,5,order='C'),axis=1)
-        
-        plt.figure()
-        plt.subplot(2,1,1)
-        plt.plot(np.abs(tot_var))
-        plt.subplot(2,1,2)
-        #EEG_Viz.plot_3d_scalp(np.abs(tot_var))      
-        plt.hist(np.abs(tot_var))
-        
-        self.tot_var = np.abs(tot_var)
-        plt.figure()
-        self.import_mask = np.abs(tot_var) > 0.10
-        EEG_Viz.plot_3d_scalp(self.import_mask.astype(np.int),unwrap=True)  
-        
-        # Let's take a look at each band's distribution
-        plt.figure()
-        
-        sns.violinplot(y=tot_var_bands,positions=np.arange(5))
-        
+            plt.figure()
+            plt.subplot(2,1,1)
+            plt.plot(np.abs(tot_var))
+            plt.subplot(2,1,2)
+            #EEG_Viz.plot_3d_scalp(np.abs(tot_var))      
+            plt.hist(np.abs(tot_var))
+            
+            self.tot_var = np.abs(tot_var)
+            plt.figure()
+            self.import_mask = np.abs(tot_var) > 0.10
+            EEG_Viz.plot_3d_scalp(self.import_mask.astype(np.int),unwrap=True)  
+            plt.suptitle('Looking at the coefficients mulitiplied by feature variances')
+            # Let's take a look at each band's distribution
+            plt.figure()
+            
+            sns.violinplot(y=tot_var_bands,positions=np.arange(5))
+            
+        else:
+            coeffs = stats.zscore(np.sum(self.bin_classif['Model'].coef_.reshape(257,5,order='C'),axis=1))
+            plt.figure()
+            self.import_mask = coeffs > 0.4
+            EEG_Viz.plot_3d_scalp(coeffs,unwrap=True)
+            EEG_Viz.plot_3d_scalp(self.import_mask.astype(np.int),unwrap=True)
+            plt.suptitle('Just looking at the coefficients')
+            
+            
     # THE BELOW FUNCTION DOES NOT RUN, JUST HERE FOR REFERENCE AS THE SVM IS BEING RECODED ABOVE
     def OLDtrain_binSVM(self):
         #%% PLOT THE WHOLE DATA
@@ -1904,6 +1962,8 @@ class proc_dEEG:
     def NEWcompute_diff(self):
         avg_change = {pt:{condit:10*(np.log10(avg_psd[pt][condit][keys_oi[condit][1]]) - np.log10(avg_psd[pt][condit]['Off_3'])) for pt,condit in itertools.product(self.pts,self.condits)}}
    
+    
+    ''' Below are functions related to the oscillatory response characterization'''
     #This goes to the psd change average and computed average PSD across all available patients
     def pop_response(self):
         psd_change_matrix = nestdict()
@@ -2062,11 +2122,10 @@ class proc_dEEG:
    
             plt.suptitle(pt)
     
+    '''GMM Classification Modules here - Analysis is obsolete'''
     def GMM_train(self,condit='OnT'):
         #gnerate our big matrix of observations; Should be 256(chann)x4(feats)x(segxpatients)(observations)
         pass
-    
-    
     
         #this function will generate a big stack of all observations for a given condition across all patients
     
@@ -2296,5 +2355,20 @@ class proc_dEEG:
             
             plt.suptitle(pt)
             
+    '''Coherence Statistics here'''
     def coher_stat(self,pt_list=[],chann_list=[]):
         return self.extract_coher_feats(do_pts=pt_list,do_condits=['OnT','OffT'])
+    
+    
+    ''' GRAVEYARD '''
+    
+    def BLWEIRDcompute_response(self,combine_baselines=True,plot=False):
+        if combine_baselines:
+            baseline = {pt:np.median(self.combined_BL[pt],axis=0) for pt in self.pts}
+        else:
+            baseline = {pt:np.median(self.osc_dict[pt][condit][keys_oi[condit][0]],axis=0) for pt in self.pts}
+            
+        self.osc_bl_norm = {pt:{condit:(self.osc_dict[pt][condit][keys_oi[condit][1]] - baseline[pt]) for condit in self.condits} for pt in self.pts}
+        
+        if plot:
+            plt.figure()

@@ -57,8 +57,8 @@ class brain_sig:
         self.brain_osc = self.amplit * np.sin(2 * np.pi * self.center_freq * self.tvect)
 
 class stim_sig():
-    def __init__(self,fs,stim_ampl=6,wform='sine',freq=130,zero_onset=True):
-        self.center_freq = freq
+    def __init__(self,fs,stim_ampl=6,wform='sine',stim_freq=130,zero_onset=True):
+        self.center_freq = stim_freq
         self.amplit = stim_ampl
         self.phase = 0
         self.wform = wform
@@ -149,9 +149,10 @@ class stim_sig():
         if self.zero_onset:
             self.stim_osc[0:int(self.tvect.shape[0]/2)] = 0
     
+''' This is the bigger simulation class that calls all others'''
 
 class sim_diff:
-    def __init__(self,Z_b = 1e4,Ad=250,wform='moresine3',clock=False,zero_onset=True,stim_v = 6):
+    def __init__(self,Z_b = 1e4,Ad=250,wform='moresine3',clock=False,zero_onset=True,stim_v = 6,stim_freq=130):
         self.fullFs = 4220
         self.Fs = self.fullFs
         self.tlims = (-10,10)
@@ -168,7 +169,7 @@ class sim_diff:
         
         self.osc_params = {'x_1':[12,3e-7],'x_3':[0,0],'x_2':[0,0]}
         self.set_brain()
-        self.set_stim(wform=wform,zero_onset=zero_onset,freq=130,stim_ampl=stim_v)
+        self.set_stim(wform=wform,zero_onset=zero_onset,freq=stim_freq,stim_ampl=stim_v)
         self.clockflag = clock
         
         if self.clockflag:
@@ -189,10 +190,10 @@ class sim_diff:
         decay_factor = 1e-3
         #WARNING, need to figure out why this part is necessary
         stim_scaling = 10
-        self.S = stim_scaling * decay_factor * stim_sig(fs=self.fullFs,stim_ampl=stim_ampl,wform=wform,zero_onset=zero_onset,freq=freq).ts_return()
+        self.S = stim_scaling * decay_factor * stim_sig(fs=self.fullFs,stim_ampl=stim_ampl,wform=wform,zero_onset=zero_onset,stim_freq=freq).ts_return()
     
     def set_clock(self):
-        self.clock = stim_sig(fs=self.fullFs,stim_ampl=2e-3,wform='sine',freq=105.5,zero_onset=False).ts_return()
+        self.clock = stim_sig(fs=self.fullFs,stim_ampl=2e-3,wform='sine',stim_freq=105.5,zero_onset=False).ts_return()
     
     def Vd_stim(self,Z1,Z3):
         self.stim_component = self.Ad * self.Z_b * self.S * ((1/(Z1 + self.Z_b)) - (1/(Z3 + self.Z_b)))
@@ -659,7 +660,7 @@ class sim_amp:
 #%%
 
 if __name__ == '__main__':
-    diff_run = sim_diff(Ad=500,wform='moresine4',clock=True,stim_v=6)
+    diff_run = sim_diff(Ad=500,wform='moresine4',clock=True,stim_v=6,stim_freq=160)
     #diff_run.set_brain()
     #diff_run.set_stim(wform='ipg')
     

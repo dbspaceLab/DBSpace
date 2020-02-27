@@ -702,6 +702,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
     def split_validation_set(self,do_split = True,train_size=0.6):
         if do_split:
             print('Splitting out validation set')
+            #ipdb.set_trace()
             print('Pre splot YFrame ' + str(len(self.YFrame.file_meta)))
             self.train_set, self.valid_set = train_test_split(self.YFrame.file_meta,train_size=train_size,shuffle=True)
             
@@ -1003,6 +1004,8 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         print('Making Training Set Data ' + str(train_pts))
         Otrain,Ctrain,_ = self.dsgn_O_C(train_pts,week_avg=avgweeks,ignore_flags=ignore_flags,circ=circ,scale='HDRS17')
         
+        #CHECK IN TO SEE HOW MANY DATAPOINTS WE'RE DEALING WITH
+        print(Otrain.shape)
         #Ctrain = sig.detrend(Ctrain) #this is ok to zscore here given that it's only across phases
                 
         if method[0:3] == 'OLS':

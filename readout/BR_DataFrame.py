@@ -61,7 +61,7 @@ class BR_Data_Tree:
             print('Generating the dataframe...')
             self.generate_sequence()
             #Save it now
-            self.Save_Frame()
+            self.Save_Frame(name_addendum='Feb2020')
             #Now just dump us out so we can do whatever we need to with the file above
 
         else:

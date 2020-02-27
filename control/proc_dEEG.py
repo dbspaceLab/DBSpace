@@ -51,8 +51,8 @@ from sklearn.metrics import confusion_matrix, roc_curve, auc, roc_auc_score
 from sklearn.model_selection import learning_curve, StratifiedKFold
 
 from sklearn.decomposition import FactorAnalysis, PCA
-import tensortools as tt
-from tensortools.operations import unfold as tt_unfold, khatri_rao
+#import tensortools as tt
+#from tensortools.operations import unfold as tt_unfold, khatri_rao
 import tensorly as tl
 from tensorly import unfold as tl_unfold
 from tensorly.decomposition import parafac

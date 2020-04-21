@@ -84,14 +84,29 @@ def poly_subtr(fvect,inp_psd,polyord=4):
 #%%            
 class RO:
     #Parent readout class
-
+    circ = 'day'
     def __init__(self,BRFrame,ClinFrame,pts,clin_measure='HDRS17'):
         self.YFrame = BRFrame
         self.CFrame = ClinFrame
         self.pts = pts
         self.c_meas = clin_measure
         self.fvect = self.YFrame.data_basis
+    
+    def filter_recs(self,rec_class='main_study'):
+        if rec_class == 'main_study':
+            filter_phases = dbo.Phase_List(exprs='ephys')
+            
+            self.active_rec_list = [rec for rec in self.YFrame.file_meta if rec['Phase'] in filter_phases and rec['Patient'] in self.pts and rec['Circadian'] in self.circ]
+    
+    def y_c_pair(self,rec_list):
+        scale_lookup = self.CFrame.clin_dict
         
+        self.data = [(rec,scale_lookup[pt][phase]['nHDRS'] for rec in rec_list if rec]
+    def rec_info(self):
+        for pt in self.pts:
+            filter_phases = dbo.Phase_List(exprs='ephys')
+            print(pt + ' has ' + str(len([rec for rec in self.YFrame.file_meta if rec['Phase'] in filter_phases and rec['Patient'] == pt])) + ' recordings')
+    
     def clin_extract(self):
         for rr in self.active_list:
             rr.update({'ClinVect': self.CFrame.clin_dict['DBS'+rr['Patient']][rr['Phase']][self.c_meas]})
@@ -105,7 +120,7 @@ class RO:
         #so, basically.... now we have every recording with its associated c_score....
         #The output of this should be a (Feats x Channs) x NRECS matrix
     
-    def extract_feats(self):
+    def feature_extract(self):
         print('Extracting Oscillatory Features')
 
         big_list = self.YFrame.file_meta
@@ -121,10 +136,8 @@ class RO:
                 feat_dict[featname] = dofunc['fn'](datacontainer,self.YFrame.data_basis['F'],dofunc['param'])
             rr.update({'FeatVect':feat_dict})
             
-    def feature_extract(self):
-        pass
 
-    def filter_recs(self,dataset):
+    def OBSfilter_recs(self,dataset):
         pdb.set_trace()
         self.active_list = [rr for rr in self.train_set if rr['Circ'] == 'day']
     
@@ -154,108 +167,25 @@ class RO:
         
     def validate_controller(self):
         pass
-        
+    
     def split_validation_set(self,split=True):
         train_size = 0.5 #This is done just to maximize the chance of having a recording from all weeks, while minimizing the training set size      
-        self.train_set, self.valid_set = train_test_split(self.YFrame.file_meta,train_size=train_size,shuffle=True)
+        self.train_set, self.valid_set = train_test_split(self.active_rec_list,train_size=train_size,shuffle=True)
     
     def regress_function(self,X,Y):
         pass
-
-class DMD_RO(RO): # This is our ondemand readout
-    # By default, it only runs on a single patient
-    # can have an option to run on all patients, but easier to put in the LFM model
-    def __init__(self,BRFrame,ClinFrame,pts=['901','903','905','906','907','908'],lim_freq=50):
-        super().__init__(BRFrame,ClinFrame,pts)
-
-        #out_matrix = [(day_pt_lim)]
     
-    def filter_recs(self,dataset):
-        pt_lim = [rec for rec in dataset if rec['Patient'] in self.pts and rec['Circadian'] == 'day']
-        # Now, we want to limit it only to the daytime recordings
-        #day_pt_lim = [rec for rec in pt_lim if rec['Circadian'] == 'day']
-        # The DATA entry in each recording is NOT log transformed
-        self.filtered_list = pt_lim
-        
-    def feature_extract(self):
-        rec_list = self.filtered_list
-        #This function will be different for different classes
-        # For readability, and compatibility with the dofunc approach, we'll do this by looping through each recording
-        for rr in rec_list:
-            feat_dict = {key:[] for key in dbo.feat_dict.keys()}
-            for featname,dofunc in dbo.feat_dict.items():
-                datacontainer = {ch: poly_subtr(fvect=self.fvect['F'],inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()} #THIS RETURNS a PSD, un-log transformed
-                feat_dict[featname] = dofunc['fn'](datacontainer,self.YFrame.data_basis['F'],dofunc['param'])
-            rr.update({'FeatVect':feat_dict})
-            
-        #The below is a cleanup of the above, but requires some refactoring of the oscillatory feature extraction system
-        #feat_list = [(poly_subtr(self.fvect['F'],rec['Data']['Left']),poly_subtr(self.fvect['F'],rec['Data']['Right'])) for rec in rec_list]
-        #for featname,dofunc in dbo.feat_dict.items():
-        #    datacontainer = {ch: poly_subtr(fvect=fvect,inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()} #THIS RETURNS a PSD, un-log transformed
-        #    feat_dict = dofunc[]
-        #       feat_dict[featname] = dofunc['fn'](datacontainer,self.YFrame.data_basis['F'],dofunc['param'])
-
-        
-        
-class SCC_RO(RO): # This is the depression-level model on oscillatory features
-    # This is the primary readout class for us to do the DEPRESSION/SCIENTIFIC READOUT approach
-    def __init__(self,BRFrame,CFrame):
-        super().__init__(BRFrame,CFrame)
-        
-        self.dsgn_shape_params = ['logged','polyrem']#,'detrendX','detrendY','zscoreX','zscoreY']
-        
-        self.Model = {}
-        
-        self.norm_func = stats.zscore
-        
-        self.do_pts = ['901','903','905','906','907','908']
-        self.clin_measure = 'HDRS17'
-        
-        self.do_detrend = 'Block'
-        self.regression = 'ENR_O'
-        
-    def train_model(self):
-        self.split_validation_set(split=True)
-        self.extract_feats()
-            
-    def pt_CV(self):
-        all_pairs = list(itertools.combinations(self.do_pts,3))
-        num_pairs = len(list(all_pairs))
-        
-        coeff_runs = [0] * num_pairs
-        summ_stats_runs  = [0] * num_pairs
-        
-        all_model_pairs = list(all_pairs)
     
-        for run,pt_pair in enumerate(all_model_pairs):
-            print(pt_pair)
-            analysis.O_regress(method=rmethod,doplot=False,avgweeks=True,ignore_flags=False,circ='day',scale=test_scale,lindetrend=do_detrend,train_pts=pt_pair)
-            coeff_runs[run] = analysis.O_models(plot=False,models=[rmethod])
-            summ_stats_runs[run] = analysis.Clinical_Summary(rmethod,plot_indiv=False,ranson=dorsac,doplot=False)
-    
-        self.model.coeffs = coeff_runs
+    def readout(self,X):
+        print(X.shape[1])
         
-    def plot_stats(self):
-        pass
-    
-    def model_coeffs(self):
-        coeff_runs = self.model.coeffs
-        
-        left_coeffs = np.array([cc['Left'] for cc in coeff_runs])
-        right_coeffs = np.array([cc['Right'] for cc in coeff_runs])
-        
-        if do_plot: plot_coeffs(left_coeffs,right_coeffs)
-        
-        return left_coeffs, right_coeffs
-            
-    
 class controller_analysis:
     def __init__(self):
         pass
 
 
 #%%
-# OLD METHODS< WILL BE DEPRECATED SOON
+# OLD METHODS < WILL BE DEPRECATED SOON
 
 
 class DSV: # This is the old DSV class
@@ -475,8 +405,8 @@ class DSV: # This is the old DSV class
             plt.title(pt)
             
             spearm = stats.spearmanr(pt_zscored[pt]['Predicted'],pt_zscored[pt]['HDRS17'])
-            print(pt + ' Spearman:')
-            print(spearm)
+            #print(pt + ' Spearman:')
+            #print(spearm)
             
             #output the PER PATIENT results plotted here
             
@@ -794,7 +724,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
             fmeta = self.valid_set
         else:
             raise ValueError
-            
+        
         ptcdict = self.CFrame.clin_dict
         
         ePhases = dbo.Phase_List(exprs='ephys')
@@ -884,7 +814,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         
         #O_dsgn = sig.detrend(O_dsgn,axis=0)
         #O_dsgn = sig.detrend(O_dsgn,axis=1)
-        
+        #ipdb.set_trace()
         return O_dsgn, C_dsgn, label_dict
     
     def O_models(self,plot=True,models=['RANSAC','RIDGE']):
@@ -1005,7 +935,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         Otrain,Ctrain,_ = self.dsgn_O_C(train_pts,week_avg=avgweeks,ignore_flags=ignore_flags,circ=circ,scale='HDRS17')
         
         #CHECK IN TO SEE HOW MANY DATAPOINTS WE'RE DEALING WITH
-        print(Otrain.shape)
+        #print(Otrain.shape)
         #Ctrain = sig.detrend(Ctrain) #this is ok to zscore here given that it's only across phases
                 
         if method[0:3] == 'OLS':
@@ -1119,9 +1049,10 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         
     def plot_model_coeffs(self,model='ENR_Osc',pt=''):
         plt.figure()
-        #pdb.set_trace()
-        plt.plot(self.Model[model]['Model'].coef_[0,:5],label='Left',linewidth=10)
-        plt.plot(self.Model[model]['Model'].coef_[0,5:],label='Right',linewidth=10)
+        model_coeffs = self.Model[model]['Model'].coef_.reshape(1,-1)
+        
+        plt.plot(model_coeffs[0,:5],label='Left',linewidth=10)
+        plt.plot(model_coeffs[0,5:],label='Right',linewidth=10)
         plt.ylim((-0.1,0.1))
         plt.suptitle('Coefficients of model for pt ' + pt)
         plt.legend()
@@ -1138,7 +1069,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
             self.Model[method]['Performance']['SpearCorr'] = stats.spearmanr(Cpredictions.astype(float).reshape(-1,),Ctest.astype(float).reshape(-1,))
             self.Model[method]['Performance']['Permutation'] = self.shuffle_summary(method)
         except Exception as e:
-            print(e)
+            #print(e)
             pdb.set_trace()
 
         #Then we do Spearman's R
@@ -1231,7 +1162,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
             else:
                 slsl,inin,rval,pval,stderr = stats.mstats.linregress(Ctest.reshape(-1,1),Cpredictions.reshape(-1,1))
                  
-                print(method + ' model has OLS ' + str(slsl) + ' correlation with real score (p < ' + str(pval) + ')')
+                #print(method + ' model has OLS ' + str(slsl) + ' correlation with real score (p < ' + str(pval) + ')')
             
             self.Model[method]['Performance']['Regression'] = assesslr
             
@@ -1494,7 +1425,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
                     cpred_block = Cpred[28*pp:28*(pp+1)]
                     Cpred[28*pp:28*(pp+1)] = sig.detrend(cpred_block,axis=0,type='linear')
             except Exception as e:
-                print(e)
+                #print(e)
                 pdb.set_trace()
         
         elif do_detrend == 'All':
@@ -1819,8 +1750,8 @@ class ORegress: # This is the old linear regression on oscillatory features modu
             _ = self.clin_changes(Cpred,Cmeas,labels,usefig=main_clin_fig)
             
             plt.axes().set_aspect('equal')
-            print(stats.spearmanr(Cmeas,Cpred))
-            print(rsac_stats['Slope'])
+            #print(stats.spearmanr(Cmeas,Cpred))
+            #print(rsac_stats['Slope'])
         else:
             plt.plot(Cmeas)
             plt.plot(Cpred)
@@ -2104,26 +2035,13 @@ class naive_readout:
             plt.figure()
             for ss,side in enumerate(['Left','Right']):
                 
-                print(ff + ' ' + side)
+                #print(ff + ' ' + side)
                 
                 plt.subplot(1,2,ss+1)
                 ax = sns.violinplot(y=aggr_week_distr[ff]['depr'][side],alpha=0.2)
                 plt.setp(ax.collections,alpha=0.3)
                 ax = sns.violinplot(y=aggr_week_distr[ff]['notdepr'][side],color='red',alpha=0.2)
                 plt.setp(ax.collections,alpha=0.3)
-                print(stats.ks_2samp(np.array(aggr_week_distr[ff]['depr'][side]),np.array(aggr_week_distr[ff]['notdepr'][side])))
+                #print(stats.ks_2samp(np.array(aggr_week_distr[ff]['depr'][side]),np.array(aggr_week_distr[ff]['notdepr'][side])))
                 
             plt.suptitle(ff + ' ' + ' min/max HDRS')
-
-
-
-class partial_readout:
-    def __init__(self):
-        pass
-    
-    def roc_analysis(self):
-        #we should have our model
-        # we should have our validation set
-        pass
-        
-            

@@ -50,8 +50,14 @@ def pca(data,numComps=None):
 class CFrame:
     do_pts = ['901','903','905','906','907','908']
     scale_max = {'HDRS17':40,'MADRS':50,'BDI':60,'GAF':-100,'DSC':0.01}
+    all_scales = ['HDRS17','MADRS','BDI','GAF']
     
-    def __init__(self,incl_scales = ['HDRS17','MADRS','BDI','GAF'],norm_scales=False):
+    #An easy referencer to find a PATIENT's SCALE at PHASE
+    lookup = []
+    DSS_dict = [] # PT-SCALE-array
+    clin_dict = [] #PT-PHASE-
+    
+    def __init__(self,incl_scales = ['HDRS17'],norm_scales=False):
         #load in our JSON file
         #Import the data structure needed for the CVect
         ClinVect = json.load(open('/home/virati/Dropbox/projects/Research/MDD-DBS/Data/ClinVec.json'))
@@ -59,48 +65,67 @@ class CFrame:
         #Setup the clinical dictionary structure
         clin_dict = defaultdict(dict)
         #This populates the clinical dictionary structure
+
+        
         for pp in range(len(ClinVect['HAMDs'])):
             ab = ClinVect['HAMDs'][pp]
             clin_dict[ab['pt']] = defaultdict(dict)
             for phph,phase in enumerate(ClinVect['HAMDs'][pp]['phases']):
-                for ss,scale in enumerate(incl_scales):
-                    
-                    if norm_scales and scale != 'dates':
-                        clin_dict[ab['pt']][phase][scale] = ab[scale][phph] / self.scale_max[scale]
-                    elif scale != 'dates':
-                        clin_dict[ab['pt']][phase][scale] = ab[scale][phph]
+                for ss,scale in enumerate(self.all_scales):
+                    clin_dict[ab['pt']][phase][scale] = ab[scale][phph]
+                    if norm_scales:
+                        clin_dict[ab['pt']][phase]['n'+scale] = ab[scale][phph] / self.scale_max[scale]
                     else:
                         clin_dict[ab['pt']][phase][scale] = ab[scale][phph]
-        #self._rawClinVect = ClinVect
         
+        self.OBS_make_dss(ClinVect)
+                
+                
+        add_scales = []
+        if norm_scales: [add_scales.append('n'+scale) for scale in self.all_scales]
+        self.all_scales = add_scales
         self.do_scales = incl_scales
         self.clin_dict = clin_dict
         
         clin_dict = []
         
+
+        
+        self.omega_state()
+        self.derived_measures()
+        self.load_stim_changes()
+    
+    def OBS_make_dss(self,ClinVect):
         #Setup derived measures
         #THIS IS JUST A COPY PASTE FROM SCALE DYNAMICS, need to merge this in with above so it's all done properly
         DSS_dict = defaultdict(dict)
         #Here, we cycle through each scale and setup an ARRAY
-        for ss,scale in enumerate(incl_scales):
+        for ss,scale in enumerate(self.all_scales):
             for pp in range(len(ClinVect['HAMDs'])):
                 ab = ClinVect['HAMDs'][pp]
-                if norm_scales:
-                     DSS_dict[ab['pt']][scale] = np.array(ab[scale]) / self.scale_max[scale]
-                     DSS_dict[ab['pt']][scale+'raw'] = np.array(ab[scale])
-                else:
-                     DSS_dict[ab['pt']][scale] = np.array(ab[scale])
-                
+
+                DSS_dict[ab['pt']]['n'+scale] = np.array(ab[scale]) / self.scale_max[scale]
+                DSS_dict[ab['pt']][scale] = np.array(ab[scale])
+
+            
+        # The DSS Dict is THE MOST IMPORTANT DICT IN THE CLASS
         self.DSS_dict = DSS_dict
-        
-        self.derived_measures()
-        self.load_stim_changes()
+
     
+    '''Omega state is the 'final' state that the clinician cares about: are they depressed or not?'''
+    def omega_state(self):
+        for pt,ph_dict in self.clin_dict.items():
+            #find the average of the first 4 weeks
+            baseline = ['A04','A03','A02','A01']
+            bl_obs = [ph_dict]
+            for phase in ph_dict:
+                print(phase)
+                
     ''' this is meant to replace self.DSS_dict as a function that calls and manipulates clin_dict '''
     def dss_struct(self):
         # go into clin dict and output its contents in a structure that is consistent with dss_dict
         # dss_dict structure is such that [pt][scale][phase x 1?]
-        pass
+        self.clin_array = {pt: {scale: {value} for scale in self.all_scales} for pt in self.clin_dict.keys()}
         
     
     ''' Here we go through and generate our derived measures from the established clinical scale measures '''
@@ -210,7 +235,9 @@ class CFrame:
             pt_tcourse = self.pt_scale_tcourse(patient)
             #now setup the right order
             prop_order = dbo.Phase_List('all')
-            ordered_tcourse = [pt_tcourse[phase][scale] for phase in prop_order]
+            #ordered_tcourse = [pt_tcourse[phase][scale] for phase in prop_order]
+            #4/7/2020
+            ordered_tcourse = pt_tcourse[scale]
             
             plt.plot(ordered_tcourse)
             plt.legend(pts)
@@ -220,6 +247,8 @@ class CFrame:
     def pt_scale_tcourse(self,pt):
         #return dictionary with all scales, and each element of that dictionary should be a NP vector
         pt_tcourse = {rr:self.clin_dict['DBS'+pt][rr] for rr in self.clin_dict['DBS'+pt]}
+        #4/7/2020 - OR we can directly go to DSS_dict
+        pt_tcourse = self.DSS_dict['DBS'+pt]
         return pt_tcourse
     
     '''this returns to us a big dictionary with all our scales'''
@@ -323,7 +352,7 @@ class CFrame:
             #now do the AUC curves and P-R curves
             precision,recall,_ = precision_recall_curve(self.big_v_change_list[2,:],self.big_v_change_list[ii,:])
             #Compute AUC directly from pr
-            prauc = auc(precision,recall,reorder=True)
+            prauc = auc(recall,precision)
             prauc = np.sum(precision) / recall.shape[0]
             #Compute average precision
             avg_precision = average_precision_score(self.big_v_change_list[2,:],self.big_v_change_list[ii,:],average="micro")
@@ -341,7 +370,7 @@ class CFrame:
         precision,recall,_ = precision_recall_curve(self.big_v_change_list[2],min_algo)
         plt.plot(recall,precision)
 
-        prauc = auc(precision,recall,reorder=True)
+        prauc = auc(recall,precision)
         prauc = np.sum(precision) / recall.shape[0]
         avg_precision = average_precision_score(self.big_v_change_list[2],min_algo,average="micro")
         #plt.annotate('Average precision for ' + str(scales[ii]) + ': ' + str(avg_precision) + ' AUC: ' + str(prauc),(-2,1),fontsize=8)

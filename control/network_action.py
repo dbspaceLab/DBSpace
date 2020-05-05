@@ -80,6 +80,14 @@ class local_response:
         self.Osc_indiv_med = {pt:{condit:np.median(self.Osc_indiv_marg[pt][condit],axis=1) for condit in ['OnT','OffT']} for pt in do_pts}
         self.Osc_indiv_pop = {side:{condit:np.array([self.Osc_indiv_med[pt][condit][ss,:] for pt in do_pts]) for condit in ['OnT','OffT']} for ss,side in enumerate(['Left','Right'])}
 
+        #%%
+        # here we'll work with the oscillatory state variables
+        self.Osc_pt_marg = {condit:np.array([(Osc_response[pt][condit]['Left'],Osc_response[pt][condit]['Right']) for pt in do_pts])for condit in ['OnT','OffT']}
+        self.Osc_pt_marg_bl = {condit:np.array([(self.Osc_prebilat[pt][condit]['Left'],self.Osc_prebilat[pt][condit]['Right']) for pt in do_pts])for condit in ['OnT','OffT']}
+        self.Osc_pt_marg_uncorr = {condit:np.array([(self.Osc_response_uncorr[pt][condit]['Left'],self.Osc_response_uncorr[pt][condit]['Right']) for pt in do_pts])for condit in ['OnT','OffT']}
+
+
+
     def plot_response(self):
         Osc_indiv_pop = self.Osc_indiv_pop
         color = self.colors

@@ -95,18 +95,34 @@ class RO:
     def filter_recs(self,rec_class='main_study'):
         if rec_class == 'main_study':
             filter_phases = dbo.Phase_List(exprs='ephys')
-            
             self.active_rec_list = [rec for rec in self.YFrame.file_meta if rec['Phase'] in filter_phases and rec['Patient'] in self.pts and rec['Circadian'] in self.circ]
     
     def y_c_pair(self,rec_list):
         scale_lookup = self.CFrame.clin_dict
         
-        self.data = [(rec,scale_lookup[pt][phase]['nHDRS'] for rec in rec_list if rec]
+        #self.data = [(rec,scale_lookup[pt][phase]['nHDRS'] for rec in rec_list if rec]
+        
+    ''' Plot things we care about when it comes to how many recordings each patient x phase has, etc.'''
     def rec_info(self):
-        for pt in self.pts:
-            filter_phases = dbo.Phase_List(exprs='ephys')
+        filter_phases = dbo.Phase_List(exprs='ephys')
+        accounting = np.zeros((len(self.pts),len(filter_phases)))
+        detailed_dict = nestdict()
+
+        for pp,pt in enumerate(self.pts):
+            
             print(pt + ' has ' + str(len([rec for rec in self.YFrame.file_meta if rec['Phase'] in filter_phases and rec['Patient'] == pt])) + ' recordings')
-    
+            for ph,phase in enumerate(filter_phases):
+                
+                detailed_dict[pt][phase] = [rec for rec in self.YFrame.file_meta if rec['Phase'] == phase and rec['Patient'] == pt]
+                print(pt + ' has ' + str(len([rec for rec in self.YFrame.file_meta if rec['Phase'] == phase and rec['Patient'] == pt])) + ' recordings in Phase ' + phase)
+                
+                accounting[pp,ph] = len(detailed_dict[pt][phase])
+                
+        plt.figure()
+        plt.imshow(accounting)
+        plt.figure()
+        plt.plot(accounting[:,:].T)
+        
     def clin_extract(self):
         for rr in self.active_list:
             rr.update({'ClinVect': self.CFrame.clin_dict['DBS'+rr['Patient']][rr['Phase']][self.c_meas]})

@@ -253,7 +253,7 @@ def F_Domain(timeser,nperseg=512,noverlap=128,nfft=2**10,Fs=422):
     return FreqReturn
 
 def TF_Domain(timeser,fs=422,nperseg=2**10,noverlap=2**10-50):
-    raise Exception
+    #raise Exception
     #assert isinstance(timeser,dbs.timeseries)
     F,T,SG = sig.spectrogram(timeser,nperseg=nperseg,noverlap=noverlap,window=sig.get_window('blackmanharris',nperseg),fs=fs)
     

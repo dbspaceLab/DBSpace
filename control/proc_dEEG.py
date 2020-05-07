@@ -66,6 +66,7 @@ import sys
 sys.path.append('/home/virati/Dropbox/projects/libs/robust-pca/')
 import r_pca
 
+import pdb
 #%%
 
 TargetingEXP = defaultdict(dict)
@@ -139,6 +140,7 @@ class proc_dEEG:
             self.standard_pipeline()
     
     def standard_pipeline(self):
+        print('Doing standard init pipeline')
         self.extract_feats(polyorder=0)
         self.pool_patients() #pool all the DBS RESPONSE vectors
         
@@ -1006,6 +1008,7 @@ class proc_dEEG:
 
     def pop_meds(self,response=True):
         print('Doing Population Meds/Mads on Oscillatory RESPONSES w/ PCA')
+        
         #THIS IS THE OLD WAY: #dsgn_X = self.shape_GMM_dsgn(self.gen_GMM_Osc(self.gen_GMM_stack(stack_bl='normalize')['Stack']),band='All')
         if response:
             dsgn_X = self.osc_bl_norm['POOL']
@@ -1185,11 +1188,12 @@ class proc_dEEG:
         plt.figure()
         ax2 = plt.subplot(111)
         for cc,condit in enumerate(['OnT','OffT']):
-            for bb in range(5):
-                meds[condit] = self.Seg_Med[0][condit][:,:]
-                mads[condit] = self.Seg_Med[1][condit][:,:]
+            #for bb in range(5):
+            meds[condit] = self.Seg_Med[0][condit][:,:] #result here is 257(chann) x 5(bands)
+            mads[condit] = self.Seg_Med[1][condit][:,:]
                 #band_segnum[condit] = self.Seg_Med[2][condit]
-                
+            plt.plot(np.arange(0,5)+(cc-0.5)/10,meds[condit][:,:].T,color[cc]+'.',markersize=20,alpha=0.05)
+            #There's a way to do MATCHED CHANGES here!! TODO
                 
                 #plt.scatter((bb+(cc-0.5)/10)*np.ones_like(meds[condit][:,bb]),meds[condit][:,bb],marker=marker[cc],color=color[cc],s=100,alpha=0.2)
             #plt.boxplot(meds[condit][:,:],positions=np.arange(5)+(cc-0.5)/10,labels=dbo.feat_order)
@@ -1197,7 +1201,7 @@ class proc_dEEG:
             for pc in parts['bodies']:
                 pc.set_facecolor(color[cc])
                 pc.set_edgecolor(color[cc])
-                #pc.set_linecolor(color[cc])
+                pc.set_linecolor(color[cc])
                                  
             #plt.ylim((-0.5,0.5))
         

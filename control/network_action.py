@@ -24,6 +24,8 @@ import numpy as np
 import copy
 from copy import deepcopy
 
+import pdb
+
 class local_response:
     #Setup our main variables for the analysis
     TF_response = nestdict()
@@ -86,9 +88,60 @@ class local_response:
         self.Osc_pt_marg_bl = {condit:np.array([(self.Osc_prebilat[pt][condit]['Left'],self.Osc_prebilat[pt][condit]['Right']) for pt in do_pts])for condit in ['OnT','OffT']}
         self.Osc_pt_marg_uncorr = {condit:np.array([(self.Osc_response_uncorr[pt][condit]['Left'],self.Osc_response_uncorr[pt][condit]['Right']) for pt in do_pts])for condit in ['OnT','OffT']}
 
-
-
-    def plot_response(self):
+    def plot_segment_responses(self,do_pts):
+        for cc,chann in enumerate(['Left','Right']):
+            #do violin plots
+            fig = plt.figure()
+            ax2 = plt.subplot(111)
+            color = ['b','g']
+            distr = nestdict()
+            
+            for co,condit in enumerate(['OnT','OffT']):
+                #how many segments?
+                #Here, we're going to plot ALL segments, marginalized across patients
+                segNum = self.Osc_pt_marg[condit].shape[2]
+                distr_to_plot = self.Osc_pt_marg[condit].swapaxes(1,2).reshape(len(do_pts)*segNum,2,5)[:,cc,:]
+                
+                plt.plot(np.arange(1,6)+0.2*co,distr_to_plot.T,color[co]+'.',markersize=20,alpha=0.2)
+                parts = ax2.violinplot(distr_to_plot,positions=np.array([1,2,3,4,5]) + 0.2*co,showmedians=True)
+                
+                for partname in ('cbars','cmins','cmaxes','cmedians'):
+                    vp = parts[partname]
+                    vp.set_edgecolor(color[co])
+                    if partname == 'cmedians':
+                        vp.set_linewidth(5)
+                    else:
+                        vp.set_linewidth(2)
+            
+                for pc in parts['bodies']:
+                    pc.set_facecolor(color[co])
+                    pc.set_edgecolor(color[co])
+                    #pc.set_linecolor(color[co])
+                
+                distr[condit] = distr_to_plot
+                #plt.plot([1,2,3,4,5],np.mean(distr_to_plot,axis=0),color=color[co])
+                plt.suptitle('Looking at all available segments')
+                
+            for bb in range(5):
+                print(bb)
+                #rsres = stats.ranksums(distr['OnT'][:,bb],distr['OffT'][:,bb])
+                rsres = stats.ks_2samp(distr['OnT'][:,bb],distr['OffT'][:,bb])
+                #rsres = stats.wilcoxon(distr['OnT'][:,bb],distr['OffT'][:,bb])
+                #rsres = stats.ttest_ind(distr['OnT'][:,bb],distr['OffT'][:,bb])
+                print(rsres)
+                
+                #ontres = stats.ranksums(distr['OnT'][:,bb])
+                #ontres = stats.kstest(distr['OnT'][:,bb],cdf='norm')
+                #ontres = stats.mannwhitneyu(distr['OnT'][:,bb])
+                ontres = stats.ttest_1samp(distr['OnT'][:,bb],np.zeros((5,1)))
+                print(ontres)
+            
+            plt.ylim((-30,50))
+            plt.legend()
+            plt.title(chann)
+            
+        
+    def plot_patient_responses(self):
         Osc_indiv_pop = self.Osc_indiv_pop
         color = self.colors
         
@@ -98,6 +151,8 @@ class local_response:
             distr = nestdict()
             for co,condit in enumerate(['OnT','OffT']):
                 distr_to_plot = Osc_indiv_pop[chann][condit]
+                
+                plt.plot(np.arange(1,6)+0.2*co,distr_to_plot.T,color[co]+'.',markersize=20)
                 
                 parts = ax2.violinplot(distr_to_plot,positions=np.array([1,2,3,4,5]) + 0.2*co,showmedians=True)
                 for partname in ('cbars','cmins','cmaxes','cmedians'):
@@ -115,6 +170,9 @@ class local_response:
                 
                 plt.ylim((-6,30))
                 distr[condit] = distr_to_plot
+            plt.title(chann)
+            plt.suptitle('Plotting average response for each patient')
+                
                     
             for bb in range(5):
                 #rsres = stats.ks_2samp(distr['OnT'][:,bb],distr['OffT'][:,bb])
@@ -131,3 +189,5 @@ class local_response:
                 print(dbo.feat_order[bb])
                 print(rsres)
                 print(ontres)
+                
+        

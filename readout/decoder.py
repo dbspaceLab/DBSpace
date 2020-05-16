@@ -48,6 +48,8 @@ import seaborn as sns
 sns.set(font_scale=4)
 sns.set_style("white")
 
+import itertools
+
 import time
 import copy
 import pdb
@@ -165,9 +167,17 @@ class base_decoder:
         return np.array(state_vector), np.array(depr_vector)
     
     '''Plot coefficients of our model'''
-    def plot_coeffs(self,model):
+    def plot_decode_coeffs(self,model):
         plt.figure()
-        plt.plot(model.coef_)
+        for side in range(2):
+            active_coeffs = self.decode_model.coef_
+            
+            active_coeffs = np.array(active_coeffs).squeeze()
+            plt.subplot(1,2,side+1)
+            plt.plot(active_coeffs[side*5:side*5+5])
+            plt.hlines(0,-2,7,linestyle='dotted')
+            plt.ylim((-0.3,0.3))
+            plt.xlim((-1,5))
 
 class weekly_decoder(base_decoder):
     def __init__(self,*args,**kwargs):
@@ -177,7 +187,8 @@ class weekly_decoder(base_decoder):
     def train_model(self):
         self.decode_model = self.regression_algo(alphas=np.linspace(0.01,0.05,20),l1_ratio=np.linspace(0.1,0.3,10),cv=10).fit(self.train_set_y,self.train_set_c)
         print('Alpha: ' + str(self.decode_model.alpha_) + ' | L1r: ' + str(self.decode_model.l1_ratio_))
-        self.plot_coeffs(self.decode_model)
+        
+        #self.plot_decode_coeffs(self.decode_model)
         
     def aggregate_weeks(self,dataset):
         #print('Performing Training Setup for Weekly Decoder')
@@ -192,21 +203,94 @@ class weekly_decoder(base_decoder):
                     y_set,c_set = self.calculate_states_in_set(block_set)
                     weekly_y_set = np.mean(y_set,axis=0)
                     
-                    running_list.append((weekly_y_set,c_set[0])) #all the c_set values should be the exact same
+                    running_list.append((weekly_y_set,c_set[0],pt)) #all the c_set values should be the exact same
         
-        y_state = np.array([a for (a,b) in running_list]) #outputs ~168 observed weeks x 10 features
-        c_state = np.array([b for (a,b) in running_list]).reshape(-1,1) #outputs ~168 observed weeks
+        y_state = np.array([a for (a,b,c) in running_list]) #outputs ~168 observed weeks x 10 features
+        c_state = np.array([b for (a,b,c) in running_list]).reshape(-1,1) #outputs ~168 observed weeks
+        pt_name = np.array([c for (a,b,c) in running_list])
         
-        return y_state, c_state
+        return y_state, c_state, pt_name
     
     def train_setup(self):
         print('Performing Training Setup for Weekly Decoder')
     
-        self.train_set_y, self.train_set_c = self.aggregate_weeks(self.train_set)
+        self.train_set_y, self.train_set_c, _  = self.aggregate_weeks(self.train_set)
     def test_setup(self):
         print('Performing TESTING Setup for Weekly Decoder')
         
-        self.test_set_y, self.test_set_c = self.aggregate_weeks(self.test_set)
+        self.test_set_y, self.test_set_c, _ = self.aggregate_weeks(self.test_set)
+
+class weekly_decoderCV(weekly_decoder):
+    def __init__(self,*args,**kwargs):
+        print('Initialized the Weekly CV decoder')
+        super().__init__(*args,**kwargs)
+        
+        self.pt_CV_sets(n=3)
+
+        
+    def pt_CV_sets(self,n=3):
+        pt_combos = list(itertools.combinations(self.pts,n))
+        
+        self.CV_num_combos = len(pt_combos)
+        self.CV_pt_combos = pt_combos
+        
+    def train_setup(self):
+        print('Performing Training Setup for Weekly Decoder')
+    
+        self.train_set_y, self.train_set_c, self.train_set_pt  = self.aggregate_weeks(self.train_set)
+    
+    ''' Train our model'''
+    def train_model(self):
+        #Our first goal is to learn a model for each patient combination
+        decode_model_combos = [None] * self.CV_num_combos
+        for run,pt_combo in enumerate(self.CV_pt_combos):
+            print(pt_combo)
+            combo_train_y = [a for (a,c) in zip(self.train_set_y,self.train_set_pt) if c in pt_combo]
+            combo_train_c = [b for (b,c) in zip(self.train_set_c,self.train_set_pt) if c in pt_combo]
+            
+            decode_model_combos[run] = self.regression_algo(alphas=np.linspace(0.01,0.05,20),l1_ratio=np.linspace(0.1,0.3,10),cv=10).fit(combo_train_y,combo_train_c)
+        
+        self.decode_model_combos_ = decode_model_combos
+        
+        average_model_coeffs,_ = self.get_average_model(self.decode_model_combos_)
+        self.decode_model = copy.deepcopy(decode_model_combos[-1])
+        self.decode_model.coef_ = average_model_coeffs
+        
+    def get_average_model(self,model):
+        active_coeffs = []
+        for ii in self.decode_model_combos_:
+            active_coeffs.append([ii.coef_])
+        
+        active_coeffs = np.array(active_coeffs).squeeze()
+        average_model = np.mean(active_coeffs,axis=0)
+        
+        #do some stats
+        
+        
+        #return the average model with the stats for each coefficient
+        return average_model, stats
+        
+    '''PLOTTING'''
+    def plot_decode_CV(self):
+        plt.figure()
+        for side in range(2):
+            active_coeffs = []
+            for ii in self.decode_model_combos_:
+                active_coeffs.append([ii.coef_[side*5:side*5+5]])
+            
+            active_coeffs = np.array(active_coeffs).squeeze()
+            plt.subplot(1,2,side+1)
+            #plt.plot(ii.coef_[side*5:side*5+5])
+            #pdb.set_trace()
+            vp_obj = sns.violinplot(data=active_coeffs,scale='width')
+            plt.setp(vp_obj.collections,alpha=0.3)
+        
+            average_model, _ = self.get_average_model(self.decode_model_combos_)
+            plt.plot(average_model[side*5:side*5+5])
+            plt.hlines(0,-2,7,linestyle='dotted')
+            plt.ylim((-0.3,0.3))
+            plt.xlim((-1,5))
+            
         
 class controller_analysis:
     def __init__(self,decoder):

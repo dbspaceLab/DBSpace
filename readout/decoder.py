@@ -53,7 +53,7 @@ import copy
 import pdb
 
 #%%            
-class RO:
+class base_decoder:
     #Parent readout class
     # Some very fixed constants up here
     circ = 'day'
@@ -65,12 +65,16 @@ class RO:
         self.pts = pts
         self.c_meas = clin_measure
         self.fvect = self.YFrame.data_basis['F']
+        
+        self.regression_algo = linear_model.LinearRegression
     
     '''Filter out the recordings we want'''
     def filter_recs(self,rec_class='main_study'):
         if rec_class == 'main_study':
             filter_phases = dbo.Phase_List(exprs='ephys')
             self.active_rec_list = [rec for rec in self.YFrame.file_meta if rec['Phase'] in filter_phases and rec['Patient'] in self.pts and rec['Circadian'] in self.circ]
+    
+        self.filter_phases = filter_phases
     
     def y_c_pair(self,rec_list):
         scale_lookup = self.CFrame.clin_dict
@@ -98,7 +102,8 @@ class RO:
         plt.imshow(accounting)
         plt.figure()
         plt.plot(accounting[:,:].T)
-        
+    
+    '''Plot PSDs for the first N recordings, sanity check'''
     def plot_psds(self,upper_lim=10):
         plt.figure()
         for ii in range(upper_lim):
@@ -106,87 +111,184 @@ class RO:
             plt.plot(np.linspace(0,211,513),np.log10(self.train_set[ii]['Data']['Left']))
             plt.subplot(122)
             plt.plot(np.log10(self.train_set[ii]['Data']['Right']))
-        
-    def split_validation_set(self,train_ratio=0.6):
-        self.train_set, self.validation_set = train_test_split(self.active_rec_list,train_size=train_ratio,shuffle=True)
     
+    '''split out our training and validation set recordings'''
+    def split_train_set(self,train_ratio=0.6):
+        self.train_set, self.test_set = train_test_split(self.active_rec_list,train_size=train_ratio,shuffle=True)
+
+    '''Setup our data for training'''
+    def train_setup(self):
+        self.train_set_y, self.train_set_c = self.calculate_states_in_set(self.train_set)
+
+    ''' Train our model'''
+    def train_model(self):
+        self.decode_model = self.regression_algo().fit(self.train_set_y,self.train_set_c)
+        
+    def test_setup(self):
+        self.test_set_y, self.test_set_c = self.calculate_states_in_set(self.test_set)
+
+    def test_model(self):
+        prediction_score = self.decode_model.score(self.test_set_y,self.test_set_c)
+        print(prediction_score)
+
+        predicted_c = self.decode_model.predict(self.test_set_y)
+        
+        plt.figure()
+        plt.scatter(self.test_set_c,predicted_c)
+        corr = stats.pearsonr(self.test_set_c.squeeze(),predicted_c.squeeze())
+        #except Exception as e: print(e); pdb.set_trace()
+        print(corr)
+        
     ''' Calculate oscillatory states for a set of recordings'''
-    def calculate_oscillatory_states(self,data_set):
+    def calculate_states_in_set(self,data_set):
         state_vector = []
+        depr_vector = []
+        
         for rr in data_set:
             psd_poly_done = {ch: dbo.poly_subtrLFP(fvect=self.fvect,inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()}
             
             feat_vect = np.zeros(shape=(len(dbo.feat_order),self.ch_num))
             for ff,featname in enumerate(dbo.feat_order):
                 dofunc = dbo.feat_dict[featname]
-                try: feat_calc = dofunc['fn'](psd_poly_done,self.fvect,dofunc['param'])
-                except Exception as e: print(e);pdb.set_trace()
+                feat_calc = dofunc['fn'](psd_poly_done,self.fvect,dofunc['param'])
+                #except Exception as e: print(e);pdb.set_trace()
                 feat_vect[ff,:] = np.array([feat_calc[ch] for ch in ['Left','Right']])
                 
-            state_vector.append(feat_vect)
+            # We need to flatten the state between channels...
+            #Then we go ahead and append it to the state vector
+            state_vector.append(np.reshape(feat_vect,-1,order='F')) #we want our FEATURE index to change quickest so we go (0,0) -> (1,0) -> (2,0) -> ... (4,1)
             
             # now we need to get a vector of the clinical states
+            depr_value = self.CFrame.get_depression_measure('DBS'+rr['Patient'],self.c_meas,rr['Phase'])
+            depr_vector.append(depr_value)
             
-        return np.array(state_vector)
+        return np.array(state_vector), np.array(depr_vector)
+      
         
-    def vectorize_set(self,dataset):
-        #First, we're going to go through all the recordings and pull out the patients we want
-        # Now, go through each recording and extract the features we want.
-        self.feature_extract() #This function works directly with the list and data to populate the feature/state vectors
-        self.clin_extract()
+    # ''''''''''''''''''''''''''''''''''''''''''''''''''
+    # def vectorize_set(self,dataset):
+    #     #First, we're going to go through all the recordings and pull out the patients we want
+    #     # Now, go through each recording and extract the features we want.
+    #     self.feature_extract() #This function works directly with the list and data to populate the feature/state vectors
+    #     self.clin_extract()
         
-        #so, basically.... now we have every recording with its associated c_score....
-        #The output of this should be a (Feats x Channs) x NRECS matrix
+    #     #so, basically.... now we have every recording with its associated c_score....
+    #     #The output of this should be a (Feats x Channs) x NRECS matrix
     
-    def OBSfeature_extract(self):
-        print('Extracting Oscillatory Features')
+    # def OBSfeature_extract(self):
+    #     print('Extracting Oscillatory Features')
 
-        big_list = self.YFrame.file_meta
-        fvect = self.YFrame.data_basis['F']
-        for rr in big_list:
-            feat_dict = {key:[] for key in dbo.feat_dict.keys()}
-            for featname,dofunc in dbo.feat_dict.items():
-                #pdb.set_trace()
-                #Choose the zero index of the poly_subtr return because we are not messing with the polynomial vector itself
-                #rr['data'] is NOT log10 transformed, so makes no sense to do the poly subtr
-                datacontainer = {ch: poly_subtr(fvect=self.fvect,inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()} #THIS RETURNS a PSD, un-log transformed
+    #     big_list = self.YFrame.file_meta
+    #     fvect = self.YFrame.data_basis['F']
+    #     for rr in big_list:
+    #         feat_dict = {key:[] for key in dbo.feat_dict.keys()}
+    #         for featname,dofunc in dbo.feat_dict.items():
+    #             #pdb.set_trace()
+    #             #Choose the zero index of the poly_subtr return because we are not messing with the polynomial vector itself
+    #             #rr['data'] is NOT log10 transformed, so makes no sense to do the poly subtr
+    #             datacontainer = {ch: poly_subtr(fvect=self.fvect,inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()} #THIS RETURNS a PSD, un-log transformed
                 
-                feat_dict[featname] = dofunc['fn'](datacontainer,self.YFrame.data_basis['F'],dofunc['param'])
-            rr.update({'FeatVect':feat_dict})
+    #             feat_dict[featname] = dofunc['fn'](datacontainer,self.YFrame.data_basis['F'],dofunc['param'])
+    #         rr.update({'FeatVect':feat_dict})
 
-    def default_run(self):
-        #This method captures the default run used to generate the figures from the paper
-        self.split_validation_set()
-        self.filter_recs(dataset=self.train_set)
-        #Here we want to vectorize our training set
-        self.vectorize_set(self.train_set)
+    # def OBSdefault_run(self):
+    #     #This method captures the default run used to generate the figures from the paper
+    #     self.split_train_set()
+    #     self.filter_recs(dataset=self.train_set)
+    #     #Here we want to vectorize our training set
+    #     self.vectorize_set(self.train_set)
 
-        #Once our training set is vectorized, we want to train the model
-        self.train_model(self.train_set)
+    #     #Once our training set is vectorized, we want to train the model
+    #     self.train_model(self.train_set)
 
-        self.validate_model(self.valid_set) #Gives us accuracy measurements
-        self.validate_controller(policy='BINARY')
+    #     self.validate_model(self.valid_set) #Gives us accuracy measurements
+    #     self.validate_controller(policy='BINARY')
+    
+    # def validate_model(self):
+        
+    #     summary_stats = self.prediction_accuracy(X_v,Y_v)
+        
+    # def validate_controller(self):
+    #     pass
+
+    # def regress_function(self,X,Y):
+    #     pass
+    
+    
+    # def readout(self,X):
+    #     print(X.shape[1])
+    def plot_coeffs(self,model):
+        plt.figure()
+        plt.plot(model.coef_)
+
+class weekly_decoder(base_decoder):
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.regression_algo = linear_model.ElasticNetCV
     
     def train_model(self):
-        #By this point, we assume we have an active matrix of the data from the recordings of interest
-        #We have a feature vector consisting of recordings and clinicals
-        #N obs x F feats + N obs of clin
+        self.decode_model = self.regression_algo(alphas=np.linspace(0.01,0.05,20),l1_ratio=np.linspace(0.1,0.3,10),cv=10).fit(self.train_set_y,self.train_set_c)
+        print('Alpha: ' + str(self.decode_model.alpha_) + ' | L1r: ' + str(self.decode_model.l1_ratio_))
+        self.plot_coeffs(self.decode_model)
         
-       self.learned_model = self.regress_function(X,Y)
-    
-    def validate_model(self):
+    def aggregate_weeks(self,dataset):
+        #print('Performing Training Setup for Weekly Decoder')
+        #go through our training set and aggregate every recording within a given week
+        #train_set_y,train_set_c = self.calculate_states_in_set(self.train_set)
         
-        summary_stats = self.prediction_accuracy(X_v,Y_v)
+        running_list = []
+        for pt in self.pts:
+            for phase in self.filter_phases:
+                block_set = [rr for rr in dataset if rr['Patient'] == pt and rr['Phase'] == phase]
+                if block_set != []:
+                    y_set,c_set = self.calculate_states_in_set(block_set)
+                    weekly_y_set = np.mean(y_set,axis=0)
+                    
+                    running_list.append((weekly_y_set,c_set[0])) #all the c_set values should be the exact same
         
-    def validate_controller(self):
-        pass
-
-    def regress_function(self,X,Y):
-        pass
+        y_state = np.array([a for (a,b) in running_list]) #outputs ~168 observed weeks x 10 features
+        c_state = np.array([b for (a,b) in running_list]).reshape(-1,1) #outputs ~168 observed weeks
+        
+        return y_state, c_state
     
+    def train_setup(self):
+        print('Performing Training Setup for Weekly Decoder')
+        # #go through our training set and aggregate every recording within a given week
+        # #train_set_y,train_set_c = self.calculate_states_in_set(self.train_set)
+        
+        # running_list = []
+        # for pt in self.pts:
+        #     for phase in self.filter_phases:
+        #         block_set = [rr for rr in self.train_set if rr['Patient'] == pt and rr['Phase'] == phase]
+        #         if block_set != []:
+        #             y_set,c_set = self.calculate_states_in_set(block_set)
+        #             weekly_y_set = np.mean(y_set,axis=0)
+                    
+        #             running_list.append((weekly_y_set,c_set[0])) #all the c_set values should be the exact same
+        
+        # self.train_set_y = np.array([a for (a,b) in running_list]) #outputs ~168 observed weeks x 10 features
+        # self.train_set_c = np.array([b for (a,b) in running_list]).reshape(-1,1) #outputs ~168 observed weeks
     
-    def readout(self,X):
-        print(X.shape[1])
+        self.train_set_y, self.train_set_c = self.aggregate_weeks(self.train_set)
+    def test_setup(self):
+        print('Performing TESTING Setup for Weekly Decoder')
+        # #go through our training set and aggregate every recording within a given week
+        # #train_set_y,train_set_c = self.calculate_states_in_set(self.train_set)
+        
+        # running_list = []
+        # for pt in self.pts:
+        #     for phase in self.filter_phases:
+        #         block_set = [rr for rr in self.test_set if rr['Patient'] == pt and rr['Phase'] == phase]
+        #         if block_set != []:
+        #             y_set,c_set = self.calculate_states_in_set(block_set)
+        #             weekly_y_set = np.mean(y_set,axis=0)
+                    
+        #             running_list.append((weekly_y_set,c_set[0])) #all the c_set values should be the exact same
+        
+        # self.test_set_y = np.array([a for (a,b) in running_list]) #outputs ~168 observed weeks x 10 features
+        # self.test_set_c = np.array([b for (a,b) in running_list]).reshape(-1,1) #outputs ~168 observed weeks
+        
+        self.test_set_y, self.test_set_c = self.aggregate_weeks(self.test_set)
         
 class controller_analysis:
     def __init__(self,decoder):

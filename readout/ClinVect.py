@@ -46,6 +46,74 @@ def pca(data,numComps=None):
     
     return np.dot(evecs.T,data.T).T,evals,evecs
 
+'''New class for clinical measurements'''
+class CStruct:
+    all_scales = ['HDRS17','MADRS','BDI','GAF']
+    scale_max = {'HDRS17':40,'MADRS':50,'BDI':60,'GAF':-100,'DSC':0.01}
+    
+    def __init__(self,incl_scales = ['HDRS17']):
+        self.phase_list = dbo.Phase_List('all')
+        ClinVect = json.load(open('/home/virati/Dropbox/projects/Research/MDD-DBS/Data/ClinVec.json'))
+        self.pt_list = [ab['pt'] for ab in ClinVect['HAMDs']]
+        
+        depression_dict = nestdict()
+        for pp in ClinVect['HAMDs']:
+            for phph,phase in enumerate(self.phase_list):
+                for ss,scale in enumerate(self.all_scales):
+                    depression_dict[pp['pt']][phase][scale] = pp[scale][phph]
+                    
+        self.depr_dict = depression_dict #This is patient->phase->scale dictionary
+        
+        self.normalize_scales()
+        
+    '''Wraps self.depr_dict to output a patient->scale->phase ARRAY'''
+    def normalize_scales(self):
+        baseline_values = nestdict()
+        for pt in self.pt_list:
+            for scale in self.all_scales:
+                #make our timeline
+                temp_timeline = np.array([self.depr_dict[pt][phase][scale] for phase in self.phase_list])
+                baseline_values[pt][scale] = np.mean(temp_timeline[0:4])
+                                                     
+        for pt in self.pt_list:
+            for phase in self.phase_list:
+                for scale in self.all_scales:
+                    #First, we're going to add absolute normalized scales to our dictionary
+                    self.depr_dict[pt][phase]['n'+scale] = self.depr_dict[pt][phase][scale] / self.scale_max[scale]
+                    
+                    #now we're going to generate patient-normalized scales, divided by the average of the first four weeks
+                    self.depr_dict[pt][phase]['p'+scale] = self.depr_dict[pt][phase][scale] / baseline_values[pt][scale]
+                    
+        #save our baseline values
+        self.pt_baseline_depression = baseline_values
+    
+    def get_binary_depressed(self,pt,phase,scale='HDRS17'):
+        return self.depr_dict[pt][phase][scale] > self.pt_baseline_depression[pt][scale] / 2
+    
+    def get_pt_binary_timeline(self,pt,scale='HDRS17'):
+        return np.array([self.get_binary_depressed(pt,phase) for phase in self.phase_list])
+    
+    '''Return the specific scale value'''
+    def get_depression_measure(self,pt,scale,phase):
+        return self.depr_dict[pt][phase][scale]
+    
+    '''Return an array of the patient's depression measuers over the entire phase list'''
+    def get_pt_scale_timeline(self,pt,scale):
+        return np.array([self.get_depression_measure(pt,scale,phase) for phase in self.phase_list])
+
+    '''PLOTTING FUNCTIONS'''
+    def plot_pt_timeline(self,pt,scale='HDRS17',overlay_binary=False):
+        if pt[0:3] != 'DBS': raise Exception;
+        
+        y = np.array([self.depr_dict[pt][phase][scale] for phase in self.phase_list])
+        plt.figure()
+        plt.plot(y,alpha=0.8,linewidth=10)
+        plt.plot(self.get_pt_binary_timeline(pt),alpha=0.5,linewidth=10)
+        plt.xticks(np.arange(0,32),self.phase_list,rotation=90)
+        plt.title('Plotting ' + scale + ' for ' + pt)
+        plt.ylabel(scale + ' Value')
+        plt.xlabel('Phase')
+        
 ''' Main Class for Clinical Data '''
 class CFrame:
     do_pts = ['901','903','905','906','907','908']
@@ -55,7 +123,7 @@ class CFrame:
     #An easy referencer to find a PATIENT's SCALE at PHASE
     lookup = []
     DSS_dict = [] # PT-SCALE-array
-    clin_dict = [] #PT-PHASE-
+    clin_dict = [] #PT-PHASE-dictionary
     
     def __init__(self,incl_scales = ['HDRS17'],norm_scales=False):
         #load in our JSON file
@@ -94,6 +162,8 @@ class CFrame:
         self.omega_state()
         self.derived_measures()
         self.load_stim_changes()
+    
+    
     
     def OBS_make_dss(self,ClinVect):
         #Setup derived measures
@@ -224,7 +294,37 @@ class CFrame:
                 #self.clin_dict[pt][ph_lut[phph]]['DSC']= new_scores[phph]
                 self.clin_dict['DBS'+pat][ph_lut[phph]]['DSC'] = DSC_scores[phph]/3
             '''
-    '''Plot whatever scale we want to'''
+            
+    
+    '''this returns to us a big dictionary with all our scales'''
+    def c_dict(self):
+        clindict = self.clin_dict
+        #This will generate a dictionary with each key being a scale, but each value being a matrix for all patients and timepoints
+        big_dict = {scale:[[clindict[pt][week][scale] for week in week_ordered] for pt in self.do_pts] for scale in self.do_scales}
+        self.scale_dict = big_dict
+        
+        
+    def c_vect(self):
+        #each patient will be a dict key
+        c_vects = {el:0 for el in self.do_pts}
+        for pp,pt in enumerate(self.do_pts):
+            #vector with all clinical measures in the thing
+            #return will be phase x clinscores
+            c_vect[pt] = 0
+            
+            
+    '''Get a patient's timecourse of scale'''
+    def pt_scale_tcourse(self,pt):
+        #return dictionary with all scales, and each element of that dictionary should be a NP vector
+        pt_tcourse = {rr:self.clin_dict['DBS'+pt][rr] for rr in self.clin_dict['DBS'+pt]}
+        #4/7/2020 - OR we can directly go to DSS_dict
+        pt_tcourse = self.DSS_dict['DBS'+pt]
+        
+        return pt_tcourse
+            
+    '''PLOTTING FUNCTIONS BELOW'''
+    
+    '''Plot scale for all patients'''
     def plot_scale(self,scale='HDRS17',pts='all'):
         if pts == 'all':
             pts = dbo.all_pts
@@ -242,30 +342,7 @@ class CFrame:
             plt.plot(ordered_tcourse)
             plt.legend(pts)
         plt.title(scale + ' for ' + str(pts))
-        
-        
-    def pt_scale_tcourse(self,pt):
-        #return dictionary with all scales, and each element of that dictionary should be a NP vector
-        pt_tcourse = {rr:self.clin_dict['DBS'+pt][rr] for rr in self.clin_dict['DBS'+pt]}
-        #4/7/2020 - OR we can directly go to DSS_dict
-        pt_tcourse = self.DSS_dict['DBS'+pt]
-        return pt_tcourse
     
-    '''this returns to us a big dictionary with all our scales'''
-    def c_dict(self):
-        clindict = self.clin_dict
-        #This will generate a dictionary with each key being a scale, but each value being a matrix for all patients and timepoints
-        big_dict = {scale:[[clindict[pt][week][scale] for week in week_ordered] for pt in self.do_pts] for scale in self.do_scales}
-        self.scale_dict = big_dict
-        
-        
-    def c_vect(self):
-        #each patient will be a dict key
-        c_vects = {el:0 for el in self.do_pts}
-        for pp,pt in enumerate(self.do_pts):
-            #vector with all clinical measures in the thing
-            #return will be phase x clinscores
-            c_vect[pt] = 0
             
     def pr_curve(self,c1,c2):
         pass
@@ -445,6 +522,12 @@ class CFrame:
 
 ''' Unit Test for CFrame '''
 if __name__=='__main__':
+    TestStruct = CStruct()
+    TestStruct.plot_pt_timeline('DBS901','pHDRS17',overlay_binary=True)
+    #binarization_test = TestStruct.get_pt_binary_timeline('DBS901')
+    #plt.plot(binarization_test)
+    
+def plot_c_vs_c():
     TestFrame = CFrame(norm_scales=False)
     for c2 in ['mHDRS','GAF','BDI','MADRS','DSC']:
         TestFrame.c_vs_c_plot(c1='HDRS17',c2=c2)

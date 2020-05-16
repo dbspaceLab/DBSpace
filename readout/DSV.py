@@ -622,6 +622,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
         else:
             raise ValueError
         
+        # LOOKS LIKE ALL THE OLD chronic Aim2 work was done with clin_dict!!!
         ptcdict = self.CFrame.clin_dict
         
         ePhases = dbo.Phase_List(exprs='ephys')
@@ -810,6 +811,7 @@ class ORegress: # This is the old linear regression on oscillatory features modu
 
     #Method for the actual oscillatory regression
     #TODO Need to split this out into the regression method and then the 'test-train' scheme method
+    
     def O_regress(self,method='OLS',inpercent=1,doplot=False,avgweeks=False,ignore_flags=False,ranson=True,circ='',plot_indiv=False,scale='HDRS17',lindetrend = 'Block',train_pts = ['903','906','907'],train_all=False,finalWrite=False,pt_specific=False):
 
         print('Doing DETREND: ' + lindetrend)

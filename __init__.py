@@ -444,7 +444,7 @@ def unity(invar):
 def displog(values):
     return 10*np.log10(values)
 
-''' Powerful structure that saves my ass'''
+''' Powerful structure that literally changed my life'''
 def nestdict():
     return defaultdict(nestdict)
 

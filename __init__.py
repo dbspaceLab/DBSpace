@@ -117,7 +117,7 @@ def l2_pow(x):
 
 #This function takes a PSD and subtracts out the PSD's fourth order polynomial fit
 #I THINK this is only used in EEG cortical signatures
-def poly_subtr(inpPSD,fVect,order=5):
+def poly_subtrEEG(inpPSD,fVect,order=5):
     #What's our feature/frequency vector?
     fix_psd = defaultdict()
     for chann in inpPSD.keys():
@@ -145,6 +145,23 @@ def poly_subtr(inpPSD,fVect,order=5):
         
     
     return fix_psd, polyitself
+
+def poly_subtrLFP(fvect,inp_psd,polyord=4):
+    #fvect HAS to be a vector function
+    # This function takes in a raw PSD, Log transforms it, poly subtracts, and then returns the unloged version.
+    #log10 in_psd first
+
+    try:
+        log_psd = 10*np.log10(inp_psd)
+        pfit = np.polyfit(fvect,log_psd,polyord)
+        pchann = np.poly1d(pfit)
+        
+        bl_correction = pchann(fvect)
+    except Exception as e:
+        print(e)
+        pdb.set_trace()
+        
+    return 10**((log_psd - bl_correction)/10), pfit
 
 def poly_SG(inSG,fVect,order=4):
     out_sg = np.zeros_like(inSG)

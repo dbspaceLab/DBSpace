@@ -105,7 +105,7 @@ TargetingEXP['liberal'] = {
 keys_oi = {'OnT':["Off_3","BONT"],'OffT':["Off_3","BOFT"]}
 
 class proc_dEEG:
-    def __init__(self,pts,procsteps='liberal',condits=['OnT','OffT'],pretty_mode=False,polyfix=0,do_pipeline=True):
+    def __init__(self,pts,procsteps='liberal',condits=['OnT','OffT'],pretty_mode=False,polyfix=0):
 
         self.chann_dim = 257
         self.ch_order_list = range(self.chann_dim)
@@ -124,6 +124,10 @@ class proc_dEEG:
         
         self.eeg_locs = mne.channels.read_montage('/home/virati/Dropbox/GSN-HydroCel-257.sfp')
         
+        self.gen_output_variables()
+    
+    '''Setup all the output variables we need'''
+    def gen_output_variables(self):
         # CHECK IF we're still using ANY of these
         
         #sloppy containers for the outputs of our analyses        
@@ -134,16 +138,14 @@ class proc_dEEG:
         self.Feat_trans = {pt:{condit:{epoch:[] for epoch in keys_oi} for condit in self.condits} for pt in self.pts}
         self.Feat_diff = {pt:{condit:[] for condit in self.condits} for pt in self.pts}
         self.Feat_var = {pt:{condit:[] for condit in self.condits} for pt in self.pts}
-        
-        
-        if do_pipeline:
-            self.standard_pipeline()
     
+    '''Run the standard pipeline to prepare segments'''
     def standard_pipeline(self):
         print('Doing standard init pipeline')
         self.extract_feats(polyorder=0)
         self.pool_patients() #pool all the DBS RESPONSE vectors
         
+    '''Load in the MAT data for preprocessed EEG recordings'''
     def load_data(self,pts):
         ts_data = defaultdict(dict)
         for pt in pts:
@@ -162,11 +164,11 @@ class proc_dEEG:
         
         return ts_data
         
+    '''Extract features from the data segments'''
     def extract_feats(self,polyorder=4):
         pts = self.pts
         
         feat_dict = nestdict()
-        #feat_dict = defaultdict(dict)
         osc_dict = nestdict()
         
         for pt in pts:
@@ -435,8 +437,8 @@ class proc_dEEG:
             plt.figure()
             plt.violinplot(ch_bl_mean)
             plt.violinplot(ch_stim_mean)
-        
-    def plot_median_response(self,pt='POOL',band='Alpha',condit='OnT',use_maya=False):
+    
+    def topo_median_response(self,pt='POOL',band='Alpha',condit='OnT',use_maya=False):
         band_i = dbo.feat_order.index(band)
        
         #medians = self.median_response(pt=pt)
@@ -526,14 +528,15 @@ class proc_dEEG:
         plt.legend(['Primary','','','Secondary'])
         plt.title(pt + ' ' + condit + ' ' + band)
     
+    '''I guess this is about developing a rPCA approach to *dynamic* response without oscillations?'''
     def OnT_ctrl_dyn(self,pt='POOL',condit='OnT',do_plot=False):
         source_label = 'Dyn PCA'
         
         response_stack = self.osc_bl_norm['POOL'][condit][:,:,2]
         # Focusing just on alpha
-        response_stack = np.dot(response_stack.T,response_stack)
+        #response_stack = np.dot(response_stack.T,response_stack)
         
-        #
+        pdb.set_trace()
         rpca = r_pca.R_pca(response_stack)
         L,S = rpca.fit()
         
@@ -1201,7 +1204,7 @@ class proc_dEEG:
             for pc in parts['bodies']:
                 pc.set_facecolor(color[cc])
                 pc.set_edgecolor(color[cc])
-                pc.set_linecolor(color[cc])
+                #pc.set_linecolor(color[cc])
                                  
             #plt.ylim((-0.5,0.5))
         

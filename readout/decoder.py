@@ -12,7 +12,7 @@ from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
 from sklearn import metrics
 from sklearn.metrics import roc_curve
-from sklearn.metrics import precision_recall_curve, average_precision_score, auc
+from sklearn.metrics import precision_recall_curve, average_precision_score, auc, mean_squared_error, mean_absolute_error
 from sklearn.metrics import roc_auc_score
 
 import warnings
@@ -243,18 +243,28 @@ class weekly_decoderCV(weekly_decoder):
     def train_model(self):
         #Our first goal is to learn a model for each patient combination
         decode_model_combos = [None] * self.CV_num_combos
+        model_performance_combos = [None] * self.CV_num_combos
         for run,pt_combo in enumerate(self.CV_pt_combos):
             print(pt_combo)
             combo_train_y = [a for (a,c) in zip(self.train_set_y,self.train_set_pt) if c in pt_combo]
             combo_train_c = [b for (b,c) in zip(self.train_set_c,self.train_set_pt) if c in pt_combo]
             
-            decode_model_combos[run] = self.regression_algo(alphas=np.linspace(0.01,0.05,20),l1_ratio=np.linspace(0.1,0.3,10),cv=10).fit(combo_train_y,combo_train_c)
+            decode_model_combos[run] = self.regression_algo(alphas=np.linspace(0.01,0.04,20),l1_ratio=np.linspace(0.1,0.3,10),cv=10).fit(combo_train_y,combo_train_c)
+            
+            combo_test_y = [a for (a,c) in zip(self.train_set_y,self.train_set_pt) if c not in pt_combo]
+            combo_test_c = [b for (b,c) in zip(self.train_set_c,self.train_set_pt) if c not in pt_combo]
+            
+            #model_performance_combos[run] = decode_model_combos[run].score(combo_test_y,combo_test_c)
+            #pred_c = decode_model_combos[run].predict(combo_test_y)
+            #model_performance_combos[run] = mean_absolute_error(combo_test_c,pred_c)
+            
         
         self.decode_model_combos_ = decode_model_combos
         
         average_model_coeffs,_ = self.get_average_model(self.decode_model_combos_)
-        self.decode_model = copy.deepcopy(decode_model_combos[-1])
+        self.decode_model = linear_model.LinearRegression()
         self.decode_model.coef_ = average_model_coeffs
+        self.decode_model.intercept_ = np.mean([m.intercept_ for m in self.decode_model_combos_])
         
     def get_average_model(self,model):
         active_coeffs = []
@@ -263,13 +273,59 @@ class weekly_decoderCV(weekly_decoder):
         
         active_coeffs = np.array(active_coeffs).squeeze()
         average_model = np.mean(active_coeffs,axis=0)
+        #average_model = np.zeros(shape=active_coeffs.shape)
         
         #do some stats
         
         
         #return the average model with the stats for each coefficient
         return average_model, stats
+    
+    def test_model(self):
+        ensemble_score = []
+        ensemble_corr = []
+        self.test_stats = {'Prediction Score': [], 'Pearson Corr Score': [], 'Spearman Corr Score': []}
+
+        for tt in range(1000):
+            test_subset_y,test_subset_c = zip(*random.sample(list(zip(self.test_set_y,self.test_set_c)),np.ceil(0.8 * len(self.test_set_y)).astype(np.int)))
+            test_subset_y = np.array(test_subset_y)
+            test_subset_c = np.array(test_subset_c)
+            
+            prediction_score = self.decode_model.score(test_subset_y,test_subset_c)
+            
+            predicted_c = self.decode_model.predict(test_subset_y)
+            corr = stats.pearsonr(test_subset_c.squeeze(),predicted_c.squeeze())
+            spear = stats.spearmanr(test_subset_c.squeeze(),predicted_c.squeeze())
+            
+            #self.test_stats = {'Prediction Score': prediction score, 'Pearson Corr Score': corr[0], 'Spearman Corr Score': spear[0]}
+            self.test_stats['Prediction Score'].append(prediction_score)
+            self.test_stats['Pearson Corr Score'].append(corr[0])
+            self.test_stats['Spearman Corr Score'].append(spear[0])
+    
+    def plot_test_regression_figure(self):
+        #do a final test on *all* the data for plotting purposes
+        predicted_c = self.decode_model.predict(self.test_set_y)
+        r2score = self.decode_model.score(self.test_set_y,self.test_set_c)
+        mse = mean_squared_error(self.test_set_c,predicted_c)
+        plt.figure()
+        plt.plot([0,1],[0,1],color='gray',linestyle='dotted')
+        ax = sns.regplot(x=self.test_set_c,y=predicted_c)
+        plt.title('R^2:' + str(r2score) + '\n' + ' MSE:' + str(mse))
+        plt.xlim((0,1.1))
+        plt.ylim((0,1.1))
         
+            
+    def plot_test_stats(self):
+        plt.figure()
+        plt.subplot(311)
+        #plt.scatter(test_subset_c,predicted_c)
+        plt.hist(self.test_stats['Prediction Score']);plt.title('R^2 Score')
+        plt.subplot(312)
+        plt.hist(self.test_stats['Pearson Corr Score']);plt.title('Pearson')
+        plt.subplot(313)
+        plt.hist(self.test_stats['Spearman Corr Score']);plt.title('Spearman')
+            
+            
     '''PLOTTING'''
     def plot_decode_CV(self):
         plt.figure()
@@ -295,4 +351,6 @@ class weekly_decoderCV(weekly_decoder):
 class controller_analysis:
     def __init__(self,decoder):
         self.decoder_model = decoder
+        
+    
 

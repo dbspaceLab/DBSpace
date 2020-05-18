@@ -36,13 +36,15 @@ import pickle
 def nearest(items,pivot):
     return min(items,key=lambda x: abs(x - pivot))
 
-#THIS CLASS IS ONLY FOR GENERATING THE FRAME
-#The frame is supposed to only go from Raw Rec -> PSDs, this can later be passed to analysis classes
-#Split out anything else into separate classes where the object this generates can go in
+
+''' This class generates the data frame (.pickle) that is used in the SCC_Readout project'''
 class BR_Data_Tree:
-    data_root_dir = '/home/virati/MDD_Data/' #Where is the raw data?
-    im_root_dir = '/home/virati/Dropbox/Data/' #the root directory for intermediate file
+    
+    data_root_dir = '/home/virati/MDD_Data/BR' #Where is the raw data?
+    im_root_dir = '/home/virati/Dropbox/Data' #the root directory for intermediate file
+    clin_data_dir = '/home/virati/Dropbox/projects/Research/MDD-DBS/Data'
     sec_end = 10
+    
     def __init__(self,preFrame,do_pts=['901','903','905','906','907','908']):
         #Fix this and don't really make it accessible; we'll stick with a single intermediate file unless you really want to change it
 
@@ -50,7 +52,7 @@ class BR_Data_Tree:
         self.fs = 422
 
         # Load in our clinical vector object with the data from ClinVec.json
-        CVect = json.load(open('/home/virati/Dropbox/projects/Research/MDD-DBS/Data/ClinVec.json'))['HAMDs']
+        CVect = json.load(open(self.clin_data_dir + '/ClinVec.json'))['HAMDs']
         clinvect = {pt['pt']: pt for pt in CVect}
         self.ClinVect = clinvect
 
@@ -61,7 +63,7 @@ class BR_Data_Tree:
             print('Generating the dataframe...')
             self.generate_sequence()
             #Save it now
-            self.Save_Frame(name_addendum='Feb2020')
+            self.Save_Frame(name_addendum='May2020')
             #Now just dump us out so we can do whatever we need to with the file above
 
         else:
@@ -130,7 +132,8 @@ class BR_Data_Tree:
     def grab_recs(self,reqs):
         fullfilt_data = [(rr['Data']['Left'],rr['Data']['Right'],rr['Phase'],rr['Patient']) for rr in self.file_meta if rr['Patient'] in reqs['Patient']]
         return fullfilt_data
-        
+    
+    '''Remove files that are Flagged to be Bad'''
     def Remove_BadFlags(self):
         try:
             self.file_meta = [rr for rr in self.file_meta if rr['BadFlag'] != True]
@@ -138,11 +141,11 @@ class BR_Data_Tree:
             pdb.set_trace()
 
         
-    #First, the goal is to literally come up with a big list of all the recordings
-    def list_files(self,rootdir='/home/virati/MDD_Data/BR/'):
+    '''This method parses the root data structure and populates a list of recordings'''
+    def list_files(self):
         file_list = []
         for pt in self.do_pts:
-            for filename in glob.iglob(rootdir + pt + '/**/' + '*.txt',recursive=True):
+            for filename in glob.iglob(self.data_root_dir + '/' + pt + '/**/' + '*.txt',recursive=True):
                 #Append the full path to a list
                 #check the file's STRUCTURE HERE
                 
@@ -281,6 +284,7 @@ class BR_Data_Tree:
         print('Loading data from...' + self.im_root_dir)
         self.file_meta = np.load(self.preFrame_file,allow_pickle=True)
 
+    '''Load in the data'''
     def Load_Data(self,domain='F'):
         #This is the main function that loads in our FEATURES
         # This function should ALWAYS crawl the file structure and bring in the raw data
@@ -302,14 +306,16 @@ class BR_Data_Tree:
                 rr.update({'BadFlag':True})
 
 
-            
+    '''Saves the frame to the intermediate directory'''
     def Save_Frame(self,name_addendum=''):
         print('Saving File Metastructure in ' + self.im_root_dir + '...')
         #np.save(self.im_root_dir + '/Chronic_Frame' + name_addendum + '.npy',self.file_meta)
 
         #Try pickling below
-        pickle.dump(self,open('/tmp/Chronic_Frame' + name_addendum + '.pickle',"wb"))
+        pickle.dump(self,open(im_root_dir + 'Chronic_Frame' + name_addendum + '.pickle',"wb"))
 
+
+    '''Here we load in the file *AND* do some preliminary Fourier analysis'''
     def load_file(self,fname,load_intv=(0,-1),domain='T'):
         #call the DBSOsc br_load_method
         #should be 1:1 from file_meta to ts_data

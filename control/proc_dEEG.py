@@ -571,18 +571,36 @@ class proc_dEEG:
         self.dyn_pca = svm_pca
         self.dyn_L = L
     
+    def OnT_ctrl_modes_segs_ICA(self,pt='POOL',do_plot=False):   
+
+        seg_responses = self.osc_bl_norm[pt]['OnT'][:,:,0:4]
+        source_label = 'Segment Responses'
+        
+        svm_ica_coeffs = []
+        for ii in range(seg_responses.shape[0]):
+            
+            #pdb.set_trace()
+            rpca = r_pca.R_pca(seg_responses[ii,:,:])
+            L,S = rpca.fit()
+            
+            #L = seg_responses[ii,:,:]
+            #S = 0
+            svm_ica = FastICA(tol=0.1,max_iter=1000)
+    
+            svm_ica.fit(L)
+            rotated_L = svm_ica.fit_transform(L)
+            
+            svm_ica_coeffs.append(svm_ica.components_)
+        
+        mode_model = {'L':L, 'S':S, 'Vectors':svm_ica_coeffs, 'Model':svm_ica, 'RotatedL':rotated_L}
+        return mode_model
+    
     def OnT_ctrl_modes_segs(self,pt='POOL',data_source=[],do_plot=False):
         
-        if data_source == []:
-            #First, get a bootstrapped estimate of the median
-            #med_response = self.median_response(pt=pt)['OnT'] #if you want the one-shot response
-            med_response = self.median_bootstrap_response(pt=pt)['mean']['OnT'] #If you want the bootstrap response
-            
-            source_label = 'Median Response'
-        else:
-            print('Using BL Norm Segments - RAW')
-            seg_responses = self.osc_bl_norm[pt]['OnT']
-            source_label = 'Segment Responses'
+
+        print('Using BL Norm Segments - RAW')
+        seg_responses = self.osc_bl_norm[pt]['OnT'][:,:,0:4]
+        source_label = 'Segment Responses'
         
         svm_pca_coeffs = []
         for ii in range(seg_responses.shape[0]):
@@ -591,7 +609,8 @@ class proc_dEEG:
             rpca = r_pca.R_pca(seg_responses[ii,:,:])
             L,S = rpca.fit()
             
-            #L = med
+            #L = seg_responses[ii,:,:]
+            #S = 0
             svm_pca = PCA()
     
             svm_pca.fit(L)
@@ -654,8 +673,10 @@ class proc_dEEG:
         plt.plot(expl_var)
         plt.ylim((0,1))
         plt.subplot(222)
-        for ii in range(5): #this loops through our COMPONENTS to find the end
-            plt.plot((coeffs)[:,ii,:].T,linewidth=5-ii,alpha=0.1)
+        for ii in range(4): #this loops through our COMPONENTS to find the end
+            plt.plot(np.mean(coeffs,axis=0)[ii,:].T,linewidth=5-ii)#,alpha=expl_var[ii])
+        plt.ylim((-0.3,0.3))
+        plt.hlines(0,0,5)
         plt.legend(['PC1','PC2','PC3','PC4','PC5'])
         plt.title('rPCA Components')
     

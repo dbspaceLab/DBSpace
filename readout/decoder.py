@@ -134,12 +134,29 @@ class base_decoder:
         print(prediction_score)
 
         predicted_c = self.decode_model.predict(self.test_set_y)
+    
+        return predicted_c
+    
+    '''Plot the test statistics'''
+    def plot_test_stats(self):
+        predicted_c = self.test_model()
         
-        plt.figure()
         plt.scatter(self.test_set_c,predicted_c)
         corr = stats.pearsonr(self.test_set_c.squeeze(),predicted_c.squeeze())
         #except Exception as e: print(e); pdb.set_trace()
         print(corr)
+        
+    '''Plot the regression visualization of the test procedure'''
+    def plot_test_regression(self):
+        #do a final test on *all* the data for plotting purposes
+        predicted_c = self.decode_model.predict(self.test_set_y)
+        r2score = self.decode_model.score(self.test_set_y,self.test_set_c)
+        mse = mean_squared_error(self.test_set_c,predicted_c)
+        plt.plot([0,1],[0,1],color='gray',linestyle='dotted')
+        ax = sns.regplot(x=self.test_set_c,y=predicted_c)
+        plt.title('R^2:' + str(r2score) + '\n' + ' MSE:' + str(mse))
+        plt.xlim((0,1.1))
+        plt.ylim((0,1.1))
         
     ''' Calculate oscillatory states for a set of recordings'''
     def calculate_states_in_set(self,data_set):
@@ -167,22 +184,34 @@ class base_decoder:
         return np.array(state_vector), np.array(depr_vector)
     
     '''Plot coefficients of our model'''
-    def plot_decode_coeffs(self,model):
-        plt.figure()
-        for side in range(2):
-            active_coeffs = self.decode_model.coef_
+    def plot_decode_coeffs(self):
+        model = self.decode_model
+        active_coeffs = self.decode_model.coef_
+        
+        active_coeffs = np.array(active_coeffs).squeeze()
+        #plt.subplot(1,2,side+1)
+        plt.plot(active_coeffs)
+        plt.hlines(0,-2,10,linestyle='dotted')
+        plt.vlines(5,-1,1,linestyle='solid',color='blue')
+        plt.ylim((np.max(np.abs(active_coeffs)) + 0.01,-np.max(np.abs(active_coeffs)) - 0.01))
+        plt.xlim((-1,10))
             
-            active_coeffs = np.array(active_coeffs).squeeze()
-            plt.subplot(1,2,side+1)
-            plt.plot(active_coeffs[side*5:side*5+5])
-            plt.hlines(0,-2,7,linestyle='dotted')
-            plt.ylim((-0.3,0.3))
-            plt.xlim((-1,5))
+    def plot_test_ensemble(self):
+        plt.figure()
+        plt.subplot(211)
+        self.plot_test_regression()
+        plt.subplot(212)
+        self.plot_decode_coeffs()
 
 class weekly_decoder(base_decoder):
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
-        self.regression_algo = linear_model.ElasticNetCV
+        if kwargs['algo'] == 'ENR':
+            self.regression_algo = linear_model.ElasticNetCV(alphas=np.linspace(0.01,0.04,20),l1_ratio=np.linspace(0.1,0.3,10),cv=10)
+        elif kwargs['algo'] == 'Ridge':
+            self.regression_algo = linear_model.RidgeCV()
+        elif kwargs['algo'] == 'Lasso':
+            self.regression_algo = linear_model.LassoCV()
     
     def train_model(self):
         self.decode_model = self.regression_algo(alphas=np.linspace(0.01,0.05,20),l1_ratio=np.linspace(0.1,0.3,10),cv=10).fit(self.train_set_y,self.train_set_c)
@@ -249,7 +278,7 @@ class weekly_decoderCV(weekly_decoder):
             combo_train_y = [a for (a,c) in zip(self.train_set_y,self.train_set_pt) if c in pt_combo]
             combo_train_c = [b for (b,c) in zip(self.train_set_c,self.train_set_pt) if c in pt_combo]
             
-            decode_model_combos[run] = self.regression_algo(alphas=np.linspace(0.01,0.04,20),l1_ratio=np.linspace(0.1,0.3,10),cv=10).fit(combo_train_y,combo_train_c)
+            decode_model_combos[run] = self.regression_algo.fit(combo_train_y,combo_train_c)
             
             combo_test_y = [a for (a,c) in zip(self.train_set_y,self.train_set_pt) if c not in pt_combo]
             combo_test_c = [b for (b,c) in zip(self.train_set_c,self.train_set_pt) if c not in pt_combo]

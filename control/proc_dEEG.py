@@ -142,8 +142,9 @@ class proc_dEEG:
     '''Run the standard pipeline to prepare segments'''
     def standard_pipeline(self):
         print('Doing standard init pipeline')
-        self.extract_feats(polyorder=0)
+        self.extract_feats(polyorder=self.polyorder)
         self.pool_patients() #pool all the DBS RESPONSE vectors
+        self.median_responses = self.median_bootstrap_response(pt='POOL',bootstrap=100)['mean']
         
     '''Load in the MAT data for preprocessed EEG recordings'''
     def load_data(self,pts):
@@ -164,7 +165,7 @@ class proc_dEEG:
         
         return ts_data
         
-    '''Extract features from the data segments'''
+    '''Extract features from the EEG datasegments'''
     def extract_feats(self,polyorder=4):
         pts = self.pts
         
@@ -195,6 +196,8 @@ class proc_dEEG:
                     for ss in range(seg_psds[0].shape[0]):
                         try:
                             state_return = dbo.calc_feats(middle_osc[:,ss,:],self.fvect)[0].T
+                            state_return[:,4] = 0 #we know gamma is nothing for this entire analysis
+                            #pdb.set_trace()
                             OSC_matr[ss,:,:] = np.array([state_return[ch] for ch in range(257)])
                         except Exception as e:
                             print('CRAP')
@@ -210,6 +213,8 @@ class proc_dEEG:
         #THIS IS THE PSDs RAW, not log transformed
         self.feat_dict = feat_dict
         #Below is the oscillatory power
+        #we should go through each osc_dict element and zero out the gamma
+        
         self.osc_dict = osc_dict
     
     ''' This function sets the response vectors to the targets x patient'''
@@ -326,7 +331,7 @@ class proc_dEEG:
 
         return {'mean':mean_of_means, 'var':var_of_means}
     
-    def median_response(self,pt='POOL',mfunc = np.median):
+    def OBSmedian_response(self,pt='POOL',mfunc = np.median):
         print('Computing Median Response for ' + pt)
         print('Doing ' + str(mfunc))
         return {condit:mfunc(self.osc_bl_norm[pt][condit],axis=0) for condit in self.condits}
@@ -438,19 +443,20 @@ class proc_dEEG:
             plt.violinplot(ch_bl_mean)
             plt.violinplot(ch_stim_mean)
     
-    def topo_median_response(self,pt='POOL',band='Alpha',condit='OnT',use_maya=False):
+    def topo_median_response(self,pt='POOL',band='Alpha',do_condits=[],use_maya=False):
         band_i = dbo.feat_order.index(band)
        
         #medians = self.median_response(pt=pt)
-        medians = self.median_bootstrap_response(pt=pt,bootstrap=100)['mean']
-        
-        #The old scatterplot approach
-        if use_maya:
-            EEG_Viz.maya_band_display(medians[condit][:,band_i])
-        else:
-            EEG_Viz.plot_3d_scalp(medians[condit][:,band_i],plt.figure(),label=condit + ' Mean Response ' + band + ' | ' + pt,unwrap=True,scale=100,clims=(-1,1),alpha=0.3,marker_scale=5)
 
-            plt.suptitle(pt)
+        for condit in do_condits:
+            
+            #The old scatterplot approach
+            if use_maya:
+                EEG_Viz.maya_band_display(self.median_responses[condit][:,band_i])
+            else:
+                EEG_Viz.plot_3d_scalp(self.median_responses[condit][:,band_i],plt.figure(),label=condit + ' Mean Response ' + band + ' | ' + pt,unwrap=True,scale=100,clims=(-1,1),alpha=0.3,marker_scale=5)
+    
+                plt.suptitle(pt)
     
     
     def OBSsupport_analysis(self,pt='POOL',condit='OnT',voltage='3',band='Alpha'):
@@ -536,7 +542,7 @@ class proc_dEEG:
         # Focusing just on alpha
         #response_stack = np.dot(response_stack.T,response_stack)
         
-        pdb.set_trace()
+        #pdb.set_trace()
         rpca = r_pca.R_pca(response_stack)
         L,S = rpca.fit()
         
@@ -564,8 +570,39 @@ class proc_dEEG:
             
         self.dyn_pca = svm_pca
         self.dyn_L = L
+    
+    def OnT_ctrl_modes_segs(self,pt='POOL',data_source=[],do_plot=False):
         
+        if data_source == []:
+            #First, get a bootstrapped estimate of the median
+            #med_response = self.median_response(pt=pt)['OnT'] #if you want the one-shot response
+            med_response = self.median_bootstrap_response(pt=pt)['mean']['OnT'] #If you want the bootstrap response
+            
+            source_label = 'Median Response'
+        else:
+            print('Using BL Norm Segments - RAW')
+            seg_responses = self.osc_bl_norm[pt]['OnT']
+            source_label = 'Segment Responses'
+        
+        svm_pca_coeffs = []
+        for ii in range(seg_responses.shape[0]):
+            
+            #pdb.set_trace()
+            rpca = r_pca.R_pca(seg_responses[ii,:,:])
+            L,S = rpca.fit()
+            
+            #L = med
+            svm_pca = PCA()
+    
+            svm_pca.fit(L)
+            rotated_L = svm_pca.fit_transform(L)
+            
+            svm_pca_coeffs.append(svm_pca.components_)
+        
+        mode_model = {'L':L, 'S':S, 'Vectors':svm_pca_coeffs, 'Model':svm_pca, 'RotatedL':rotated_L}
+        return mode_model
     #Dimensionality reduction of ONTarget response; for now rPCA
+    
     def OnT_ctrl_modes(self,pt='POOL',data_source=[],do_plot=False):
         
         if data_source == []:
@@ -575,41 +612,52 @@ class proc_dEEG:
             
             source_label = 'Median Response'
         else:
-            med_response = np.median(data_source,axis=0)
-            source_label = 'SVM Coefficients'
+            print('Using BL Norm Segments - RAW')
+            med_response = np.median(self.osc_bl_norm[pt]['OnT'],axis=0)
+            source_label = 'BL Normed Segments'
         
         svm_pca_coeffs = []
+        #pdb.set_trace()
         rpca = r_pca.R_pca(med_response)
         L,S = rpca.fit()
         
         #L = med
         svm_pca = PCA()
+
         svm_pca.fit(L)
-        #SVM_coeff_L = svm_pca.fit_transform(L)
+        rotated_L = svm_pca.fit_transform(L)
         
         svm_pca_coeffs = svm_pca.components_
         
-        # ALL PLOTTING BELOW
-        if do_plot:
-            for comp in range(2):
-                fig = plt.figure()
-                EEG_Viz.plot_3d_scalp(L[:,comp],fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
-                plt.title('rPCA Component ' + str(comp))
-                
-            
-            plt.figure()
-            plt.subplot(221)
-            plt.plot(svm_pca.explained_variance_ratio_)
-            plt.ylim((0,1))
-            plt.subplot(222)
-            plt.plot(np.mean(np.array(svm_pca_coeffs),axis=0))
-            plt.legend(['PC1','PC2','PC3','PC4','PC5'])
-            plt.title('rPCA Components ' + source_label)
+        plt.scatter(med_response[:,2],med_response[:,3])
         
-        self.SVM_model = svm_pca
-        #go ahead and dump our control bases into a separate structure
-        self.control_bases = svm_pca_coeffs
-        self.control_modes = L
+        mode_model = {'L':L, 'S':S, 'Vectors':svm_pca_coeffs, 'Model':svm_pca, 'RotatedL':rotated_L}
+        return mode_model
+    
+    def topo_OnT_ctrl(self,**kwargs):
+        model = self.OnT_ctrl_modes_segs(**kwargs)
+        
+        L = model['RotatedL']
+        expl_var = model['Model'].explained_variance_ratio_
+        coeffs = np.array(model['Vectors'])
+        
+        # ALL PLOTTING BELOW
+
+        for comp in range(2):
+            fig = plt.figure()
+            EEG_Viz.plot_3d_scalp(L[:,comp],fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
+            plt.title('rPCA Component ' + str(comp))
+            
+        
+        plt.figure()
+        plt.subplot(221)
+        plt.plot(expl_var)
+        plt.ylim((0,1))
+        plt.subplot(222)
+        for ii in range(5): #this loops through our COMPONENTS to find the end
+            plt.plot((coeffs)[:,ii,:].T,linewidth=5-ii,alpha=0.1)
+        plt.legend(['PC1','PC2','PC3','PC4','PC5'])
+        plt.title('rPCA Components')
     
     def dict_all_obs(self,condits=['OnT']):
         full_stack = nestdict()
@@ -1010,7 +1058,46 @@ class proc_dEEG:
         return segs_feats
 
     def pop_meds(self,response=True):
-        print('Doing Population Meds/Mads on Oscillatory RESPONSES w/ PCA')
+        print('Doing Population Meds/Mads on Oscillatory RESPONSES')
+        
+        #THIS IS THE OLD WAY: #dsgn_X = self.shape_GMM_dsgn(self.gen_GMM_Osc(self.gen_GMM_stack(stack_bl='normalize')['Stack']),band='All')
+        if response:
+            dsgn_X = self.osc_bl_norm['POOL']
+        else:
+            dsgn_X = self.osc_stim['POOL']
+        
+        X_med = nestdict()
+        X_mad = nestdict()
+        X_segnum = nestdict()
+        #do some small simple crap here
+        
+        #Here we're averaging across axis zero which corresponds to 'averaging' across SEGMENTS
+        for condit in self.condits:
+            #Old version just does one shot median
+            X_med[condit]= np.median(dsgn_X[condit],axis=0)
+            X_med[condit]= np.mean(dsgn_X[condit],axis=0)
+            
+            
+            # VARIANCE HERE
+
+            X_mad[condit] = robust.mad(dsgn_X[condit],axis=0)
+            #X_mad[condit] = np.var(dsgn_X[condit],axis=0)
+            X_segnum[condit] = dsgn_X[condit].shape[0]
+        
+        self.Seg_Med = (X_med,X_mad,X_segnum)
+        
+        weigh_mad = 0.3
+        try:
+            self.median_mask = (np.abs(self.Seg_Med[0]['OnT'][:,2]) - weigh_mad*self.Seg_Med[1]['OnT'][:,2] >= 0)
+        except:
+            pdb.set_trace()
+            
+        #Do a quick zscore to zero out the problem channels
+        chann_patt_zs = stats.zscore(X_med['OnT'],axis=0)
+        outlier_channs = np.where(chann_patt_zs > 3)
+        
+    def pop_meds_jk(self,response=True):
+        print('Doing Population Meds/Mads on Oscillatory RESPONSES - JackKnife Version')
         
         #THIS IS THE OLD WAY: #dsgn_X = self.shape_GMM_dsgn(self.gen_GMM_Osc(self.gen_GMM_stack(stack_bl='normalize')['Stack']),band='All')
         if response:
@@ -1028,11 +1115,6 @@ class proc_dEEG:
             # this version does jackknifing of the median estimate
             ensemble_med = dbo.jk_median(dsgn_X[condit])
             X_med[condit] = np.median(ensemble_med,axis=0)
-            
-            #Old version just does one shot median
-            #X_med[condit]= np.median(dsgn_X[condit],axis=0)
-            #X_med[condit]= np.mean(dsgn_X[condit],axis=0)
-            
             
             # VARIANCE HERE
             X_mad[condit] = np.std(ensemble_med,axis=0)

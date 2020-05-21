@@ -133,6 +133,8 @@ class base_decoder:
         predicted_c = self.decode_model.predict(self.test_set_y)
         test_stats = self.get_test_stats(self.test_set_y,self.test_set_c,predicted_c)
 
+        plt.figure()
+        plt.plot(self.test_set_c,predicted_c,'r.')
         return predicted_c, test_stats
     
     def get_test_stats(self,test_y,true_c,predicted_c):        
@@ -145,7 +147,7 @@ class base_decoder:
         s_stats = stats.spearmanr(true_c,predicted_c)
         
         #Linear Regression
-        regr_model = linear_model.LinearRegression().fit(self.test_set_y,predicted_c)
+        regr_model = linear_model.LinearRegression().fit(true_c.reshape(-1,1),predicted_c.reshape(-1,1))
         lr_slope = regr_model.coef_[0]
         
         stat_dict = {'Score':self.decode_model.score(test_y,true_c),'Pearson':p_stats,'Spearman':s_stats,'Slope':lr_slope}
@@ -224,15 +226,16 @@ class base_decoder:
 class weekly_decoder(base_decoder):
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
+        
         if kwargs['algo'] == 'ENR':
-            self.regression_algo = linear_model.ElasticNetCV(alphas=np.linspace(0.01,0.04,20),l1_ratio=np.linspace(0.1,0.3,10),cv=10)
+            self.regression_algo = linear_model.ElasticNet(alpha=0.2)
         elif kwargs['algo'] == 'Ridge':
             self.regression_algo = linear_model.RidgeCV()
         elif kwargs['algo'] == 'Lasso':
             self.regression_algo = linear_model.LassoCV()
     
     def train_model(self):
-        self.decode_model = self.regression_algo(alphas=np.linspace(0.01,0.05,20),l1_ratio=np.linspace(0.1,0.3,10),cv=10).fit(self.train_set_y,self.train_set_c)
+        self.decode_model = self.regression_algo.fit(self.train_set_y,self.train_set_c)
         print('Alpha: ' + str(self.decode_model.alpha_) + ' | L1r: ' + str(self.decode_model.l1_ratio_))
         
         #self.plot_decode_coeffs(self.decode_model)
@@ -272,6 +275,10 @@ class weekly_decoderCV(weekly_decoder):
         print('Initialized the Weekly CV decoder')
         super().__init__(*args,**kwargs)
         
+        if kwargs['algo'] == 'ENR':
+            self.regression_algo = linear_model.ElasticNetCV
+            self.model_args = {'alphas':np.linspace(0.01,0.04,20),'l1_ratio':np.linspace(0.1,0.3,10),'cv':10}
+            
         self.pt_CV_sets(n=3)
 
         
@@ -296,7 +303,7 @@ class weekly_decoderCV(weekly_decoder):
             combo_train_y = [a for (a,c) in zip(self.train_set_y,self.train_set_pt) if c in pt_combo]
             combo_train_c = [b for (b,c) in zip(self.train_set_c,self.train_set_pt) if c in pt_combo]
             
-            decode_model_combos[run] = self.regression_algo.fit(combo_train_y,combo_train_c)
+            decode_model_combos[run] = self.regression_algo(**self.model_args).fit(combo_train_y,combo_train_c)
             
             combo_test_y = [a for (a,c) in zip(self.train_set_y,self.train_set_pt) if c not in pt_combo]
             combo_test_c = [b for (b,c) in zip(self.train_set_c,self.train_set_pt) if c not in pt_combo]
@@ -349,7 +356,7 @@ class weekly_decoderCV(weekly_decoder):
         plt.figure()
         plt.plot([0,1],[0,1],color='gray',linestyle='dotted')
         ax = sns.regplot(x=self.test_set_c,y=predicted_c)
-        plt.title('R^2:' + str(r2score) + '\n' + ' MSE:' + str(mse))
+        plt.title('R2:' + str(r2score) + '\n' + ' MSE:' + str(mse))
         plt.xlim((0,1.1))
         plt.ylim((0,1.1))
         
@@ -358,14 +365,15 @@ class weekly_decoderCV(weekly_decoder):
         plt.figure()
         plt.subplot(311)
         #plt.scatter(test_subset_c,predicted_c)
-        plt.hist(self.test_stats['Prediction Score']);plt.title('R^2 Score')
+        plt.hist([a['Score'] for a in self.test_stats]);plt.title('R2 Score')
         plt.subplot(312)
-        plt.hist(self.test_stats['Pearson Corr Score']);plt.title('Pearson')
+        plt.hist([a['Pearson'][0] for a in self.test_stats]);plt.title('Pearson')
         plt.subplot(313)
-        plt.hist(self.test_stats['Spearman Corr Score']);plt.title('Spearman')
+        plt.hist([a['Spearman'][0] for a in self.test_stats]);plt.title('Spearman')
             
             
-    '''PLOTTING'''
+    '''PLOTTING--------------------------------------------------------'''
+    
     
     '''Plot the decoding CV coefficients'''
     def plot_decode_CV(self):
@@ -392,6 +400,10 @@ class weekly_decoderCV(weekly_decoder):
 class controller_analysis:
     def __init__(self,decoder):
         self.decoder_model = decoder
+        # get our binarized disease states
+        
+    def roc_auc(self):
+        
         
     
 

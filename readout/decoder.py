@@ -61,11 +61,11 @@ class base_decoder:
     circ = 'day'
     ch_num = 2
     
-    def __init__(self,BRFrame,ClinFrame,pts,clin_measure='HDRS17'):
-        self.YFrame = BRFrame
-        self.CFrame = ClinFrame
-        self.pts = pts
-        self.c_meas = clin_measure
+    def __init__(self,*args,**kwargs):#BRFrame,ClinFrame,pts,clin_measure='HDRS17'):
+        self.YFrame = kwargs['BRFrame']
+        self.CFrame = kwargs['ClinFrame']
+        self.pts = kwargs['pts']
+        self.c_meas = kwargs['clin_measure']
         self.fvect = self.YFrame.data_basis['F']
         
         self.regression_algo = linear_model.LinearRegression
@@ -130,19 +130,33 @@ class base_decoder:
         self.test_set_y, self.test_set_c = self.calculate_states_in_set(self.test_set)
 
     def test_model(self):
-        prediction_score = self.decode_model.score(self.test_set_y,self.test_set_c)
-        print(prediction_score)
-
         predicted_c = self.decode_model.predict(self.test_set_y)
+        test_stats = self.get_test_stats(self.test_set_y,self.test_set_c,predicted_c)
+
+        return predicted_c, test_stats
     
-        return predicted_c
+    def get_test_stats(self,test_y,true_c,predicted_c):        
+        #Pearson
+        test_y = test_y.squeeze()
+        true_c = true_c.squeeze()
+        predicted_c = predicted_c.squeeze()
+        p_stats = stats.pearsonr(true_c,predicted_c)
+        #Spearman
+        s_stats = stats.spearmanr(true_c,predicted_c)
+        
+        #Linear Regression
+        regr_model = linear_model.LinearRegression().fit(self.test_set_y,predicted_c)
+        lr_slope = regr_model.coef_[0]
+        
+        stat_dict = {'Score':self.decode_model.score(test_y,true_c),'Pearson':p_stats,'Spearman':s_stats,'Slope':lr_slope}
+        return stat_dict
     
     '''Plot the test statistics'''
     def plot_test_stats(self):
         predicted_c = self.test_model()
         
         plt.scatter(self.test_set_c,predicted_c)
-        corr = stats.pearsonr(self.test_set_c.squeeze(),predicted_c.squeeze())
+        
         #except Exception as e: print(e); pdb.set_trace()
         print(corr)
         
@@ -152,9 +166,11 @@ class base_decoder:
         predicted_c = self.decode_model.predict(self.test_set_y)
         r2score = self.decode_model.score(self.test_set_y,self.test_set_c)
         mse = mean_squared_error(self.test_set_c,predicted_c)
+        corr = stats.pearsonr(self.test_set_c.squeeze(),predicted_c.squeeze())
+        
         plt.plot([0,1],[0,1],color='gray',linestyle='dotted')
         ax = sns.regplot(x=self.test_set_c,y=predicted_c)
-        plt.title('R^2:' + str(r2score) + '\n' + ' MSE:' + str(mse))
+        plt.title('R^2:' + str(r2score) + '\n' + ' MSE:' + str(mse) + '\n Corr:' + str(corr))
         plt.xlim((0,1.1))
         plt.ylim((0,1.1))
         
@@ -183,12 +199,14 @@ class base_decoder:
             
         return np.array(state_vector), np.array(depr_vector)
     
-    '''Plot coefficients of our model'''
-    def plot_decode_coeffs(self):
+    def get_coeffs(self):
         model = self.decode_model
         active_coeffs = self.decode_model.coef_
         
-        active_coeffs = np.array(active_coeffs).squeeze()
+        return active_coeffs
+    '''Plot coefficients of our model'''
+    def plot_decode_coeffs(self):
+        active_coeffs = np.array(self.get_coeffs).squeeze()
         #plt.subplot(1,2,side+1)
         plt.plot(active_coeffs)
         plt.hlines(0,-2,10,linestyle='dotted')
@@ -313,23 +331,15 @@ class weekly_decoderCV(weekly_decoder):
     def test_model(self):
         ensemble_score = []
         ensemble_corr = []
-        self.test_stats = {'Prediction Score': [], 'Pearson Corr Score': [], 'Spearman Corr Score': []}
+        self.test_stats = [] #{'Prediction Score': [], 'Pearson Corr Score': [], 'Spearman Corr Score': []}
 
         for tt in range(1000):
             test_subset_y,test_subset_c = zip(*random.sample(list(zip(self.test_set_y,self.test_set_c)),np.ceil(0.8 * len(self.test_set_y)).astype(np.int)))
             test_subset_y = np.array(test_subset_y)
             test_subset_c = np.array(test_subset_c)
             
-            prediction_score = self.decode_model.score(test_subset_y,test_subset_c)
-            
             predicted_c = self.decode_model.predict(test_subset_y)
-            corr = stats.pearsonr(test_subset_c.squeeze(),predicted_c.squeeze())
-            spear = stats.spearmanr(test_subset_c.squeeze(),predicted_c.squeeze())
-            
-            #self.test_stats = {'Prediction Score': prediction score, 'Pearson Corr Score': corr[0], 'Spearman Corr Score': spear[0]}
-            self.test_stats['Prediction Score'].append(prediction_score)
-            self.test_stats['Pearson Corr Score'].append(corr[0])
-            self.test_stats['Spearman Corr Score'].append(spear[0])
+            self.test_stats.append(self.get_test_stats(test_subset_y,test_subset_c,predicted_c))
     
     def plot_test_regression_figure(self):
         #do a final test on *all* the data for plotting purposes
@@ -356,6 +366,8 @@ class weekly_decoderCV(weekly_decoder):
             
             
     '''PLOTTING'''
+    
+    '''Plot the decoding CV coefficients'''
     def plot_decode_CV(self):
         plt.figure()
         for side in range(2):

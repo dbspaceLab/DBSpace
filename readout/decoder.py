@@ -123,8 +123,14 @@ class base_decoder:
         self.train_set_y, self.train_set_c = self.calculate_states_in_set(self.train_set)
 
     ''' Train our model'''
-    def train_model(self):
-        self.decode_model = self.regression_algo().fit(self.train_set_y,self.train_set_c)
+    def train_model(self,do_null=False):
+        if do_null:
+            shuffled_c = copy.deepcopy(self.train_set_c)
+            np.random.shuffle(shuffled_c)
+            #pdb.set_trace()
+            self.decode_model = self.regression_algo().fit(self.train_set_y,shuffled_c)    
+        else:
+            self.decode_model = self.regression_algo().fit(self.train_set_y,self.train_set_c)
         
     def test_setup(self):
         self.test_set_y, self.test_set_c = self.calculate_states_in_set(self.test_set)
@@ -253,22 +259,23 @@ class weekly_decoder(base_decoder):
                     y_set,c_set = self.calculate_states_in_set(block_set)
                     weekly_y_set = np.mean(y_set,axis=0)
                     
-                    running_list.append((weekly_y_set,c_set[0],pt)) #all the c_set values should be the exact same
+                    running_list.append((weekly_y_set,c_set[0],pt,phase)) #all the c_set values should be the exact same
         
-        y_state = np.array([a for (a,b,c) in running_list]) #outputs ~168 observed weeks x 10 features
-        c_state = np.array([b for (a,b,c) in running_list]).reshape(-1,1) #outputs ~168 observed weeks
-        pt_name = np.array([c for (a,b,c) in running_list])
+        y_state = np.array([a for (a,b,c,d) in running_list]) #outputs ~168 observed weeks x 10 features
+        c_state = np.array([b for (a,b,c,d) in running_list]).reshape(-1,1) #outputs ~168 observed weeks
+        pt_name = np.array([c for (a,b,c,d) in running_list])
+        phase_label = np.array([d for (a,b,c,d) in running_list])
         
-        return y_state, c_state, pt_name
+        return y_state, c_state, pt_name, phase_label
     
     def train_setup(self):
         print('Performing Training Setup for Weekly Decoder')
     
-        self.train_set_y, self.train_set_c, _  = self.aggregate_weeks(self.train_set)
+        self.train_set_y, self.train_set_c, self.train_set_pt, self.train_set_ph  = self.aggregate_weeks(self.train_set)
     def test_setup(self):
         print('Performing TESTING Setup for Weekly Decoder')
         
-        self.test_set_y, self.test_set_c, _ = self.aggregate_weeks(self.test_set)
+        self.test_set_y, self.test_set_c, self.train_set_pt, self.train_set_ph = self.aggregate_weeks(self.test_set)
 
 class weekly_decoderCV(weekly_decoder):
     def __init__(self,*args,**kwargs):
@@ -373,8 +380,7 @@ class weekly_decoderCV(weekly_decoder):
             
             
     '''PLOTTING--------------------------------------------------------'''
-    
-    
+
     '''Plot the decoding CV coefficients'''
     def plot_decode_CV(self):
         plt.figure()
@@ -403,7 +409,4 @@ class controller_analysis:
         # get our binarized disease states
         
     def roc_auc(self):
-        
-        
-    
-
+        pass

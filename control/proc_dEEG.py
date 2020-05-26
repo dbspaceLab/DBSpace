@@ -111,7 +111,7 @@ class proc_dEEG:
         self.ch_order_list = range(self.chann_dim)
         self.procsteps = procsteps
         
-        self.pts = pts
+        self.do_pts = pts
         self.condits = condits
         
         self.polyorder = polyfix
@@ -131,20 +131,25 @@ class proc_dEEG:
         # CHECK IF we're still using ANY of these
         
         #sloppy containers for the outputs of our analyses        
-        self.psd_trans = {pt:{condit:{epoch:[] for epoch in keys_oi} for condit in self.condits} for pt in self.pts}
-        self.PSD_diff = {pt:{condit:[] for condit in self.condits} for pt in self.pts}
-        self.PSD_var = {pt:{condit:[] for condit in self.condits} for pt in self.pts}
+        self.psd_trans = {pt:{condit:{epoch:[] for epoch in keys_oi} for condit in self.condits} for pt in self.do_pts}
+        self.PSD_diff = {pt:{condit:[] for condit in self.condits} for pt in self.do_pts}
+        self.PSD_var = {pt:{condit:[] for condit in self.condits} for pt in self.do_pts}
         
-        self.Feat_trans = {pt:{condit:{epoch:[] for epoch in keys_oi} for condit in self.condits} for pt in self.pts}
-        self.Feat_diff = {pt:{condit:[] for condit in self.condits} for pt in self.pts}
-        self.Feat_var = {pt:{condit:[] for condit in self.condits} for pt in self.pts}
+        self.Feat_trans = {pt:{condit:{epoch:[] for epoch in keys_oi} for condit in self.condits} for pt in self.do_pts}
+        self.Feat_diff = {pt:{condit:[] for condit in self.condits} for pt in self.do_pts}
+        self.Feat_var = {pt:{condit:[] for condit in self.condits} for pt in self.do_pts}
     
     '''Run the standard pipeline to prepare segments'''
     def standard_pipeline(self):
         print('Doing standard init pipeline')
         self.extract_feats(polyorder=self.polyorder)
         self.pool_patients() #pool all the DBS RESPONSE vectors
+        #self.median_responses = self.median_response(pt=self.do_pts)
         self.median_responses = self.median_bootstrap_response(pt='POOL',bootstrap=100)['mean']
+        
+        self.pt_response = nestdict()
+        for pt in self.do_pts:
+            self.pt_responses[pt] = self.median_response(pt = pt)
         
     '''Load in the MAT data for preprocessed EEG recordings'''
     def load_data(self,pts):
@@ -167,7 +172,7 @@ class proc_dEEG:
         
     '''Extract features from the EEG datasegments'''
     def extract_feats(self,polyorder=4):
-        pts = self.pts
+        pts = self.do_pts
         
         feat_dict = nestdict()
         osc_dict = nestdict()
@@ -220,7 +225,7 @@ class proc_dEEG:
     ''' This function sets the response vectors to the targets x patient'''
     def compute_response(self,do_pts=[],condits=['OnT','OffT']):
         if do_pts == []:
-            do_pts = self.pts
+            do_pts = self.do_pts
             
         BL = {pt:{condit:[] for condit in condits} for pt in do_pts}
         response = {pt:{condit:[] for condit in condits} for pt in do_pts}
@@ -242,21 +247,21 @@ class proc_dEEG:
             
     def response_stats(self,band='Alpha',plot=False):
         band_idx = dbo.feat_order.index(band)
-        response_diff_stats = {pt:[] for pt in self.pts}
+        response_diff_stats = {pt:[] for pt in self.do_pts}
         
         ## First, check to see if per-channel h-testing rejects the null
-        for pt in self.pts:
+        for pt in self.do_pts:
             for cc in range(256):
                 response_diff_stats[pt].append(stats.mannwhitneyu(self.targ_response[pt]['OnT'][:,cc,band_idx],self.targ_response[pt]['OffT'][:,cc,band_idx])[1])
     
         self.response_diff_stats = response_diff_stats
         
         ## Now check variances\
-        ONT_var = {pt:[] for pt in self.pts}
-        OFFT_var = {pt:[] for pt in self.pts}
+        ONT_var = {pt:[] for pt in self.do_pts}
+        OFFT_var = {pt:[] for pt in self.do_pts}
         pool_ONT = []
         pool_OFFT = []
-        for pt in self.pts:
+        for pt in self.do_pts:
             for cc in range(256):
                 ONT_var[pt].append(np.var(self.targ_response[pt]['OnT'][:,cc,band_idx]))
                 OFFT_var[pt].append(np.var(self.targ_response[pt]['OffT'][:,cc,band_idx]))
@@ -268,12 +273,12 @@ class proc_dEEG:
         pool_ONT_var = np.var(np.concatenate(pool_ONT,axis=0),axis=0)
         pool_OFFT_var = np.var(np.concatenate(pool_OFFT,axis=0),axis=0)
         
-        ch_response_sig = {pt:np.array(response_diff_stats[pt]) for pt in self.pts}
+        ch_response_sig = {pt:np.array(response_diff_stats[pt]) for pt in self.do_pts}
         aggr_resp_sig = np.array([(resp < 0.05/256).astype(np.int) for pt,resp in ch_response_sig.items()])
         union_sig = np.sum(aggr_resp_sig,axis=0) >= 2
         
         if plot:
-            for pt in self.pts:
+            for pt in self.do_pts:
                 if 0:
                     pass
                 
@@ -303,12 +308,12 @@ class proc_dEEG:
     
     def pool_patients(self):
         print('Pooling Patient Observations')
-        self.osc_bl_norm = {pt:{condit:self.osc_dict[pt][condit][keys_oi[condit][1]] - np.median(self.osc_dict[pt][condit][keys_oi[condit][0]],axis=0) for condit in self.condits} for pt in self.pts}
-        self.osc_bl_norm['POOL'] = {condit:np.concatenate([self.osc_dict[pt][condit][keys_oi[condit][1]] - np.median(self.osc_dict[pt][condit][keys_oi[condit][0]],axis=0) for pt in self.pts]) for condit in self.condits}
+        self.osc_bl_norm = {pt:{condit:self.osc_dict[pt][condit][keys_oi[condit][1]] - np.median(self.osc_dict[pt][condit][keys_oi[condit][0]],axis=0) for condit in self.condits} for pt in self.do_pts}
+        self.osc_bl_norm['POOL'] = {condit:np.concatenate([self.osc_dict[pt][condit][keys_oi[condit][1]] - np.median(self.osc_dict[pt][condit][keys_oi[condit][0]],axis=0) for pt in self.do_pts]) for condit in self.condits}
    
         self.osc_stim = nestdict()
-        self.osc_stim_ = {pt:{condit:10**(self.osc_dict[pt][condit][keys_oi[condit][1]]/10) for condit in self.condits} for pt in self.pts}
-        self.osc_stim['POOL'] = {condit:np.concatenate([10**(self.osc_dict[pt][condit][keys_oi[condit][1]]/10) for pt in self.pts]) for condit in self.condits}
+        self.osc_stim_ = {pt:{condit:10**(self.osc_dict[pt][condit][keys_oi[condit][1]]/10) for condit in self.condits} for pt in self.do_pts}
+        self.osc_stim['POOL'] = {condit:np.concatenate([10**(self.osc_dict[pt][condit][keys_oi[condit][1]]/10) for pt in self.do_pts]) for condit in self.condits}
      
         
     
@@ -340,7 +345,7 @@ class proc_dEEG:
     #In this function, we stack ONT_Off3 and OFFT_Off3 together to DEFINE the null distribution
     def combined_bl(self):
         self.combined_BL = nestdict()
-        for pt in self.pts:
+        for pt in self.do_pts:
             ONT_BL = self.osc_dict[pt]['OnT'][keys_oi['OnT'][0]]
             OFFT_BL = self.osc_dict[pt]['OffT'][keys_oi['OffT'][0]]
             
@@ -352,7 +357,7 @@ class proc_dEEG:
     def combined_bl_distr(self,band='Alpha'):
         band_idx = dbo.feat_order.index(band)
         
-        for pt in self.pts:
+        for pt in self.do_pts:
             plt.figure()
             for ch in range(256):
                 plt.violinplot(self.combined_BL[pt][:,ch,band_idx])
@@ -361,7 +366,7 @@ class proc_dEEG:
     def ONTvsOFFT(self,band='Alpha',stim=0):
         band_idx = dbo.feat_order.index(band)
         
-        for pt in self.pts:
+        for pt in self.do_pts:
             ch_stat = np.zeros((257,))
             ch_ont = []
             ch_offt = []
@@ -405,7 +410,7 @@ class proc_dEEG:
     def per_chann_stats(self,condit='OnT',band='Alpha'):
         band_idx = dbo.feat_order.index(band)
         
-        for pt in self.pts:
+        for pt in self.do_pts:
             ch_stat = np.zeros((257,))
             ch_bl_mean = []
             ch_stim_mean = []
@@ -449,13 +454,12 @@ class proc_dEEG:
         #medians = self.median_response(pt=pt)
 
         for condit in do_condits:
-            
+            response_dict = np.median(self.osc_bl_norm[pt][condit][:,:,:],axis=0).squeeze()      
             #The old scatterplot approach
             if use_maya:
-                EEG_Viz.maya_band_display(self.median_responses[condit][:,band_i])
+                EEG_Viz.maya_band_display(response_dict[:,band_i])
             else:
-                EEG_Viz.plot_3d_scalp(self.median_responses[condit][:,band_i],plt.figure(),label=condit + ' Mean Response ' + band + ' | ' + pt,unwrap=True,scale=100,clims=(-1,1),alpha=0.3,marker_scale=5)
-    
+                EEG_Viz.plot_3d_scalp(response_dict[:,band_i],plt.figure(),label=condit + ' Mean Response ' + band + ' | ' + pt,unwrap=True,scale=100,clims=(-1,1),alpha=0.3,marker_scale=5)
                 plt.suptitle(pt)
     
     
@@ -771,7 +775,7 @@ class proc_dEEG:
         band_idx = dbo.feat_order.index(do_band)
         plag = nestdict()
         
-        for pt in self.pts:
+        for pt in self.do_pts:
             for condit in self.condits:
                 plag[pt][condit] = big_stack[pt][condit][keys_oi[condit][1]][:,:,band_idx] - np.median(big_stack[pt][condit]['Off_3'][:,:,band_idx],axis=0)
         
@@ -817,23 +821,23 @@ class proc_dEEG:
         ref_stack = self.big_stack_dict
         #Work with the Osc Dict data
         for condit in self.condits:
-            ref_stack[condit]['Diff'] = defaultdict()#{key:[] for key in ([self.pts] + ['All'])}
+            ref_stack[condit]['Diff'] = defaultdict()#{key:[] for key in ([self.do_pts] + ['All'])}
             for epoch in ['OF','ON']:
-                for pt in self.pts:
+                for pt in self.do_pts:
                     ref_stack[condit][epoch][pt + 'med'] = np.median(ref_stack[condit][epoch][pt],axis=0)
                     ref_stack[condit][epoch][pt + 'mad'] = robust.mad(ref_stack[condit][epoch][pt],axis=0)
                 #stack all
-                all_stack = [ref_stack[condit][epoch][pt] for pt in self.pts]
+                all_stack = [ref_stack[condit][epoch][pt] for pt in self.do_pts]
                 
                 ref_stack[condit][epoch]['MED'] = np.median(np.concatenate(all_stack,axis=0),axis=0)
                 ref_stack[condit][epoch]['MAD'] = robust.mad(np.concatenate(all_stack,axis=0),axis=0)
             
-            for pt in self.pts:
+            for pt in self.do_pts:
                 ref_stack[condit]['Diff'][pt] = ref_stack[condit]['ON'][pt+'med'] - ref_stack[condit]['OF'][pt+'med']
             ref_stack[condit]['Diff']['All'] = ref_stack[condit]['ON']['MED'] - ref_stack[condit]['OF']['MED']
         
-        all_stack = np.concatenate([np.concatenate([np.concatenate([ref_stack[condit][epoch][pt] for pt in self.pts],axis=0) for epoch in ['OF','ON']],axis=0) for condit in self.condits],axis=0)
-        label_stack = [[[[condit+epoch for seg in ref_stack[condit][epoch][pt]] for pt in self.pts] for epoch in ['OF','ON']] for condit in self.condits]
+        all_stack = np.concatenate([np.concatenate([np.concatenate([ref_stack[condit][epoch][pt] for pt in self.do_pts],axis=0) for epoch in ['OF','ON']],axis=0) for condit in self.condits],axis=0)
+        label_stack = [[[[condit+epoch for seg in ref_stack[condit][epoch][pt]] for pt in self.do_pts] for epoch in ['OF','ON']] for condit in self.condits]
         label_list = [item for sublist in label_stack for item in sublist]
         label_list = [item for sublist in label_list for item in sublist]
         label_list = [item for sublist in label_list for item in sublist]
@@ -2047,7 +2051,7 @@ class proc_dEEG:
         avg_change = nestdict()
         var_psd = nestdict()
         
-        for pt in self.pts:
+        for pt in self.do_pts:
             #avg_psd[pt] = defaultdict(dict)
             #avg_change[pt] = defaultdict(dict)
             for condit in self.condits:
@@ -2070,7 +2074,7 @@ class proc_dEEG:
         self.psd_var = var_psd
         
     def NEWcompute_diff(self):
-        avg_change = {pt:{condit:10*(np.log10(avg_psd[pt][condit][keys_oi[condit][1]]) - np.log10(avg_psd[pt][condit]['Off_3'])) for pt,condit in itertools.product(self.pts,self.condits)}}
+        avg_change = {pt:{condit:10*(np.log10(avg_psd[pt][condit][keys_oi[condit][1]]) - np.log10(avg_psd[pt][condit]['Off_3'])) for pt,condit in itertools.product(self.do_pts,self.condits)}}
    
     
     ''' Below are functions related to the oscillatory response characterization'''
@@ -2211,7 +2215,7 @@ class proc_dEEG:
             np.save('/tmp/' + condit + '_sig.npy',signature)
     
     def plot_diff(self):
-        for pt in self.pts:
+        for pt in self.do_pts:
             plt.figure()
             plt.subplot(221)
             plt.plot(self.fvect,self.psd_change[pt]['OnT'].T)
@@ -2245,7 +2249,7 @@ class proc_dEEG:
         big_stack = nestdict()
         for condit in self.condits:
             #want a stack for OnT and a stack for OffT
-            big_stack[condit] = {remap[epoch]:{pt:self.osc_dict[pt][condit][epoch] for pt in self.pts} for epoch in keys_oi[condit]}
+            big_stack[condit] = {remap[epoch]:{pt:self.osc_dict[pt][condit][epoch] for pt in self.do_pts} for epoch in keys_oi[condit]}
             
         if stack_type == 'all':
             pass
@@ -2255,7 +2259,7 @@ class proc_dEEG:
     
     def DEPRextract_feats(self):
         donfft = self.donfft
-        pts = self.pts
+        pts = self.do_pts
         for pt in pts:
             var_matr = defaultdict(dict)
             for condit in self.condits:
@@ -2375,7 +2379,7 @@ class proc_dEEG:
     
     def extract_coher_feats(self,do_pts=[],do_condits=['OnT'],epochs='all'):
         if do_pts == []:
-            do_pts=self.pts
+            do_pts=self.do_pts
             
         PLV_dict = nestdict()
         CSD_dict = nestdict()
@@ -2425,7 +2429,7 @@ class proc_dEEG:
             
         f_vect = np.linspace(0,500,2**10+1)
         
-        for pt in self.pts:
+        for pt in self.do_pts:
             #avg_psd[pt] = defaultdict(dict)
             #avg_change[pt] = defaultdict(dict)
             for condit in self.condits:
@@ -2474,11 +2478,11 @@ class proc_dEEG:
     
     def BLWEIRDcompute_response(self,combine_baselines=True,plot=False):
         if combine_baselines:
-            baseline = {pt:np.median(self.combined_BL[pt],axis=0) for pt in self.pts}
+            baseline = {pt:np.median(self.combined_BL[pt],axis=0) for pt in self.do_pts}
         else:
-            baseline = {pt:np.median(self.osc_dict[pt][condit][keys_oi[condit][0]],axis=0) for pt in self.pts}
+            baseline = {pt:np.median(self.osc_dict[pt][condit][keys_oi[condit][0]],axis=0) for pt in self.do_pts}
             
-        self.osc_bl_norm = {pt:{condit:(self.osc_dict[pt][condit][keys_oi[condit][1]] - baseline[pt]) for condit in self.condits} for pt in self.pts}
+        self.osc_bl_norm = {pt:{condit:(self.osc_dict[pt][condit][keys_oi[condit][1]] - baseline[pt]) for condit in self.condits} for pt in self.do_pts}
         
         if plot:
             plt.figure()

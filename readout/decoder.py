@@ -54,6 +54,9 @@ import time
 import copy
 import pdb
 
+def zero_mean(inp):
+    return inp - np.mean(inp)
+
 #%%            
 class base_decoder:
     #Parent readout class
@@ -161,7 +164,7 @@ class base_decoder:
         offset_train_y = self.train_set_y - np.mean(self.train_set_y)
         offset_train_c = self.train_set_c - np.mean(self.train_set_c)
         
-        coeff_path = self.decode_model.path(offset_train_y,offset_train_c,n_alphas=100,cv=False,fit_intercept=True) # Path is STUPIDLY hardcoded to do fit_intercept = False
+        coeff_path = self.decode_model.path(offset_train_y,offset_train_c,n_alphas=100,cv=False,eps=0.001,fit_intercept=True) # Path is STUPIDLY hardcoded to do fit_intercept = False
         if do_plot:
             plt.figure()
             plt.subplot(211)
@@ -345,9 +348,12 @@ class weekly_decoderCV(weekly_decoder):
         super().__init__(*args,**kwargs)
         
         if kwargs['algo'] == 'ENR':
-            print('Running ENR_CV')
-            self.regression_algo = linear_model.ElasticNetCV
-            self.model_args = {'alphas':np.linspace(0.01,0.04,20),'l1_ratio':np.linspace(0.1,0.3,10),'cv':10}
+            
+            self.regression_algo = linear_model.ElasticNet
+            self.model_args = {'alpha':np.e **-3.4,'l1_ratio':0.8}
+            print('Running ENR_CV w/:' + str(self.model_args))
+            #self.regression_algo = linear_model.ElasticNetCV
+            #self.model_args = {'alphas':np.linspace(0.01,0.04,20),'l1_ratio':np.linspace(0.1,0.3,10),'cv':10}
             
         self.pt_CV_sets(n=3)
 
@@ -375,13 +381,19 @@ class weekly_decoderCV(weekly_decoder):
             combo_train_y = [a for (a,c) in zip(self.train_set_y,self.train_set_pt) if c in pt_combo]
             combo_train_c = [b for (b,c) in zip(self.train_set_c,self.train_set_pt) if c in pt_combo]
             
+                        
             decode_model_combos[run] = self.regression_algo(**self.model_args).fit(combo_train_y,combo_train_c)
             
+            offset_train_y = combo_train_y - np.mean(combo_train_y)
+            offset_train_c = combo_train_c - np.mean(combo_train_c)
+            
+            coeff_path[run] = decode_model_combos[run].path(offset_train_y,offset_train_c,n_alphas=100,cv=True)
+
             combo_test_y = [a for (a,c) in zip(self.train_set_y,self.train_set_pt) if c not in pt_combo]
             combo_test_c = [b for (b,c) in zip(self.train_set_c,self.train_set_pt) if c not in pt_combo]
             
             #quick coeff path
-            coeff_path[run] = decode_model_combos[run].path(combo_train_y,combo_train_c,n_alphas=100,cv=True)
+            
             
             #model_performance_combos[run] = decode_model_combos[run].score(combo_test_y,combo_test_c)
             #pred_c = decode_model_combos[run].predict(combo_test_y)
@@ -396,13 +408,57 @@ class weekly_decoderCV(weekly_decoder):
         self.decode_model.coef_ = average_model_coeffs
         self.decode_model.intercept_ = np.mean([m.intercept_ for m in self.decode_model_combos_])
     
-    def plot_combo_paths(self):
+    '''Plot the paths for all CV combos'''
+    def plot_combo_paths(self,do_feats=[]):
+        if do_feats == []: do_feats = self.feat_labels
         plt.figure()
-        for path in self.decode_model_combos_paths_:
-            for ii,label in enumerate(self.feat_labels):
-                plt.plot(-np.log(path[0]),path[1].squeeze()[ii,:],linewidth=5,alpha=0.2)
+    
+        for ii,label in enumerate(self.feat_labels):
+            if label in do_feats:
+                path_list = np.array([path[1].squeeze() for path in self.decode_model_combos_paths_])
+                for path in self.decode_model_combos_paths_:
+                    plt.plot(-np.log(path[0]),path[1].squeeze()[ii,:],linewidth=5,alpha=0.1)
+                plt.plot(-np.log(path[0]),np.mean(path_list,axis=0)[ii,:],linewidth=10,label=label)
             #plt.legend(labels = self.feat_labels)
-            plt.legend(labels=self.feat_labels)
+            plt.legend()
+    
+    '''This method goes down the regression path and assesses the performance of the model all along the way'''
+    def _path_slope_regression(self):
+        assess_traj = []
+        
+        internal_train_y, internal_test_y, internal_train_c, internal_test_c = train_test_split(self.train_set_y,self.train_set_c,train_size=0.6,shuffle=True)
+        path_model = linear_model.ElasticNet(l1_ratio=0.8,fit_intercept=True,normalize=False)
+        path = path_model.path(zero_mean(self.train_set_y),zero_mean(self.train_set_c),eps=0.0001,n_alphas=1000,cv=True)
+        for alpha in path[0]:
+            run_model = linear_model.ElasticNet(alpha=alpha,l1_ratio=0.8,fit_intercept=True,normalize=False)
+            run_model.fit(internal_train_y,internal_train_c)
+            #lin regression to identify slope
+            predict_c = run_model.predict(internal_test_y)
+            score = run_model.score(internal_test_y,internal_test_c)
+            #pdb.set_trace()
+            slope = stats.linregress(internal_test_c.squeeze(),predict_c)
+            assess_traj.append({'Alpha':alpha,'Slope':slope,'Score':score})
+        #now do the path, this should match up with above
+
+        self._path_slope_results = assess_traj, path
+        
+        # Figure out how many coefficients are around
+        coeff_present = (path[1].squeeze().T > 0).astype(np.int)
+        total_coeffs = np.sum(coeff_present,axis=1)
+        
+        plt.figure()
+        slope_traj_vec = np.array([a['Slope'][0] for a in assess_traj])
+        score_traj_vec = np.array([a['Score'] for a in assess_traj])
+
+        plt.plot(-np.log(path[0]),slope_traj_vec,label='Slope');plt.title('Slope of readout, Score of readout')
+        plt.plot(-np.log(path[0]),score_traj_vec,label='Score');plt.legend()
+        plt.vlines(-np.log(self.model_args['alpha']), 0, 0.3, linewidth=10)
+
+        fig,ax1 = plt.subplots()
+        ax1.plot(-np.log(path[0]),path[1].squeeze().T);plt.title('Regularization Path')
+        ax2 = ax1.twinx()
+        ax2.plot(-np.log(path[0]),total_coeffs)
+        plt.vlines(-np.log(self.model_args['alpha']), 0, 0.3, linewidth=10)
         
     def get_average_model(self,model):
         active_coeffs = []
@@ -447,17 +503,20 @@ class weekly_decoderCV(weekly_decoder):
             
     def plot_test_stats(self):
         plt.figure()
-        # plt.subplot(311)
-        # #plt.scatter(test_subset_c,predicted_c)
-        # plt.hist([a['Score'] for a in self.test_stats]);
-        # plt.title('R2 Score')
-        # plt.subplot(312)
-        # plt.hist([a['Pearson'][0] for a in self.test_stats]);
-        # plt.title('Pearson')
-        # #plt.subplot(313)
-        # #plt.hist([a['Spearman'][0] for a in self.test_stats]);plt.title('Spearman')
+        plt.subplot(311)
+        #plt.scatter(test_subset_c,predicted_c)
+        plt.hist([a['Score'] for a in self.test_stats]);
+        plt.vlines(np.mean([a['Score'] for a in self.test_stats]), 0, 10,linewidth=10)
+        plt.title('R2 Score')
+        plt.subplot(312)
+        plt.hist([a['Pearson'][0] for a in self.test_stats]);
+        plt.vlines(np.mean([a['Pearson'][0] for a in self.test_stats]), 0, 10,linewidth=10)
+        plt.title('Pearson')
+        #plt.subplot(313)
+        #plt.hist([a['Spearman'][0] for a in self.test_stats]);plt.title('Spearman')
         plt.subplot(313)
         plt.hist([a['Slope'][0] for a in self.test_stats]);
+        plt.vlines(np.mean([a['Slope'] for a in self.test_stats]), 0, 10,linewidth=10)
         plt.title('Slope')
             
             
@@ -466,23 +525,24 @@ class weekly_decoderCV(weekly_decoder):
     '''Plot the decoding CV coefficients'''
     def plot_decode_CV(self):
         plt.figure()
-        for side in range(2):
-            active_coeffs = []
-            for ii in self.decode_model_combos_:
-                active_coeffs.append([ii.coef_[side*5:side*5+5]])
-            
-            active_coeffs = np.array(active_coeffs).squeeze()
-            plt.subplot(1,2,side+1)
-            #plt.plot(ii.coef_[side*5:side*5+5])
-            #pdb.set_trace()
-            vp_obj = sns.violinplot(data=active_coeffs,scale='width')
-            plt.setp(vp_obj.collections,alpha=0.3)
+    
+        active_coeffs = []
+        for ii in self.decode_model_combos_:
+            active_coeffs.append([ii.coef_[:]])
         
-            average_model, _ = self.get_average_model(self.decode_model_combos_)
-            plt.plot(average_model[side*5:side*5+5])
-            plt.hlines(0,-2,7,linestyle='dotted')
-            plt.ylim((-0.3,0.3))
-            plt.xlim((-1,5))
+        active_coeffs = np.array(active_coeffs).squeeze()
+        plt.plot(active_coeffs.T,'r.',markersize=20)
+        
+        #pdb.set_trace()
+        #plt.plot()
+        vp_obj = sns.violinplot(data=active_coeffs,scale='width')
+        plt.setp(vp_obj.collections,alpha=0.3)
+    
+        average_model, _ = self.get_average_model(self.decode_model_combos_)
+        plt.plot(average_model)
+        plt.hlines(0,-2,11,linestyle='dotted')
+        plt.ylim((-0.3,0.3))
+        plt.xlim((-1,10))
             
         
 class controller_analysis:

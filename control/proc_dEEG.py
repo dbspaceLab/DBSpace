@@ -601,34 +601,7 @@ class proc_dEEG:
         
         mode_model = {'L':L, 'S':S, 'Vectors':svm_ica_coeffs, 'Model':svm_ica, 'RotatedL':rotated_L}
         return mode_model
-    
-    def OnT_ctrl_modes_segs(self,pt='POOL',data_source=[],do_plot=False):
-        
 
-        print('Using BL Norm Segments - RAW')
-        seg_responses = self.osc_bl_norm[pt]['OnT'][:,:,0:4]
-        source_label = 'Segment Responses'
-        
-        svm_pca_coeffs = []
-        for ii in range(seg_responses.shape[0]):
-            
-            #pdb.set_trace()
-            rpca = r_pca.R_pca(seg_responses[ii,:,:])
-            L,S = rpca.fit()
-            
-            #L = seg_responses[ii,:,:]
-            #S = 0
-            svm_pca = PCA()
-    
-            svm_pca.fit(L)
-            rotated_L = svm_pca.fit_transform(L)
-            
-            svm_pca_coeffs.append(svm_pca.components_)
-        
-        mode_model = {'L':L, 'S':S, 'Vectors':svm_pca_coeffs, 'Model':svm_pca, 'RotatedL':rotated_L}
-        return mode_model
-    #Dimensionality reduction of ONTarget response; for now rPCA
-    
     def OnT_ctrl_modes(self,pt='POOL',data_source=[],do_plot=False):
         
         if data_source == []:
@@ -660,20 +633,58 @@ class proc_dEEG:
         mode_model = {'L':L, 'S':S, 'Vectors':svm_pca_coeffs, 'Model':svm_pca, 'RotatedL':rotated_L}
         return mode_model
     
-    def topo_OnT_ctrl(self,**kwargs):
-        model = self.OnT_ctrl_modes_segs(**kwargs)
+    def OnT_alpha_modes_segs(self,pt='POOL',data_source=[],do_plot=False,band='Alpha'):
+        seg_responses = self.osc_bl_norm[pt]['OnT'][:,:,dbo.feat_order.index(band)].squeeze()
+        source_label = 'Alpha Segmental Response'
+        
+        lr_pca_coeffs = []
+        S_pca_coeffs = []
+        rot_L = []
+        rot_S = []
+        
+        #pdb.set_trace()
+        rpca = r_pca.R_pca(seg_responses[:,:].T)
+        L,S = rpca.fit()
+        
+        #L = seg_responses[ii,:,:]
+        #S = 0
+        lr_pca = PCA()
+
+        lr_pca.fit(L)
+        rotated_L = lr_pca.fit_transform(L)
+        rot_L.append(rotated_L)
+        
+        lr_pca_coeffs.append(lr_pca.components_)
+    
+        S_pca = PCA()
+        S_pca.fit(S)
+        rotated_S = S_pca.fit_transform(S)
+        rot_S.append(rotated_S)
+        S_pca_coeffs.append(S_pca.components_)
+        
+        mode_model = {'L':L, 'S':S, 'SModel':S_pca, 'RotatedS':np.array(rot_S), 'SVectors':S_pca_coeffs,'Vectors':lr_pca_coeffs, 'Model':lr_pca, 'RotatedL':np.array(rot_L)}
+        return mode_model
+
+    def topo_OnT_alpha_ctrl(self,**kwargs):
+        self.alpha_ctrl_model = self.OnT_alpha_modes_segs(**kwargs)
+        #model = self.alpha_ctrl_model
+        
+        
+    def plot_alpha_ctrl_L(self,top_comp=5):
+        model = self.alpha_ctrl_model
         
         L = model['RotatedL']
         expl_var = model['Model'].explained_variance_ratio_
         coeffs = np.array(model['Vectors'])
+
         
         # ALL PLOTTING BELOW
-
-        for comp in range(2):
+        #Plot the topo for our low-rank component
+        for comp in range(0,top_comp):
             fig = plt.figure()
-            EEG_Viz.plot_3d_scalp(L[:,comp],fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
-            plt.title('rPCA Component ' + str(comp))
-            
+            EEG_Viz.plot_3d_scalp(np.median(L,axis=0)[:,comp],fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
+            plt.title('rPCA Component ' + str(comp) + ' ' + str(expl_var[comp]))
+        
         
         plt.figure()
         plt.subplot(221)
@@ -682,6 +693,118 @@ class proc_dEEG:
         plt.subplot(222)
         for ii in range(4): #this loops through our COMPONENTS to find the end
             plt.plot(np.mean(coeffs,axis=0)[ii,:].T,linewidth=5-ii)#,alpha=expl_var[ii])
+        plt.ylim((-0.3,0.3))
+        plt.hlines(0,0,5)
+        plt.legend(['PC1','PC2','PC3','PC4','PC5'])
+        plt.title('rPCA Components')
+        
+    def plot_alpha_ctrl_S(self,top_comp=10):
+        model = self.alpha_ctrl_model
+        
+        S = model['RotatedS']
+        s_coeffs = np.array(model['SVectors'])
+        s_expl_var = model['SModel'].explained_variance_ratio_
+        
+        for comp in range(0,top_comp):
+            #Plot sparse component next
+            fig = plt.figure()
+            EEG_Viz.plot_3d_scalp(np.median(S,axis=0)[:,comp],fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
+            plt.title('Sparse Component ' + str(comp))
+            
+        plt.figure()
+        plt.subplot(221)
+        plt.plot(s_expl_var)
+        plt.ylim((0,1))
+        plt.subplot(222)
+        
+        for ii in range(4): #this loops through our COMPONENTS to find the end
+            plt.plot(np.mean(s_coeffs,axis=0)[ii,:].T,linewidth=5-ii)#,alpha=expl_var[ii])
+        plt.ylim((-0.3,0.3))
+        plt.hlines(0,0,5)
+        plt.legend(['PC1','PC2','PC3','PC4','PC5'])
+        plt.title('rPCA Components')   
+    
+    def OnT_ctrl_modes_segs(self,pt='POOL',data_source=[],do_plot=False):
+        
+
+        print('Using BL Norm Segments - RAW')
+        seg_responses = self.osc_bl_norm[pt]['OnT'][:,:,0:4]
+        source_label = 'Segment Responses'
+        
+        lr_pca_coeffs = []
+        S_pca_coeffs = []
+        rot_L = []
+        rot_S = []
+        for ii in range(seg_responses.shape[0]):
+            
+            #pdb.set_trace()
+            rpca = r_pca.R_pca(seg_responses[ii,:,:])
+            L,S = rpca.fit()
+            
+            #L = seg_responses[ii,:,:]
+            #S = 0
+            lr_pca = PCA()
+    
+            lr_pca.fit(L)
+            rotated_L = lr_pca.fit_transform(L)
+            rot_L.append(rotated_L)
+            
+            lr_pca_coeffs.append(lr_pca.components_)
+        
+            S_pca = PCA()
+            S_pca.fit(S)
+            rotated_S = S_pca.fit_transform(S)
+            rot_S.append(rotated_S)
+            S_pca_coeffs.append(S_pca.components_)
+        
+        mode_model = {'L':L, 'S':S, 'SModel':S_pca, 'RotatedS':np.array(rot_S), 'SVectors':S_pca_coeffs,'Vectors':lr_pca_coeffs, 'Model':lr_pca, 'RotatedL':np.array(rot_L)}
+        return mode_model
+    #Dimensionality reduction of ONTarget response; for now rPCA
+    
+    def topo_OnT_ctrl(self,**kwargs):
+        model = self.OnT_ctrl_modes_segs(**kwargs)
+        
+        L = model['RotatedL']
+        expl_var = model['Model'].explained_variance_ratio_
+        coeffs = np.array(model['Vectors'])
+        S = model['RotatedS']
+        s_coeffs = np.array(model['SVectors'])
+        s_expl_var = model['SModel'].explained_variance_ratio_
+        
+        # ALL PLOTTING BELOW
+        #Plot the topo for our low-rank component
+        for comp in range(1):
+            fig = plt.figure()
+            EEG_Viz.plot_3d_scalp(np.median(L,axis=0)[:,comp],fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
+            plt.title('rPCA Component ' + str(comp))
+        
+        
+        plt.figure()
+        plt.subplot(221)
+        plt.plot(expl_var)
+        plt.ylim((0,1))
+        plt.subplot(222)
+        for ii in range(4): #this loops through our COMPONENTS to find the end
+            plt.plot(np.mean(coeffs,axis=0)[ii,:].T,linewidth=5-ii)#,alpha=expl_var[ii])
+        plt.ylim((-0.3,0.3))
+        plt.hlines(0,0,5)
+        plt.legend(['PC1','PC2','PC3','PC4','PC5'])
+        plt.title('rPCA Components')
+        
+        for comp in range(4):
+            #Plot sparse component next
+            fig = plt.figure()
+            EEG_Viz.plot_3d_scalp(np.median(S,axis=0)[:,comp],fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
+            plt.title('Sparse Component ' + str(comp))
+            
+        plt.figure()
+        plt.subplot(221)
+        plt.plot(s_expl_var)
+        plt.ylim((0,1))
+        plt.subplot(222)
+        
+        for ii in range(4): #this loops through our COMPONENTS to find the end
+            plt.plot(np.mean(s_coeffs,axis=0)[ii,:].T,linewidth=5-ii)#,alpha=expl_var[ii])
         plt.ylim((-0.3,0.3))
         plt.hlines(0,0,5)
         plt.legend(['PC1','PC2','PC3','PC4','PC5'])

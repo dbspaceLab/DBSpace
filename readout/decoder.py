@@ -150,13 +150,14 @@ class base_decoder:
             null_stats.append(stats)
         
         slope_results = np.array([a['Slope'] for a in null_stats])
+        r2_results = np.array([a['Score'] for a in null_stats])
         
         if do_plot:
             #plot our distribution
             plt.figure()
             plt.hist(slope_results,bins=10)
         
-        return slope_results
+        return slope_results, r2_results
     
     '''Plot the coefficient path in the regression'''
     def plot_coeff_sig_path(self,do_plot=False):
@@ -491,12 +492,14 @@ class weekly_decoderCV(weekly_decoder):
     def plot_test_regression_figure(self):
         #do a final test on *all* the data for plotting purposes
         predicted_c = self.decode_model.predict(self.test_set_y)
+        slope = stats.linregress(self.test_set_c.squeeze(),predicted_c.squeeze())
+        pearson = stats.pearsonr(self.test_set_c.squeeze(),predicted_c.squeeze())
         r2score = self.decode_model.score(self.test_set_y,self.test_set_c)
         mse = mean_squared_error(self.test_set_c,predicted_c)
         plt.figure()
         plt.plot([0,1],[0,1],color='gray',linestyle='dotted')
         ax = sns.regplot(x=self.test_set_c,y=predicted_c)
-        plt.title('R2:' + str(r2score) + '\n' + ' MSE:' + str(mse))
+        plt.title('R2:' + str(r2score) + '\n' + ' MSE:' + str(mse) + ' Slope:' + str(slope[0]) + ' Pearson:' + str(pearson))
         plt.xlim((0,1.1))
         plt.ylim((0,1.1))
         
@@ -541,7 +544,7 @@ class weekly_decoderCV(weekly_decoder):
         average_model, _ = self.get_average_model(self.decode_model_combos_)
         plt.plot(average_model)
         plt.hlines(0,-2,11,linestyle='dotted')
-        plt.ylim((-0.3,0.3))
+        plt.ylim((-0.2,0.2))
         plt.xlim((-1,10))
             
         

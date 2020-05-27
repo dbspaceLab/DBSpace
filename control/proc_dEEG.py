@@ -147,10 +147,6 @@ class proc_dEEG:
         #self.median_responses = self.median_response(pt=self.do_pts)
         self.median_responses = self.median_bootstrap_response(pt='POOL',bootstrap=100)['mean']
         
-        self.pt_response = nestdict()
-        for pt in self.do_pts:
-            self.pt_responses[pt] = self.median_response(pt = pt)
-        
     '''Load in the MAT data for preprocessed EEG recordings'''
     def load_data(self,pts):
         ts_data = defaultdict(dict)
@@ -174,7 +170,7 @@ class proc_dEEG:
     def extract_feats(self,polyorder=4):
         pts = self.do_pts
         
-        feat_dict = nestdict()
+        psd_dict = nestdict()
         osc_dict = nestdict()
         
         for pt in pts:
@@ -210,16 +206,15 @@ class proc_dEEG:
                             ipdb.set_trace()
                     
                     #find the variance for all segments
-                    feat_dict[pt][condit][epoch] = PSD_matr
+                    psd_dict[pt][condit][epoch] = PSD_matr
                     osc_dict[pt][condit][epoch] = OSC_matr
                     
                     #need to do OSCILLATIONS here
         
         #THIS IS THE PSDs RAW, not log transformed
-        self.feat_dict = feat_dict
+        self.psd_dict = psd_dict
         #Below is the oscillatory power
         #we should go through each osc_dict element and zero out the gamma
-        
         self.osc_dict = osc_dict
     
     ''' This function sets the response vectors to the targets x patient'''
@@ -306,6 +301,7 @@ class proc_dEEG:
             print(np.median(pool_OFFT_var))
             plt.suptitle('Pooled stats for ONT/OFFT consistency check')
     
+    '''Generate the pooled/ensemble segment response matrices -> dict'''
     def pool_patients(self):
         print('Pooling Patient Observations')
         self.osc_bl_norm = {pt:{condit:self.osc_dict[pt][condit][keys_oi[condit][1]] - np.median(self.osc_dict[pt][condit][keys_oi[condit][0]],axis=0) for condit in self.condits} for pt in self.do_pts}
@@ -315,12 +311,19 @@ class proc_dEEG:
         self.osc_stim_ = {pt:{condit:10**(self.osc_dict[pt][condit][keys_oi[condit][1]]/10) for condit in self.condits} for pt in self.do_pts}
         self.osc_stim['POOL'] = {condit:np.concatenate([10**(self.osc_dict[pt][condit][keys_oi[condit][1]]/10) for pt in self.do_pts]) for condit in self.condits}
      
+    def plot_psd(self,pt,condit,epoch):
+        plt.figure()
+        #reshape
+        reshaped = self.psd_dict[pt][condit][epoch].reshape(-1,1025)
+        print(reshaped.shape)
+        plt.plot(np.linspace(0,1000/2,1025),20*np.log10(reshaped.T),alpha=0.2)
+        plt.xlim((0,160))
         
-    
     #Median dimensionality reduction here; for now rPCA
     def distr_response(self,pt='POOL'):
         return {condit:self.osc_bl_norm[pt][condit] for condit in self.condits}
     
+    '''Compute the median response using bootstrap'''
     def median_bootstrap_response(self,pt='POOL',mfunc=np.mean,bootstrap=100):
         print('Computing Bootstrap Median Response for ' + pt)
 
@@ -343,7 +346,7 @@ class proc_dEEG:
 
         
     #In this function, we stack ONT_Off3 and OFFT_Off3 together to DEFINE the null distribution
-    def combined_bl(self):
+    def OBScombined_bl(self):
         self.combined_BL = nestdict()
         for pt in self.do_pts:
             ONT_BL = self.osc_dict[pt]['OnT'][keys_oi['OnT'][0]]
@@ -354,7 +357,7 @@ class proc_dEEG:
             else:
                 self.combined_BL[pt] = ONT_BL
     
-    def combined_bl_distr(self,band='Alpha'):
+    def OBScombined_bl_distr(self,band='Alpha'):
         band_idx = dbo.feat_order.index(band)
         
         for pt in self.do_pts:
@@ -363,7 +366,7 @@ class proc_dEEG:
                 plt.violinplot(self.combined_BL[pt][:,ch,band_idx])
     
     # Compare ONTarget and OFFTarget distributions
-    def ONTvsOFFT(self,band='Alpha',stim=0):
+    def OBSONTvsOFFT(self,band='Alpha',stim=0):
         band_idx = dbo.feat_order.index(band)
         
         for pt in self.do_pts:
@@ -1082,6 +1085,7 @@ class proc_dEEG:
         
         return segs_feats
 
+    '''Plot the population medians'''
     def pop_meds(self,response=True):
         print('Doing Population Meds/Mads on Oscillatory RESPONSES')
         
@@ -2043,8 +2047,8 @@ class proc_dEEG:
         self.binSVM_dsgn_X = dsgn_X
         self.binSVM_test_labels = predlabels
         
-        
-    def compute_diff(self,take_mean=True):
+    
+    def OBScompute_diff(self,take_mean=True):
         print('Computing Difference')
         assert len(self.condits) >= 2
         avg_psd = nestdict()

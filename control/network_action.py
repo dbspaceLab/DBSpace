@@ -89,8 +89,6 @@ class local_response:
         self.Osc_pt_marg_uncorr = {condit:np.array([(self.Osc_response_uncorr[pt][condit]['Left'],self.Osc_response_uncorr[pt][condit]['Right']) for pt in do_pts])for condit in ['OnT','OffT']}
         
     def plot_responses(self,do_pts,r_type='pt'):
-        
-            
         for cc,chann in enumerate(['Left','Right']):
             #do violin plots
             fig = plt.figure()
@@ -107,7 +105,7 @@ class local_response:
                 elif r_type == 'segs':
                     distr_to_plot = self.Osc_pt_marg[condit].swapaxes(1,2).reshape(len(do_pts)*segNum,2,5)[:,cc,:]
                 
-                plt.plot(np.arange(1,6)+0.2*co,distr_to_plot.T,color[co]+'.',markersize=20,alpha=0.2)
+                plt.plot(np.arange(1,6)+0.2*co,distr_to_plot.T,color[co]+'.',markersize=20,alpha=0.8)
                 parts = ax2.violinplot(distr_to_plot,positions=np.array([1,2,3,4,5]) + 0.2*co,showmedians=True)
                 
                 for partname in ('cbars','cmins','cmaxes','cmedians'):
@@ -126,10 +124,10 @@ class local_response:
                 distr[condit] = distr_to_plot
                 #plt.plot([1,2,3,4,5],np.mean(distr_to_plot,axis=0),color=color[co])
                 plt.hlines(0,0,5,linestyle='dotted',linewidth=5,alpha=0.8)
-                plt.suptitle('Looking at all available segments')
+                plt.suptitle('Looking at patient averages')
                 
             for bb in range(5):
-                print(bb)
+                print(dbo.feat_order[bb])
                 #rsres = stats.ranksums(distr['OnT'][:,bb],distr['OffT'][:,bb])
                 rsres = stats.ks_2samp(distr['OnT'][:,bb],distr['OffT'][:,bb]);
                 

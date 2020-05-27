@@ -68,6 +68,8 @@ class base_decoder:
         self.c_meas = kwargs['clin_measure']
         self.fvect = self.YFrame.data_basis['F']
         
+        self.feat_labels = ['L' + feat for feat in dbo.feat_order] + ['R' + feat for feat in dbo.feat_order]
+        
         self.regression_algo = linear_model.LinearRegression
     
     '''Filter out the recordings we want'''
@@ -131,17 +133,68 @@ class base_decoder:
             self.decode_model = self.regression_algo().fit(self.train_set_y,shuffled_c)    
         else:
             self.decode_model = self.regression_algo().fit(self.train_set_y,self.train_set_c)
+    
+    '''See what the null model generates for stats'''
+    def model_analysis(self,do_null=False,n_iter=1,do_plot=False):
+        self.train_setup()
+        self.test_setup()
+        null_stats = []
         
+        for ii in range(n_iter):
+            self.train_model(do_null = do_null)
+
+            _,stats = self.test_model()
+            null_stats.append(stats)
+        
+        slope_results = np.array([a['Slope'] for a in null_stats])
+        
+        if do_plot:
+            #plot our distribution
+            plt.figure()
+            plt.hist(slope_results,bins=10)
+        
+        return slope_results
+    
+    '''Plot the coefficient path in the regression'''
+    def plot_coeff_sig_path(self,do_plot=False):
+        #print('Running path')
+        offset_train_y = self.train_set_y - np.mean(self.train_set_y)
+        offset_train_c = self.train_set_c - np.mean(self.train_set_c)
+        
+        coeff_path = self.decode_model.path(offset_train_y,offset_train_c,n_alphas=100,cv=False,fit_intercept=True) # Path is STUPIDLY hardcoded to do fit_intercept = False
+        if do_plot:
+            plt.figure()
+            plt.subplot(211)
+            for ii,label in enumerate(self.feat_labels):
+                plt.plot(-np.log(coeff_path[0]),coeff_path[1].squeeze()[ii,:],linewidth=5,label=label)
+            #plt.legend(labels = self.feat_labels)
+            plt.legend()
+            plt.subplot(212)
+            plt.plot(self.decode_model.coef_)
+            plt.hlines(0,-2,10,linestyle='dotted')
+            plt.xticks(np.arange(10),self.feat_labels)
+    
+    '''setup our data for the TESTING'''
     def test_setup(self):
         self.test_set_y, self.test_set_c = self.calculate_states_in_set(self.test_set)
 
+    '''Main TESTING method for our model'''
     def test_model(self):
         predicted_c = self.decode_model.predict(self.test_set_y)
         test_stats = self.get_test_stats(self.test_set_y,self.test_set_c,predicted_c)
-
-        plt.figure()
-        plt.plot(self.test_set_c,predicted_c,'r.')
+        
         return predicted_c, test_stats
+    
+    '''Plot our predictions here'''
+    def plot_test_predictions(self):
+        predicted_c,_ = self.test_model()
+        plt.figure()
+        plt.plot(self.test_set_c,predicted_c,'r.');plt.title('Predicted vs Actual')
+        #plt.plot(predicted_c,predicted_c - self.test_set_c,'r.');plt.title('Residuals')
+        plt.plot([0,1],[0,1])
+        plt.xlim((0,1.1))
+        plt.ylim((0,1.1))
+        
     
     def get_test_stats(self,test_y,true_c,predicted_c):        
         #Pearson
@@ -156,7 +209,11 @@ class base_decoder:
         regr_model = linear_model.LinearRegression().fit(true_c.reshape(-1,1),predicted_c.reshape(-1,1))
         lr_slope = regr_model.coef_[0]
         
-        stat_dict = {'Score':self.decode_model.score(test_y,true_c),'Pearson':p_stats,'Spearman':s_stats,'Slope':lr_slope}
+        #Robust regression
+        #ransac = linear_model.RANSACRegressor().fit(true_c.reshape(-1,1),predicted_c.reshape(-1,1))
+        #ransac_slope = ransac.estimator_.coef_
+        
+        stat_dict = {'Score':self.decode_model.score(test_y,true_c),'Pearson':p_stats,'Spearman':s_stats,'Slope':lr_slope}#,'RANSACm':ransac_slope}
         return stat_dict
     
     '''Plot the test statistics'''
@@ -207,20 +264,23 @@ class base_decoder:
             
         return np.array(state_vector), np.array(depr_vector)
     
-    def get_coeffs(self):
+    def OBSget_coeffs(self):
         model = self.decode_model
         active_coeffs = self.decode_model.coef_
         
         return active_coeffs
+    
     '''Plot coefficients of our model'''
-    def plot_decode_coeffs(self):
-        active_coeffs = np.array(self.get_coeffs).squeeze()
+    def plot_decode_coeffs(self,model):
+        active_coeffs = np.array(model.coef_).squeeze()
         #plt.subplot(1,2,side+1)
+        plt.figure()
         plt.plot(active_coeffs)
         plt.hlines(0,-2,10,linestyle='dotted')
         plt.vlines(5,-1,1,linestyle='solid',color='blue')
-        plt.ylim((np.max(np.abs(active_coeffs)) + 0.01,-np.max(np.abs(active_coeffs)) - 0.01))
+        plt.ylim((-np.max(np.abs(active_coeffs)) + 0.01,np.max(np.abs(active_coeffs)) - 0.01))
         plt.xlim((-1,10))
+        plt.xticks(np.arange(10),self.feat_labels)
             
     def plot_test_ensemble(self):
         plt.figure()
@@ -235,6 +295,8 @@ class weekly_decoder(base_decoder):
         
         if kwargs['algo'] == 'ENR':
             self.regression_algo = linear_model.ElasticNet(alpha=0.2)
+        elif kwargs['algo'] == 'ENR_all':
+            self.regression_algo = linear_model.ElasticNet(alpha=0.05,l1_ratio=0.9,fit_intercept=True, normalize=False)
         elif kwargs['algo'] == 'Ridge':
             self.regression_algo = linear_model.RidgeCV()
         elif kwargs['algo'] == 'Lasso':
@@ -242,7 +304,7 @@ class weekly_decoder(base_decoder):
     
     def train_model(self):
         self.decode_model = self.regression_algo.fit(self.train_set_y,self.train_set_c)
-        print('Alpha: ' + str(self.decode_model.alpha_) + ' | L1r: ' + str(self.decode_model.l1_ratio_))
+        #print('Alpha: ' + str(self.decode_model.alpha_) + ' | L1r: ' + str(self.decode_model.l1_ratio_))
         
         #self.plot_decode_coeffs(self.decode_model)
         
@@ -283,6 +345,7 @@ class weekly_decoderCV(weekly_decoder):
         super().__init__(*args,**kwargs)
         
         if kwargs['algo'] == 'ENR':
+            print('Running ENR_CV')
             self.regression_algo = linear_model.ElasticNetCV
             self.model_args = {'alphas':np.linspace(0.01,0.04,20),'l1_ratio':np.linspace(0.1,0.3,10),'cv':10}
             
@@ -298,13 +361,15 @@ class weekly_decoderCV(weekly_decoder):
     def train_setup(self):
         print('Performing Training Setup for Weekly Decoder')
     
-        self.train_set_y, self.train_set_c, self.train_set_pt  = self.aggregate_weeks(self.train_set)
+        self.train_set_y, self.train_set_c, self.train_set_pt, self.train_set_ph  = self.aggregate_weeks(self.train_set)
     
     ''' Train our model'''
     def train_model(self):
         #Our first goal is to learn a model for each patient combination
         decode_model_combos = [None] * self.CV_num_combos
         model_performance_combos = [None] * self.CV_num_combos
+        coeff_path = [None] * self.CV_num_combos
+        
         for run,pt_combo in enumerate(self.CV_pt_combos):
             print(pt_combo)
             combo_train_y = [a for (a,c) in zip(self.train_set_y,self.train_set_pt) if c in pt_combo]
@@ -315,17 +380,29 @@ class weekly_decoderCV(weekly_decoder):
             combo_test_y = [a for (a,c) in zip(self.train_set_y,self.train_set_pt) if c not in pt_combo]
             combo_test_c = [b for (b,c) in zip(self.train_set_c,self.train_set_pt) if c not in pt_combo]
             
+            #quick coeff path
+            coeff_path[run] = decode_model_combos[run].path(combo_train_y,combo_train_c,n_alphas=100,cv=True)
+            
             #model_performance_combos[run] = decode_model_combos[run].score(combo_test_y,combo_test_c)
             #pred_c = decode_model_combos[run].predict(combo_test_y)
             #model_performance_combos[run] = mean_absolute_error(combo_test_c,pred_c)
             
         
         self.decode_model_combos_ = decode_model_combos
+        self.decode_model_combos_paths_ = coeff_path
         
         average_model_coeffs,_ = self.get_average_model(self.decode_model_combos_)
         self.decode_model = linear_model.LinearRegression()
         self.decode_model.coef_ = average_model_coeffs
         self.decode_model.intercept_ = np.mean([m.intercept_ for m in self.decode_model_combos_])
+    
+    def plot_combo_paths(self):
+        plt.figure()
+        for path in self.decode_model_combos_paths_:
+            for ii,label in enumerate(self.feat_labels):
+                plt.plot(-np.log(path[0]),path[1].squeeze()[ii,:],linewidth=5,alpha=0.2)
+            #plt.legend(labels = self.feat_labels)
+            plt.legend(labels=self.feat_labels)
         
     def get_average_model(self,model):
         active_coeffs = []
@@ -347,7 +424,7 @@ class weekly_decoderCV(weekly_decoder):
         ensemble_corr = []
         self.test_stats = [] #{'Prediction Score': [], 'Pearson Corr Score': [], 'Spearman Corr Score': []}
 
-        for tt in range(1000):
+        for tt in range(100):
             test_subset_y,test_subset_c = zip(*random.sample(list(zip(self.test_set_y,self.test_set_c)),np.ceil(0.8 * len(self.test_set_y)).astype(np.int)))
             test_subset_y = np.array(test_subset_y)
             test_subset_c = np.array(test_subset_c)
@@ -370,13 +447,18 @@ class weekly_decoderCV(weekly_decoder):
             
     def plot_test_stats(self):
         plt.figure()
-        plt.subplot(311)
-        #plt.scatter(test_subset_c,predicted_c)
-        plt.hist([a['Score'] for a in self.test_stats]);plt.title('R2 Score')
-        plt.subplot(312)
-        plt.hist([a['Pearson'][0] for a in self.test_stats]);plt.title('Pearson')
+        # plt.subplot(311)
+        # #plt.scatter(test_subset_c,predicted_c)
+        # plt.hist([a['Score'] for a in self.test_stats]);
+        # plt.title('R2 Score')
+        # plt.subplot(312)
+        # plt.hist([a['Pearson'][0] for a in self.test_stats]);
+        # plt.title('Pearson')
+        # #plt.subplot(313)
+        # #plt.hist([a['Spearman'][0] for a in self.test_stats]);plt.title('Spearman')
         plt.subplot(313)
-        plt.hist([a['Spearman'][0] for a in self.test_stats]);plt.title('Spearman')
+        plt.hist([a['Slope'][0] for a in self.test_stats]);
+        plt.title('Slope')
             
             
     '''PLOTTING--------------------------------------------------------'''

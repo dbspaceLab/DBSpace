@@ -15,6 +15,8 @@ from sklearn.metrics import roc_curve
 from sklearn.metrics import precision_recall_curve, average_precision_score, auc, mean_squared_error, mean_absolute_error
 from sklearn.metrics import roc_auc_score
 
+from scipy import interp
+
 import warnings
 from collections import defaultdict
 import itertools as itt
@@ -247,6 +249,7 @@ class base_decoder:
     def calculate_states_in_set(self,data_set):
         state_vector = []
         depr_vector = []
+        #pt_ph_vector = []
         
         for rr in data_set:
             psd_poly_done = {ch: dbo.poly_subtrLFP(fvect=self.fvect,inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()}
@@ -266,7 +269,8 @@ class base_decoder:
             depr_value = self.CFrame.get_depression_measure('DBS'+rr['Patient'],self.c_meas,rr['Phase'])
             depr_vector.append(depr_value)
             
-        return np.array(state_vector), np.array(depr_vector)
+            #pt_ph_vector.append(rr['Patient'],rr['Phase'])
+        return np.array(state_vector), np.array(depr_vector) #, pt_ph_vector
     
     def OBSget_coeffs(self):
         model = self.decode_model
@@ -332,7 +336,7 @@ class weekly_decoder(base_decoder):
         pt_name = np.array([c for (a,b,c,d) in running_list])
         phase_label = np.array([d for (a,b,c,d) in running_list])
         
-        return y_state, c_state, pt_name, phase_label
+        return y_state, c_state, (pt_name, phase_label)
     
     def train_setup(self):
         print('Performing Training Setup for Weekly Decoder')
@@ -444,7 +448,7 @@ class weekly_decoderCV(weekly_decoder):
         self._path_slope_results = assess_traj, path
         
         # Figure out how many coefficients are around
-        coeff_present = (path[1].squeeze().T > 0).astype(np.int)
+        coeff_present = (np.abs(path[1].squeeze().T) > 0).astype(np.int)
         total_coeffs = np.sum(coeff_present,axis=1)
         
         plt.figure()
@@ -457,9 +461,11 @@ class weekly_decoderCV(weekly_decoder):
 
         fig,ax1 = plt.subplots()
         ax1.plot(-np.log(path[0]),path[1].squeeze().T);plt.title('Regularization Path')
+        ax1.legend(labels=self.feat_labels)
         ax2 = ax1.twinx()
         ax2.plot(-np.log(path[0]),total_coeffs)
         plt.vlines(-np.log(self.model_args['alpha']), 0, 0.3, linewidth=10)
+        
         
     def get_average_model(self,model):
         active_coeffs = []
@@ -488,7 +494,10 @@ class weekly_decoderCV(weekly_decoder):
             
             predicted_c = self.decode_model.predict(test_subset_y)
             self.test_stats.append(self.get_test_stats(test_subset_y,test_subset_c,predicted_c))
-    
+    def plot_test_timecourse(self):
+        #ok... let's think this through...
+        pass
+        
     def plot_test_regression_figure(self):
         #do a final test on *all* the data for plotting purposes
         predicted_c = self.decode_model.predict(self.test_set_y)
@@ -549,9 +558,67 @@ class weekly_decoderCV(weekly_decoder):
             
         
 class controller_analysis:
-    def __init__(self,decoder):
-        self.decoder_model = decoder
+    def __init__(self,readout):
+        self.readout_model = readout
         # get our binarized disease states
+        
+    def gen_binarized_state(self,input_c):
+        #redo our testing set
+        binarized = input_c > 0.5
+        
+        return binarized
+
+    def bin_classif(self,binarized,predicted):
+        
+        fpr,tpr,thresholds = metrics.roc_curve(binarized,predicted)
+        roc_curve = (fpr,tpr,thresholds)
+        auc = roc_auc_score(binarized,predicted)
+        
+        return auc, roc_curve
+    
+    def classif_runs(self,):
+        aucs = []
+        roc_curves = []
+        for ii in range(100):
+            test_subset_y,test_subset_c = zip(*random.sample(list(zip(self.readout_model.test_set_y,self.readout_model.test_set_c)),np.ceil(0.8 * len(self.readout_model.test_set_y)).astype(np.int)))
+            #pdb.set_trace()
+            binarized_c = self.gen_binarized_state(np.array(test_subset_c))
+            predicted_c = self.readout_model.decode_model.predict(test_subset_y)
+
+            auc, roc_curve = self.bin_classif(binarized_c,predicted_c)
+            aucs.append(auc)
+            roc_curves.append(roc_curve)
+    
+        self.plot_classif_runs(aucs, roc_curves)
+        
+    def plot_classif_runs(self,aucs,roc_curves):
+        plt.figure()
+        plt.hist(aucs)
+        plt.vlines(np.mean(aucs),0,10,linewidth=10)
+
+        
+        fig,ax = plt.subplots()
+        mean_fpr = np.linspace(0,1,100)
+        interp_tpr = []
+        for aa in roc_curves:
+            interp_tpr_individ = interp(mean_fpr,aa[0],aa[1])
+            interp_tpr_individ[0] = 0
+            interp_tpr.append(interp_tpr_individ)
+            
+        mean_tpr = np.mean(interp_tpr,axis=0)
+        std_tpr = np.std(interp_tpr,axis=0)
+        
+        tprs_upper = np.minimum(mean_tpr + std_tpr,1)
+        tprs_lower = np.maximum(mean_tpr - std_tpr,0)
+        
+        ax.plot(mean_fpr,mean_tpr)
+        ax.fill_between(mean_fpr,tprs_lower,tprs_upper,alpha=0.2)
+        ax.plot(mean_fpr,mean_fpr,linestyle='dotted')
+        plt.plot([0,1],[0,1],linestyle='dotted')
+
+        #for aa in roc_curves:
+        #    plt.plot(aa[0],aa[1],alpha=0.2)
+        
         
     def roc_auc(self):
         pass

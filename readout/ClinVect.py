@@ -65,6 +65,7 @@ class CStruct:
         self.depr_dict = depression_dict #This is patient->phase->scale dictionary
         
         self.normalize_scales()
+        self.load_stim_changes()
         
     '''Wraps self.depr_dict to output a patient->scale->phase ARRAY'''
     def normalize_scales(self):
@@ -113,6 +114,37 @@ class CStruct:
         plt.title('Plotting ' + scale + ' for ' + pt)
         plt.ylabel(scale + ' Value')
         plt.xlabel('Phase')
+        
+    def query_stim_change(self,pt,ph):
+        stim_change_list = self.Stim_Change_Table()
+        return ('DBS'+pt,ph) in stim_change_list
+
+        
+    def load_stim_changes(self):
+        #this is where we'll load in information of when stim changes were done so we can maybe LABEL them in figures
+        self.stim_change_mat = sio.loadmat('/home/virati/Dropbox/stim_changes.mat')['StimMatrix']
+        # remove the voltage DECREASES?? from DBS905
+    
+    def Stim_Change_Table(self):
+        #return stim changes in a meaningful format
+        
+        #Diff vector belongs in first part of the diff_matrix
+        # Key thing to check for: CHanges are in B04, and DBS907 change is at C15
+        #see: https://docs.google.com/spreadsheets/d/1HLZfMoE83ulHm0dc3j8c3ZEDk4LaF-0qQztnavgmAQw/edit#gid=0
+        
+        diff_matrix = np.hstack((np.diff(self.stim_change_mat) > 0,np.zeros((6,1)).astype(np.bool)))
+        #find the phase corresponding to the stim change
+        bump_phases = np.array([np.array(dbo.all_phases)[0:][idxs] for idxs in diff_matrix])
+        
+        full_table = [[(self.pt_list[rr],ph) for ph in row] for rr,row in enumerate(bump_phases)]
+        
+        full_table = [item for sublist in full_table for item in sublist]
+        
+        # This returns ALL stim change locations
+        
+        #TODO do B-- filtering here
+        
+        return full_table
         
 ''' Main Class for Clinical Data '''
 class CFrame:
@@ -346,6 +378,8 @@ class CFrame:
             
     def pr_curve(self,c1,c2):
         pass
+    
+
     
     def c_vs_c_plot(self,c1='HDRS17',c2='HDRS17',plot_v_change=True):
         plt.figure()

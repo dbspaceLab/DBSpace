@@ -65,6 +65,7 @@ class base_decoder:
     # Some very fixed constants up here
     circ = 'day'
     ch_num = 2
+    global_plotting = False
     
     def __init__(self,*args,**kwargs):#BRFrame,ClinFrame,pts,clin_measure='HDRS17'):
         self.YFrame = kwargs['BRFrame']
@@ -72,6 +73,7 @@ class base_decoder:
         self.pts = kwargs['pts']
         self.c_meas = kwargs['clin_measure']
         self.fvect = self.YFrame.data_basis['F']
+        self.do_shuffle_null = kwargs['shuffle_null']
         
         self.feat_labels = ['L' + feat for feat in dbo.feat_order] + ['R' + feat for feat in dbo.feat_order]
         
@@ -107,10 +109,11 @@ class base_decoder:
                 accounting[pp,ph] = len(detailed_dict[pt][phase])
         
         #Plot the accounting
-        plt.figure()
-        plt.imshow(accounting)
-        plt.figure()
-        plt.plot(accounting[:,:].T)
+        if self.global_plotting:
+            plt.figure()
+            plt.imshow(accounting)
+            plt.figure()
+            plt.plot(accounting[:,:].T)
     
     '''Plot PSDs for the first N recordings, sanity check'''
     def plot_psds(self,upper_lim=10):
@@ -128,6 +131,9 @@ class base_decoder:
     '''Setup our data for training'''
     def train_setup(self):
         self.train_set_y, self.train_set_c = self.calculate_states_in_set(self.train_set)
+        
+    def shuffle_test_c(self):
+        np.random.shuffle(self.test_set_c)
 
     ''' Train our model'''
     def train_model(self,do_null=False):
@@ -154,7 +160,7 @@ class base_decoder:
         slope_results = np.array([a['Slope'] for a in null_stats])
         r2_results = np.array([a['Score'] for a in null_stats])
         
-        if do_plot:
+        if self.global_plotting and do_plot:
             #plot our distribution
             plt.figure()
             plt.hist(slope_results,bins=10)
@@ -168,7 +174,7 @@ class base_decoder:
         offset_train_c = self.train_set_c - np.mean(self.train_set_c)
         
         coeff_path = self.decode_model.path(offset_train_y,offset_train_c,n_alphas=100,cv=False,eps=0.001,fit_intercept=True) # Path is STUPIDLY hardcoded to do fit_intercept = False
-        if do_plot:
+        if self.global_plotting and do_plot:
             plt.figure()
             plt.subplot(211)
             for ii,label in enumerate(self.feat_labels):
@@ -183,6 +189,8 @@ class base_decoder:
     '''setup our data for the TESTING'''
     def test_setup(self):
         self.test_set_y, self.test_set_c = self.calculate_states_in_set(self.test_set)
+        if self.do_shuffle_null:
+            self.shuffle_null()
 
     '''Main TESTING method for our model'''
     def test_model(self):
@@ -214,7 +222,6 @@ class base_decoder:
         #Linear Regression
         regr_model = linear_model.LinearRegression().fit(true_c.reshape(-1,1),predicted_c.reshape(-1,1))
         lr_slope = regr_model.coef_[0]
-        
         #Robust regression
         #ransac = linear_model.RANSACRegressor().fit(true_c.reshape(-1,1),predicted_c.reshape(-1,1))
         #ransac_slope = ransac.estimator_.coef_
@@ -304,16 +311,18 @@ class weekly_decoder(base_decoder):
         if kwargs['algo'] == 'ENR':
             self.regression_algo = linear_model.ElasticNet(alpha=0.2)
         elif kwargs['algo'] == 'ENR_all':
-            self.regression_algo = linear_model.ElasticNet(alpha=0.05,l1_ratio=0.9,fit_intercept=True, normalize=False)
+            self.regression_algo = linear_model.ElasticNet
+            #self.model_args = {'alpha':np.e **-3.4,'l1_ratio':0.8} #5/28, good stats, visual is small
+            self.model_args = {'alpha':[],'l1_ratio':0.8}
         elif kwargs['algo'] == 'Ridge':
             self.regression_algo = linear_model.RidgeCV()
         elif kwargs['algo'] == 'Lasso':
             self.regression_algo = linear_model.LassoCV()
     
     def train_model(self):
-        self.decode_model = self.regression_algo.fit(self.train_set_y,self.train_set_c)
-        #print('Alpha: ' + str(self.decode_model.alpha_) + ' | L1r: ' + str(self.decode_model.l1_ratio_))
         
+        self.decode_model = self.regression_algo(**self.model_args).fit(self.train_set_y,self.train_set_c)
+        #print('Alpha: ' + str(self.decode_model.alpha_) + ' | L1r: ' + str(self.decode_model.l1_ratio_))
         #self.plot_decode_coeffs(self.decode_model)
         
     def aggregate_weeks(self,dataset):
@@ -336,7 +345,7 @@ class weekly_decoder(base_decoder):
         pt_name = np.array([c for (a,b,c,d) in running_list])
         phase_label = np.array([d for (a,b,c,d) in running_list])
         
-        return y_state, c_state, (pt_name, phase_label)
+        return y_state, c_state, pt_name, phase_label
     
     def train_setup(self):
         print('Performing Training Setup for Weekly Decoder')
@@ -345,7 +354,62 @@ class weekly_decoder(base_decoder):
     def test_setup(self):
         print('Performing TESTING Setup for Weekly Decoder')
         
-        self.test_set_y, self.test_set_c, self.train_set_pt, self.train_set_ph = self.aggregate_weeks(self.test_set)
+        self.test_set_y, self.test_set_c, self.test_set_pt, self.test_set_ph = self.aggregate_weeks(self.test_set)
+        if self.do_shuffle_null:
+            self.shuffle_test_c()
+
+    '''This method goes down the regression path and assesses the performance of the model all along the way: Returns the 'optimal' alpha'''
+    def _path_slope_regression(self,do_plot=False):
+        assess_traj = []
+        
+        internal_train_y, internal_test_y, internal_train_c, internal_test_c = train_test_split(self.train_set_y,self.train_set_c,train_size=0.6,shuffle=True)
+        path_model = linear_model.ElasticNet(l1_ratio=0.8,fit_intercept=True,normalize=False)
+        path = path_model.path(zero_mean(self.train_set_y),zero_mean(self.train_set_c),eps=0.0001,n_alphas=1000,cv=True)
+        for alpha in path[0]:
+            run_model = linear_model.ElasticNet(alpha=alpha,l1_ratio=0.8,fit_intercept=True,normalize=False)
+            run_model.fit(internal_train_y,internal_train_c)
+            #lin regression to identify slope
+            predict_c = run_model.predict(internal_test_y)
+            score = run_model.score(internal_test_y,internal_test_c)
+            #pdb.set_trace()
+            slope = stats.linregress(internal_test_c.squeeze(),predict_c)
+            assess_traj.append({'Alpha':alpha,'Slope':slope,'Score':score})
+        #now do the path, this should match up with above
+
+        self._path_slope_results = assess_traj, path
+        
+
+        
+        # Figure out how many coefficients are around
+        coeff_present = (np.abs(path[1].squeeze().T) > 0).astype(np.int)
+        total_coeffs = np.sum(coeff_present,axis=1)
+        slope_traj_vec = np.array([a['Slope'][0] for a in assess_traj])
+        score_traj_vec = np.array([a['Score'] for a in assess_traj])
+        
+        ## Find the max of the r^2 for our optimal alpha
+        optimal_alpha = path[0][np.argmax(score_traj_vec)] #This merely does an R^2 optimal
+        lamb = 1/10 * 0.2
+        lamb2 = 1
+        optimal_alpha = path[0][np.argmax(slope_traj_vec - lamb * total_coeffs + lamb2*score_traj_vec)]
+        
+        if self.global_plotting and do_plot:
+            fig,ax1 = plt.subplots()
+            
+            ax1.plot(-np.log(path[0]),slope_traj_vec,label='Slope');plt.title('Slope of readout, Score of readout')
+            ax1.plot(-np.log(path[0]),score_traj_vec,label='Score');plt.legend()
+            plt.vlines(-np.log(optimal_alpha), 0, 0.3, linewidth=10)
+            ax2 = ax1.twinx()
+            ax2.plot(-np.log(path[0]),total_coeffs)
+            
+            fig,ax1 = plt.subplots()
+            ax1.plot(-np.log(path[0]),path[1].squeeze().T);plt.title('Regularization Path')
+            ax1.legend(labels=self.feat_labels)
+            ax2 = ax1.twinx()
+            ax2.plot(-np.log(path[0]),total_coeffs)
+            plt.vlines(-np.log(optimal_alpha), 0, 0.3, linewidth=10)
+
+        
+        return optimal_alpha
 
 class weekly_decoderCV(weekly_decoder):
     def __init__(self,*args,**kwargs):
@@ -354,9 +418,13 @@ class weekly_decoderCV(weekly_decoder):
         
         if kwargs['algo'] == 'ENR':
             
+            
             self.regression_algo = linear_model.ElasticNet
-            self.model_args = {'alpha':np.e **-3.4,'l1_ratio':0.8}
-            print('Running ENR_CV w/:' + str(self.model_args))
+            #self.model_args = {'alpha':np.e **-3.4,'l1_ratio':0.8} #5/28, good stats, visual is small
+            self.model_args = {'alpha':np.e ** kwargs['alpha'],'l1_ratio':0.8}
+            print('Running ENR_CV w/:' + str(self.model_args['l1_ratio']))
+            
+            #BEFORE 5/28
             #self.regression_algo = linear_model.ElasticNetCV
             #self.model_args = {'alphas':np.linspace(0.01,0.04,20),'l1_ratio':np.linspace(0.1,0.3,10),'cv':10}
             
@@ -371,8 +439,10 @@ class weekly_decoderCV(weekly_decoder):
         
     def train_setup(self):
         print('Performing Training Setup for Weekly Decoder')
-    
         self.train_set_y, self.train_set_c, self.train_set_pt, self.train_set_ph  = self.aggregate_weeks(self.train_set)
+        
+        self.model_args['alpha'] = self._path_slope_regression(do_plot=True)
+        print('Set ENR-Alpha at ' + str(self.model_args['alpha']))
     
     ''' Train our model'''
     def train_model(self):
@@ -427,45 +497,7 @@ class weekly_decoderCV(weekly_decoder):
             #plt.legend(labels = self.feat_labels)
             plt.legend()
     
-    '''This method goes down the regression path and assesses the performance of the model all along the way'''
-    def _path_slope_regression(self):
-        assess_traj = []
-        
-        internal_train_y, internal_test_y, internal_train_c, internal_test_c = train_test_split(self.train_set_y,self.train_set_c,train_size=0.6,shuffle=True)
-        path_model = linear_model.ElasticNet(l1_ratio=0.8,fit_intercept=True,normalize=False)
-        path = path_model.path(zero_mean(self.train_set_y),zero_mean(self.train_set_c),eps=0.0001,n_alphas=1000,cv=True)
-        for alpha in path[0]:
-            run_model = linear_model.ElasticNet(alpha=alpha,l1_ratio=0.8,fit_intercept=True,normalize=False)
-            run_model.fit(internal_train_y,internal_train_c)
-            #lin regression to identify slope
-            predict_c = run_model.predict(internal_test_y)
-            score = run_model.score(internal_test_y,internal_test_c)
-            #pdb.set_trace()
-            slope = stats.linregress(internal_test_c.squeeze(),predict_c)
-            assess_traj.append({'Alpha':alpha,'Slope':slope,'Score':score})
-        #now do the path, this should match up with above
-
-        self._path_slope_results = assess_traj, path
-        
-        # Figure out how many coefficients are around
-        coeff_present = (np.abs(path[1].squeeze().T) > 0).astype(np.int)
-        total_coeffs = np.sum(coeff_present,axis=1)
-        
-        plt.figure()
-        slope_traj_vec = np.array([a['Slope'][0] for a in assess_traj])
-        score_traj_vec = np.array([a['Score'] for a in assess_traj])
-
-        plt.plot(-np.log(path[0]),slope_traj_vec,label='Slope');plt.title('Slope of readout, Score of readout')
-        plt.plot(-np.log(path[0]),score_traj_vec,label='Score');plt.legend()
-        plt.vlines(-np.log(self.model_args['alpha']), 0, 0.3, linewidth=10)
-
-        fig,ax1 = plt.subplots()
-        ax1.plot(-np.log(path[0]),path[1].squeeze().T);plt.title('Regularization Path')
-        ax1.legend(labels=self.feat_labels)
-        ax2 = ax1.twinx()
-        ax2.plot(-np.log(path[0]),total_coeffs)
-        plt.vlines(-np.log(self.model_args['alpha']), 0, 0.3, linewidth=10)
-        
+    
         
     def get_average_model(self,model):
         active_coeffs = []
@@ -473,11 +505,8 @@ class weekly_decoderCV(weekly_decoder):
             active_coeffs.append([ii.coef_])
         
         active_coeffs = np.array(active_coeffs).squeeze()
-        average_model = np.mean(active_coeffs,axis=0)
+        average_model = np.median(active_coeffs,axis=0)
         #average_model = np.zeros(shape=active_coeffs.shape)
-        
-        #do some stats
-        
         
         #return the average model with the stats for each coefficient
         return average_model, stats
@@ -486,18 +515,51 @@ class weekly_decoderCV(weekly_decoder):
         ensemble_score = []
         ensemble_corr = []
         self.test_stats = [] #{'Prediction Score': [], 'Pearson Corr Score': [], 'Spearman Corr Score': []}
-
+        display_test = []
+        
+        
         for tt in range(100):
-            test_subset_y,test_subset_c = zip(*random.sample(list(zip(self.test_set_y,self.test_set_c)),np.ceil(0.8 * len(self.test_set_y)).astype(np.int)))
+            test_subset_y, test_subset_c, test_subset_pt, test_subset_ph = zip(*random.sample(list(zip(self.test_set_y,self.test_set_c,self.test_set_pt, self.test_set_ph)),np.ceil(0.5 * len(self.test_set_y)).astype(np.int)))
             test_subset_y = np.array(test_subset_y)
             test_subset_c = np.array(test_subset_c)
             
             predicted_c = self.decode_model.predict(test_subset_y)
             self.test_stats.append(self.get_test_stats(test_subset_y,test_subset_c,predicted_c))
+          
+    '''Does a one-shot through the entire testing set to get a single timecourse'''
     def plot_test_timecourse(self):
         #ok... let's think this through...
-        pass
+        pred_c = self.decode_model.predict(self.test_set_y)
+        zipped_data = list(zip(pred_c,self.test_set_c.squeeze(),self.test_set_pt,self.test_set_ph))
         
+        pred_add = []
+        real_add = []
+        
+        predicted_dict = nestdict()
+        
+        for pt in self.pts:
+            print(pt)
+            plt.figure()
+            sorted_inp = {do_phase:[0,0] for do_phase in self.filter_phases}
+            sorted_inp = {do_phase:np.array([(predc,testc) for predc,testc,patient,phase in zipped_data if phase == do_phase and patient == pt]).squeeze() for do_phase in self.filter_phases}
+            #pdb.set_trace()
+            predicted = []
+            actual = []
+            for phase in self.filter_phases:
+                if sorted_inp[phase].size == 0:
+                    predicted.append(0)
+                    actual.append(0)
+                else:
+                    try: predicted.append(sorted_inp[phase][0]);
+                    except: pdb.set_trace()
+                    actual.append(sorted_inp[phase][1])
+            
+            plt.plot(predicted)
+            plt.plot(actual)
+            plt.xlabel('Week')
+            plt.ylabel('nHDRS')
+            plt.title(pt)
+            
     def plot_test_regression_figure(self):
         #do a final test on *all* the data for plotting purposes
         predicted_c = self.decode_model.predict(self.test_set_y)
@@ -558,18 +620,30 @@ class weekly_decoderCV(weekly_decoder):
             
         
 class controller_analysis:
-    def __init__(self,readout):
+    def __init__(self,readout,**kwargs):
         self.readout_model = readout
         # get our binarized disease states
+        self.binarized_type = kwargs['bin_type']
         
-    def gen_binarized_state(self,input_c):
+    def gen_binarized_state(self,**kwargs):
         #redo our testing set
-        binarized = input_c > 0.5
+        if kwargs['approach'] == 'threshold':
+            binarized = kwargs['input_c'] > 0.5
+        elif kwargs['approach'] == 'stim_changes':
+            query_array = kwargs['input_ptph']
+            binarized = [self.readout_model.CFrame.query_stim_change(pt,ph) for pt,ph in query_array]
+        else:
+            raise Exception
         
         return binarized
 
-    def bin_classif(self,binarized,predicted):
+    def pr_classif(self,binarized,predicted):
+        precision,recall, thresholds = precision_recall_curve(binarized,predicted)
+        #plt.figure()
+        #plt.step(recall,precision)
         
+        return precision, recall
+    def bin_classif(self,binarized,predicted):
         fpr,tpr,thresholds = metrics.roc_curve(binarized,predicted)
         roc_curve = (fpr,tpr,thresholds)
         auc = roc_auc_score(binarized,predicted)
@@ -580,14 +654,22 @@ class controller_analysis:
         aucs = []
         roc_curves = []
         for ii in range(100):
-            test_subset_y,test_subset_c = zip(*random.sample(list(zip(self.readout_model.test_set_y,self.readout_model.test_set_c)),np.ceil(0.8 * len(self.readout_model.test_set_y)).astype(np.int)))
+            test_subset_y, test_subset_c, test_subset_pt, test_subset_ph = zip(*random.sample(list(zip(self.readout_model.test_set_y,self.readout_model.test_set_c,self.readout_model.test_set_pt,self.readout_model.test_set_ph)),np.ceil(0.8 * len(self.readout_model.test_set_y)).astype(np.int)))
             #pdb.set_trace()
-            binarized_c = self.gen_binarized_state(np.array(test_subset_c))
             predicted_c = self.readout_model.decode_model.predict(test_subset_y)
+            if self.binarized_type == 'threshold':
+                binarized_c = self.gen_binarized_state(approach = 'threshold', input_c = np.array(test_subset_c))
+                auc, roc_curve = self.bin_classif(binarized_c,predicted_c)
+                aucs.append(auc)
+                roc_curves.append(roc_curve)
+                
+            elif self.binarized_type == 'stim_change':
+                binarized_c = self.gen_binarized_state(approach = 'stim_changes',input_ptph = list(zip(test_subset_pt,test_subset_ph)))
+                precision, recall = self.pr_classif(binarized_c,predicted_c)
+                aucs.append(0)
+                roc_curves.append((precision,recall))
+                
 
-            auc, roc_curve = self.bin_classif(binarized_c,predicted_c)
-            aucs.append(auc)
-            roc_curves.append(roc_curve)
     
         self.plot_classif_runs(aucs, roc_curves)
         

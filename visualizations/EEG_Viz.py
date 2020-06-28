@@ -251,6 +251,8 @@ def maya_band_display(band,montage='dense'):
     #Have to bring band from (-1,1) to (0,1) for mayavi color bullshit
     band_norm = band / 2
     band_norm += 1/2
+    #band_norm = 0.5 * np.tanh(band * 5) + 0.5
+    
 
     #This sets the colors for the nodes themselves to the band  changes after normalization into [0,1]
     nodes.mlab_source.dataset.point_data.scalars = (band_norm)

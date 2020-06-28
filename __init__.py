@@ -150,13 +150,15 @@ def poly_subtrLFP(fvect,inp_psd,polyord=4):
     #fvect HAS to be a vector function
     # This function takes in a raw PSD, Log transforms it, poly subtracts, and then returns the unloged version.
     #log10 in_psd first
-
+    
+    if inp_psd[0] == 0: inp_psd[0]=1e-6
+    
     try:
         log_psd = 10*np.log10(inp_psd)
-        pfit = np.polyfit(fvect,log_psd,polyord)
+        pfit = np.polyfit(fvect['Left'],log_psd,polyord)
         pchann = np.poly1d(pfit)
         
-        bl_correction = pchann(fvect)
+        bl_correction = pchann(fvect['Left'])
     except Exception as e:
         print(e)
         pdb.set_trace()
@@ -202,9 +204,11 @@ def get_pow(Pxx,F,frange,cmode=np.median):
 
     #check if Pxx is NOT a dict
     if isinstance(Pxx,np.ndarray):
+        Pxx = Pxx.reshape(-1,1)
         #JUST ADDED THIS
         chann_order = range(Pxx.shape[0])
-        Pxx = {ch:Pxx[ch,:] for ch in chann_order}
+        try: Pxx = {ch:Pxx[ch,:] for ch in chann_order}
+        except: pdb.set_trace()
         
         #ThIS WAS WORKING BEFORE
         #Pxx = {0:Pxx}

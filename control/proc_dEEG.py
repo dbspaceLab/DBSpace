@@ -55,7 +55,7 @@ from sklearn.decomposition import FactorAnalysis, PCA
 #from tensortools.operations import unfold as tt_unfold, khatri_rao
 import tensorly as tl
 from tensorly import unfold as tl_unfold
-from tensorly.decomposition import parafac
+from tensorly.decomposition import parafac, tucker
 
 # import some useful functions (they are available in utils.py)
 #from utils import *
@@ -65,7 +65,6 @@ import pickle
 import sys
 sys.path.append('/home/virati/Dropbox/projects/libs/robust-pca/')
 import r_pca
-
 import pdb
 #%%
 
@@ -316,7 +315,8 @@ class proc_dEEG:
         #reshape
         reshaped = self.psd_dict[pt][condit][epoch].reshape(-1,1025)
         print(reshaped.shape)
-        plt.plot(np.linspace(0,1000/2,1025),20*np.log10(reshaped.T),alpha=0.2)
+        plt.plot(np.linspace(0,1000/2,1025),np.mean(20*np.log10(reshaped.T),axis=1),alpha=0.9)
+        plt.plot(np.linspace(0,1000/2,1025),20*np.log10(reshaped.T)[:,np.random.randint(0,256,size=(30,))],alpha=0.2)
         plt.xlim((0,160))
         
     #Median dimensionality reduction here; for now rPCA
@@ -462,7 +462,7 @@ class proc_dEEG:
             if use_maya:
                 EEG_Viz.maya_band_display(response_dict[:,band_i])
             else:
-                EEG_Viz.plot_3d_scalp(response_dict[:,band_i],plt.figure(),label=condit + ' Mean Response ' + band + ' | ' + pt,unwrap=True,scale=100,clims=(-1,1),alpha=0.3,marker_scale=5)
+                EEG_Viz.plot_3d_scalp(response_dict[:,band_i],plt.figure(),label=condit + ' Mean Response ' + band + ' | ' + pt,unwrap=True,scale=100,clims=(-2,2),alpha=0.3,marker_scale=5)
                 plt.suptitle(pt)
     
     
@@ -601,37 +601,6 @@ class proc_dEEG:
         
         mode_model = {'L':L, 'S':S, 'Vectors':svm_ica_coeffs, 'Model':svm_ica, 'RotatedL':rotated_L}
         return mode_model
-
-    def OnT_ctrl_modes(self,pt='POOL',data_source=[],do_plot=False):
-        
-        if data_source == []:
-            #First, get a bootstrapped estimate of the median
-            #med_response = self.median_response(pt=pt)['OnT'] #if you want the one-shot response
-            med_response = self.median_bootstrap_response(pt=pt)['mean']['OnT'] #If you want the bootstrap response
-            
-            source_label = 'Median Response'
-        else:
-            print('Using BL Norm Segments - RAW')
-            med_response = np.median(self.osc_bl_norm[pt]['OnT'],axis=0)
-            source_label = 'BL Normed Segments'
-        
-        svm_pca_coeffs = []
-        #pdb.set_trace()
-        rpca = r_pca.R_pca(med_response)
-        L,S = rpca.fit()
-        
-        #L = med
-        svm_pca = PCA()
-
-        svm_pca.fit(L)
-        rotated_L = svm_pca.fit_transform(L)
-        
-        svm_pca_coeffs = svm_pca.components_
-        
-        plt.scatter(med_response[:,2],med_response[:,3])
-        
-        mode_model = {'L':L, 'S':S, 'Vectors':svm_pca_coeffs, 'Model':svm_pca, 'RotatedL':rotated_L}
-        return mode_model
     
     def OnT_alpha_modes_segs(self,pt='POOL',data_source=[],do_plot=False,band='Alpha'):
         seg_responses = self.osc_bl_norm[pt]['OnT'][:,:,dbo.feat_order.index(band)].squeeze()
@@ -692,10 +661,10 @@ class proc_dEEG:
         plt.ylim((0,1))
         plt.subplot(222)
         for ii in range(4): #this loops through our COMPONENTS to find the end
-            plt.plot(np.mean(coeffs,axis=0)[ii,:].T,linewidth=5-ii)#,alpha=expl_var[ii])
+            plt.plot(np.mean(coeffs,axis=0)[ii,:].T,linewidth=5-ii,alpha=expl_var[ii])
         plt.ylim((-0.3,0.3))
-        plt.hlines(0,0,5)
-        plt.legend(['PC1','PC2','PC3','PC4','PC5'])
+        #plt.hlines(0,0,5)
+        plt.legend(['PC0','PC1','PC2','PC3','PC4'])
         plt.title('rPCA Components')
         
     def plot_alpha_ctrl_S(self,top_comp=10):
@@ -724,8 +693,12 @@ class proc_dEEG:
         plt.legend(['PC1','PC2','PC3','PC4','PC5'])
         plt.title('rPCA Components')   
     
-    def OnT_ctrl_modes_segs(self,pt='POOL',data_source=[],do_plot=False):
-        
+    #def OnT_ctrl_modes_segs(self,pt='POOL',data_source=[],do_plot=False):
+    
+    ''' We do naive rPCA on each segment and then average things together: this has been superceded by the tensor decomposition'''
+    def OnT_ctrl_modes_segs(self,**kwargs):
+        pt = kwargs['pt']
+        do_plot = kwargs['do_plot']
 
         print('Using BL Norm Segments - RAW')
         seg_responses = self.osc_bl_norm[pt]['OnT'][:,:,0:4]
@@ -759,9 +732,9 @@ class proc_dEEG:
         
         mode_model = {'L':L, 'S':S, 'SModel':S_pca, 'RotatedS':np.array(rot_S), 'SVectors':S_pca_coeffs,'Vectors':lr_pca_coeffs, 'Model':lr_pca, 'RotatedL':np.array(rot_L)}
         return mode_model
-    #Dimensionality reduction of ONTarget response; for now rPCA
     
-    def topo_OnT_ctrl(self,**kwargs):
+    '''THIS IS OBSOLETE FOR TENSOR ANALYSES'''
+    def topo_OnT_ctrl_segs(self,**kwargs):
         model = self.OnT_ctrl_modes_segs(**kwargs)
         
         L = model['RotatedL']
@@ -769,46 +742,152 @@ class proc_dEEG:
         coeffs = np.array(model['Vectors'])
         S = model['RotatedS']
         s_coeffs = np.array(model['SVectors'])
-        s_expl_var = model['SModel'].explained_variance_ratio_
+        #s_expl_var = model['SModel'].explained_variance_ratio_
         
         # ALL PLOTTING BELOW
         #Plot the topo for our low-rank component
         for comp in range(1):
             fig = plt.figure()
-            EEG_Viz.plot_3d_scalp(np.median(L,axis=0)[:,comp],fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
-            plt.title('rPCA Component ' + str(comp))
+            EEG_Viz.plot_3d_scalp(np.mean(L,axis=0)[:,comp],fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
+            #plt.title('rPCA Component ' + str(comp))
+            plt.title('Median Low-Rank Component ' + str(comp))
         
-        
+        # Plot our Components
         plt.figure()
         plt.subplot(221)
         plt.plot(expl_var)
         plt.ylim((0,1))
         plt.subplot(222)
         for ii in range(4): #this loops through our COMPONENTS to find the end
-            plt.plot(np.mean(coeffs,axis=0)[ii,:].T,linewidth=5-ii)#,alpha=expl_var[ii])
-        plt.ylim((-0.3,0.3))
-        plt.hlines(0,0,5)
-        plt.legend(['PC1','PC2','PC3','PC4','PC5'])
-        plt.title('rPCA Components')
+            plt.plot(coeffs[ii,:].T,linewidth=5-ii,alpha=expl_var[ii])#,alpha=expl_var[ii])
+        plt.ylim((-1,1))
+        plt.hlines(0,0,3)
+        plt.legend(['PC0','PC1','PC2','PC3','PC4'])
+        plt.title('Low-Rank Components')
         
-        for comp in range(4):
-            #Plot sparse component next
-            fig = plt.figure()
-            EEG_Viz.plot_3d_scalp(np.median(S,axis=0)[:,comp],fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
-            plt.title('Sparse Component ' + str(comp))
+        plot_sparse = False
+        if plot_sparse:
+            for comp in range(4):
+                #Plot sparse component next
+                fig = plt.figure()
+                EEG_Viz.plot_3d_scalp(np.median(S,axis=0)[:,comp],fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
+                plt.title('Sparse Component ' + str(comp))
+                
+            plt.figure()
+            plt.subplot(221)
+            plt.plot(s_expl_var)
+            plt.ylim((0,1))
+            plt.subplot(222)
             
+            for ii in range(4): #this loops through our COMPONENTS to find the end
+                plt.plot(np.mean(s_coeffs,axis=0)[ii,:].T,linewidth=5-ii)#,alpha=expl_var[ii])
+            plt.ylim((-0.3,0.3))
+            plt.hlines(0,0,3)
+            plt.legend(['PC0','PC1','PC2','PC3','PC4'])
+            plt.title('Sparse Components')
+            
+        if kwargs['plot_maya']:
+            response_dict = np.median(L,axis=0)[:,comp].squeeze()      
+            EEG_Viz.maya_band_display(response_dict)
+    
+    
+    #Dimensionality reduction of ONTarget response; for now rPCA
+    def topo_OnT_ctrl_tensor(self,**kwargs):
+        pt = kwargs['pt']
+        seg_responses = self.osc_bl_norm[pt]['OnT'][:,:,0:4]
+        
+        #factors = parafac(seg_responses,rank=4)
+        print(seg_responses.shape)
+        #core, factors = tucker(seg_responses)
+        factors = parafac(seg_responses.swapaxes(0,1),rank=4) # factors gives us weight, factors
+        #plt.plot(core[0])
+        #print(len(factors))
+        print(factors)
+        for ii in range(4):
+            fig = plt.figure()
+            #EEG_Viz.plot_3d_scalp(seg_responses[20,:,2],fig,label='Raw Segment',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
+            EEG_Viz.plot_3d_scalp(factors[1][0][:,ii],fig,label='Tensor Decomp ' + str(ii),unwrap=True,scale=100,alpha=0.3,marker_scale=5)
+        print(factors[0])
+        #print(core.shape)
+        #print((factors))
+
+
+    def OnT_ctrl_modes(self,pt='POOL',data_source=[],do_plot=False,plot_maya=True):
+        
+        print('Using BL Norm Segments - RAW')
+        med_response = np.median(self.osc_bl_norm[pt]['OnT'],axis=0).squeeze()
+        source_label = 'BL Normed Segments'
+        
+        svm_pca_coeffs = []
+        rpca = r_pca.R_pca(med_response)
+        L,S = rpca.fit()
+        
+        #L = med
+        svm_pca = PCA()
+        svm_pca.fit(L)
+        rotated_L = svm_pca.fit_transform(L)
+        
+        svm_pca_coeffs = svm_pca.components_
+        
+        #plt.scatter(med_response[:,2],med_response[:,3])
+  
+        mode_model = {'L':L, 'S':S, 'SModel':[], 'RotatedS':[], 'SVectors':[], 'Vectors':svm_pca_coeffs, 'Model':svm_pca, 'RotatedL':rotated_L}
+        return mode_model
+    
+    
+    def topo_OnT_ctrl(self,**kwargs):
+        model = self.OnT_ctrl_modes(**kwargs)
+        
+        L = model['RotatedL']
+        expl_var = model['Model'].explained_variance_ratio_
+        coeffs = np.array(model['Vectors'])
+        #s_expl_var = model['SModel'].explained_variance_ratio_
+        
+        # ALL PLOTTING BELOW
+        #Plot the topo for our low-rank component
+        for comp in range(2):
+            fig = plt.figure()
+            EEG_Viz.plot_3d_scalp(L[:,comp],fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
+            #plt.title('rPCA Component ' + str(comp))
+            plt.title('Median Low-Rank Component ' + str(comp))
+        
+        # Plot our Components
         plt.figure()
         plt.subplot(221)
-        plt.plot(s_expl_var)
+        plt.plot(expl_var)
         plt.ylim((0,1))
         plt.subplot(222)
-        
         for ii in range(4): #this loops through our COMPONENTS to find the end
-            plt.plot(np.mean(s_coeffs,axis=0)[ii,:].T,linewidth=5-ii)#,alpha=expl_var[ii])
-        plt.ylim((-0.3,0.3))
-        plt.hlines(0,0,5)
-        plt.legend(['PC1','PC2','PC3','PC4','PC5'])
-        plt.title('rPCA Components')
+            plt.plot(coeffs[ii,:],linewidth=5-ii,alpha=0.2)#,alpha=expl_var[ii])
+        plt.ylim((-1,1))
+        plt.hlines(0,0,3)
+        plt.legend(['PC0','PC1','PC2','PC3','PC4'])
+        plt.title('Low-Rank Components')
+        
+        plot_sparse = False
+        if plot_sparse:
+            for comp in range(4):
+                #Plot sparse component next
+                fig = plt.figure()
+                EEG_Viz.plot_3d_scalp(np.median(S,axis=0)[:,comp],fig,label='OnT Mean Response',unwrap=True,scale=100,alpha=0.3,marker_scale=5)
+                plt.title('Sparse Component ' + str(comp))
+                
+            plt.figure()
+            plt.subplot(221)
+            plt.plot(s_expl_var)
+            plt.ylim((0,1))
+            plt.subplot(222)
+            
+            for ii in range(4): #this loops through our COMPONENTS to find the end
+                plt.plot(np.mean(s_coeffs,axis=0)[ii,:].T,linewidth=5-ii)#,alpha=expl_var[ii])
+            plt.ylim((-0.3,0.3))
+            plt.hlines(0,0,3)
+            plt.legend(['PC0','PC1','PC2','PC3','PC4'])
+            plt.title('Sparse Components')
+            
+        if kwargs['plot_maya']:
+            response_dict = np.median(L,axis=0)[:,comp].squeeze()      
+            EEG_Viz.maya_band_display(response_dict)
     
     def dict_all_obs(self,condits=['OnT']):
         full_stack = nestdict()
@@ -1226,8 +1305,8 @@ class proc_dEEG:
         #Here we're averaging across axis zero which corresponds to 'averaging' across SEGMENTS
         for condit in self.condits:
             #Old version just does one shot median
-            X_med[condit]= np.median(dsgn_X[condit],axis=0)
-            X_med[condit]= np.mean(dsgn_X[condit],axis=0)
+            X_med[condit]= 10*np.median(dsgn_X[condit],axis=0)
+            X_med[condit]= 10*np.mean(dsgn_X[condit],axis=0)
             
             
             # VARIANCE HERE
@@ -1429,7 +1508,7 @@ class proc_dEEG:
             meds[condit] = self.Seg_Med[0][condit][:,:] #result here is 257(chann) x 5(bands)
             mads[condit] = self.Seg_Med[1][condit][:,:]
                 #band_segnum[condit] = self.Seg_Med[2][condit]
-            plt.plot(np.arange(0,5)+(cc-0.5)/10,meds[condit][:,:].T,color[cc]+'.',markersize=20,alpha=0.05)
+            #plt.plot(np.arange(0,5)+(cc-0.5)/10,meds[condit][:,:].T,color[cc]+'.',markersize=20,alpha=0.05)
             #There's a way to do MATCHED CHANGES here!! TODO
                 
                 #plt.scatter((bb+(cc-0.5)/10)*np.ones_like(meds[condit][:,bb]),meds[condit][:,bb],marker=marker[cc],color=color[cc],s=100,alpha=0.2)
@@ -1450,6 +1529,7 @@ class proc_dEEG:
             print(rsres)
         
         #plt.suptitle(condit)
+        plt.legend(['OnTarget','OffTarget'])
         
     def plot_meds(self,band='Alpha',flatten=True,condits=['OnT','OffT']):
         print('Doing Population Level Medians and MADs')
@@ -1960,12 +2040,21 @@ class proc_dEEG:
         
         #randomlt sample the validation set
         validation_accuracy = []
+        rocs_auc = []
         for ii in range(100):
             Xva_ss,Yva_ss = resample(self.Xva,self.Yva,replace=True)
             validation_accuracy.append(best_model['Model'].score(Xva_ss,Yva_ss))
+            predicted_Y = best_model['Model'].predict(Xva_ss)
+            fpr,tpr,_ = roc_curve(Yva_ss,predicted_Y)
+            rocs_auc.append(auc(fpr, tpr))
             
         plt.figure()
+        plt.subplot(311)
         plt.hist(validation_accuracy)
+        plt.subplot(312)
+        plt.plot(fpr,tpr)
+        plt.subplot(313)
+        plt.hist(rocs_auc)
         
     def oneshot_binSVM(self):
         best_model = self.bin_classif
@@ -2035,7 +2124,7 @@ class proc_dEEG:
         else:
             coeffs = stats.zscore(np.sum(self.bin_classif['Model'].coef_.reshape(257,5,order='C'),axis=1))
             plt.figure()
-            self.import_mask = coeffs > 0.4
+            self.import_mask = coeffs > 0.68
             EEG_Viz.plot_3d_scalp(coeffs,unwrap=True)
             EEG_Viz.plot_3d_scalp(self.import_mask.astype(np.int),unwrap=True)
             plt.suptitle('Just looking at the coefficients')
@@ -2603,7 +2692,7 @@ class proc_dEEG:
     
     ''' GRAVEYARD '''
     
-    def BLWEIRDcompute_response(self,combine_baselines=True,plot=False):
+    def OBSBLWEIRDcompute_response(self,combine_baselines=True,plot=False):
         if combine_baselines:
             baseline = {pt:np.median(self.combined_BL[pt],axis=0) for pt in self.do_pts}
         else:

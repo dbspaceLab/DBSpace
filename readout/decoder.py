@@ -525,7 +525,19 @@ class weekly_decoderCV(weekly_decoder):
             
             predicted_c = self.decode_model.predict(test_subset_y)
             self.test_stats.append(self.get_test_stats(test_subset_y,test_subset_c,predicted_c))
-          
+    def one_shot_test(self):
+
+        
+        
+
+        test_subset_y, test_subset_c, test_subset_pt, test_subset_ph = zip(*random.sample(list(zip(self.test_set_y,self.test_set_c,self.test_set_pt, self.test_set_ph)),np.ceil(0.5 * len(self.test_set_y)).astype(np.int)))
+        test_subset_y = np.array(test_subset_y)
+        test_subset_c = np.array(test_subset_c)
+        
+        predicted_c = self.decode_model.predict(test_subset_y)
+        
+        return self.get_test_stats(test_subset_y,test_subset_c,predicted_c)
+        
     '''Does a one-shot through the entire testing set to get a single timecourse'''
     def plot_test_timecourse(self):
         #ok... let's think this through...

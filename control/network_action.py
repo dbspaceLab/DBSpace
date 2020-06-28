@@ -159,7 +159,7 @@ class local_response:
                 segNum = self.Osc_pt_marg[condit].shape[2]
                 distr_to_plot = self.Osc_pt_marg[condit].swapaxes(1,2).reshape(len(do_pts)*segNum,2,5)[:,cc,:]
                 
-                plt.plot(np.arange(1,6)+0.2*co,distr_to_plot.T,color[co]+'.',markersize=20,alpha=0.2)
+                #plt.plot(np.arange(1,6)+0.2*co,distr_to_plot.T,color[co]+'.',markersize=20,alpha=0.2)
                 parts = ax2.violinplot(distr_to_plot,positions=np.array([1,2,3,4,5]) + 0.2*co,showmedians=True)
                 
                 for partname in ('cbars','cmins','cmaxes','cmedians'):
@@ -180,19 +180,20 @@ class local_response:
                 plt.hlines(0,0,5,linestyle='dotted',linewidth=5,alpha=0.8)
                 plt.suptitle('Looking at all available segments')
                 
-                for bb in range(5):
-                    print(bb)
-                    #rsres = stats.ranksums(distr['OnT'][:,bb],distr['OffT'][:,bb])
-                    rsres = stats.ks_2samp(distr['OnT'][:,bb],distr['OffT'][:,bb])
-                    #rsres = stats.wilcoxon(distr['OnT'][:,bb],distr['OffT'][:,bb])
-                    #rsres = stats.ttest_ind(distr['OnT'][:,bb],distr['OffT'][:,bb])
-                    print(rsres)
-                    
-                    #ontres = stats.ranksums(distr['OnT'][:,bb])
-                    #ontres = stats.kstest(distr['OnT'][:,bb],cdf='norm')
-                    #ontres = stats.mannwhitneyu(distr['OnT'][:,bb])
-                    ontres = stats.ttest_1samp(distr['OnT'][:,bb],np.zeros((5,1)))
-                    print(condit + ' ' + str(ontres))
+            for bb in range(5):
+                print(bb)
+                #rsres = stats.ranksums(distr['OnT'][:,bb],distr['OffT'][:,bb])
+                try: rsres = stats.ks_2samp(distr['OnT'][:,bb],distr['OffT'][:,bb])
+                except: pdb.set_trace()
+                #rsres = stats.wilcoxon(distr['OnT'][:,bb],distr['OffT'][:,bb])
+                #rsres = stats.ttest_ind(distr['OnT'][:,bb],distr['OffT'][:,bb])
+                print(rsres)
+                
+                #ontres = stats.ranksums(distr['OnT'][:,bb])
+                #ontres = stats.kstest(distr['OnT'][:,bb],cdf='norm')
+                #ontres = stats.mannwhitneyu(distr['OnT'][:,bb])
+                ontres = stats.ttest_1samp(distr['OnT'][:,bb],np.zeros((5,1)))
+                print(condit + ' ' + str(ontres))
             
             plt.ylim((-30,50))
             plt.legend()

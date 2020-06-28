@@ -66,7 +66,7 @@ class CStruct:
         
         self.normalize_scales()
         self.load_stim_changes()
-        
+    
     '''Wraps self.depr_dict to output a patient->scale->phase ARRAY'''
     def normalize_scales(self):
         baseline_values = nestdict()

@@ -125,7 +125,6 @@ def poly_subtrEEG(inpPSD,fVect,order=5):
         inpPSD[chann] = inpPSD[chann].reshape(-1,1).T
         #This should now be (513(nfft) x segments).T
         
-        
         #SEGMENTS x PSD
         postpsd_matr = np.zeros((inpPSD[chann].shape[0],inpPSD[chann].shape[1]))
         
@@ -146,22 +145,23 @@ def poly_subtrEEG(inpPSD,fVect,order=5):
     
     return fix_psd, polyitself
 
-def poly_subtrLFP(fvect,inp_psd,polyord=4):
+'''Throw an error if we're calling the old name for the vector function below'''
+def poly_subtrLFP(**kwargs):
+    raise Exception
+    
+'''Below used to be called poly_subtrLFP, unclear whether it was being used, now renamed and look for errors elsewhere'''
+def poly_subtr_vect(fvect,inp_psd,polyord=4):
     #fvect HAS to be a vector function
     # This function takes in a raw PSD, Log transforms it, poly subtracts, and then returns the unloged version.
     #log10 in_psd first
     
-    if inp_psd[0] == 0: inp_psd[0]=1e-6
+ 
+    log_psd = 10*np.log10(inp_psd)
+    pfit = np.polyfit(fvect,log_psd,polyord)
+    pchann = np.poly1d(pfit)
     
-    try:
-        log_psd = 10*np.log10(inp_psd)
-        pfit = np.polyfit(fvect['Left'],log_psd,polyord)
-        pchann = np.poly1d(pfit)
-        
-        bl_correction = pchann(fvect['Left'])
-    except Exception as e:
-        print(e)
-        pdb.set_trace()
+    bl_correction = pchann(fvect)
+
         
     return 10**((log_psd - bl_correction)/10), pfit
 
@@ -204,11 +204,11 @@ def get_pow(Pxx,F,frange,cmode=np.median):
 
     #check if Pxx is NOT a dict
     if isinstance(Pxx,np.ndarray):
-        Pxx = Pxx.reshape(-1,1)
+        #Pxx = Pxx.reshape(-1,1)
         #JUST ADDED THIS
         chann_order = range(Pxx.shape[0])
-        try: Pxx = {ch:Pxx[ch,:] for ch in chann_order}
-        except: pdb.set_trace()
+        Pxx = {ch:Pxx[ch,:] for ch in chann_order}
+        #except: pdb.set_trace()
         
         #ThIS WAS WORKING BEFORE
         #Pxx = {0:Pxx}
@@ -369,10 +369,10 @@ Important block, this is where we define our features
 #Need to regen this based off of the bands up there
 feat_dict = {
                 'Delta':{'fn':get_pow,'param':(1,4)},
-                'Alpha':{'fn':get_pow,'param':(8,14)},
+                'Alpha':{'fn':get_pow,'param':(8,13)},
                 'Theta':{'fn':get_pow,'param':(4,8)},
-                'Beta*':{'fn':get_pow,'param':(14,20)},
-                'Beta':{'fn':get_pow,'param':(14,30)},
+                'Beta*':{'fn':get_pow,'param':(13,20)},
+                'Beta':{'fn':get_pow,'param':(13,30)},
                 'Gamma1':{'fn':get_pow,'param':(35,60)},
                 'Gamma2':{'fn':get_pow,'param':(60,100)},
                 'Gamma':{'fn':get_pow,'param':(30,100)},

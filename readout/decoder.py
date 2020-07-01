@@ -259,7 +259,7 @@ class base_decoder:
         #pt_ph_vector = []
         
         for rr in data_set:
-            psd_poly_done = {ch: dbo.poly_subtrLFP(fvect=self.fvect,inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()}
+            psd_poly_done = {ch: dbo.poly_subtr_vect(fvect=self.fvect,inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()}
             
             feat_vect = np.zeros(shape=(len(dbo.feat_order),self.ch_num))
             for ff,featname in enumerate(dbo.feat_order):

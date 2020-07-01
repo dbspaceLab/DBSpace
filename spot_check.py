@@ -163,7 +163,7 @@ def spot_check(fname=[],tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']
     ## Do spectrogram stuff
     SG = defaultdict(dict)
     Pxx = defaultdict(dict)
-    for cc,side in enumerate(['Left','Right']):
+    for cc,side in enumerate(chann_labels):
         #first, let's do the PWelch
         Fpsd,Pxx[chann_labels[cc]] = sig.welch(Container[side][nlims[0]:nlims[1]],fs,window='blackmanharris',nperseg=NFFT,noverlap=0,nfft=NFFT)
         
@@ -192,7 +192,7 @@ def spot_check(fname=[],tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']
                 
             #plt.suptitle('Raw TS: ' + fname.split('/')[-1])
             
-            plt.suptitle('Raw TS: ')
+            #plt.suptitle('Raw TS: ' + fname)
     
     return {'TS':Container,'TF':{'SG':SG,'F':F,'T':T},'F':{'Pxx':Pxx,'F':Fpsd}}
 

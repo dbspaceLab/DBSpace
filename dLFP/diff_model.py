@@ -192,8 +192,8 @@ class sim_diff:
         stim_scaling = 10
         self.S = stim_scaling * decay_factor * stim_sig(fs=self.fullFs,stim_ampl=stim_ampl,wform=wform,zero_onset=zero_onset,stim_freq=freq).ts_return()
     
-    def set_clock(self):
-        self.clock = stim_sig(fs=self.fullFs,stim_ampl=2e-3,wform='sine',stim_freq=105.5,zero_onset=False).ts_return()
+    def set_clock(self,clock_V = 2e-3):
+        self.clock = stim_sig(fs=self.fullFs,stim_ampl=clock_V,wform='sine',stim_freq=105.5,zero_onset=False).ts_return()
     
     def Vd_stim(self,Z1,Z3):
         self.stim_component = self.Ad * self.Z_b * self.S * ((1/(Z1 + self.Z_b)) - (1/(Z3 + self.Z_b)))

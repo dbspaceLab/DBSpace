@@ -15,7 +15,8 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 plt.rcParams['image.cmap'] = 'jet'
 
-import DBSpace.control.neigh_mont
+
+import DBSpace.control.neigh_mont as neigh_mont
 
 import sys
 sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
@@ -386,7 +387,7 @@ class streamEEG:
             
             #subtract out the polynom
             
-            postpoly = dbo.poly_subtr(psd_vect,self.fvect)[0]
+            postpoly = dbo.poly_subtrEEG(psd_vect,self.fvect)[0]
             
             out_vect = dbo.calc_feats(postpoly,self.fvect,dofeats=['Delta','Theta','Alpha','Beta*','Gamma1','Stim'])[0]
             

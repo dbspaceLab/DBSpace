@@ -59,6 +59,7 @@ import pdb
 def zero_mean(inp):
     return inp - np.mean(inp)
 
+
 #%%            
 class base_decoder:
     #Parent readout class
@@ -75,7 +76,11 @@ class base_decoder:
         self.fvect = self.YFrame.data_basis['F']
         self.do_shuffle_null = kwargs['shuffle_null']
         
-        self.feat_labels = ['L' + feat for feat in dbo.feat_order] + ['R' + feat for feat in dbo.feat_order]
+        #here we decide which features we want to do for this analysis
+        self.do_feats = ['Delta','Theta','Alpha','Beta*','Gamma1','GCratio']# 
+        #self.do_feats = dbo.feat_order
+        
+        self.feat_labels = ['L' + feat for feat in self.do_feats] + ['R' + feat for feat in self.do_feats]
         
         self.regression_algo = linear_model.LinearRegression
     
@@ -261,8 +266,8 @@ class base_decoder:
         for rr in data_set:
             psd_poly_done = {ch: dbo.poly_subtr_vect(fvect=self.fvect,inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()}
             
-            feat_vect = np.zeros(shape=(len(dbo.feat_order),self.ch_num))
-            for ff,featname in enumerate(dbo.feat_order):
+            feat_vect = np.zeros(shape=(len(self.do_feats),self.ch_num))
+            for ff,featname in enumerate(self.do_feats):
                 dofunc = dbo.feat_dict[featname]
                 feat_calc = dofunc['fn'](psd_poly_done,self.fvect,dofunc['param'])
                 #except Exception as e: print(e);pdb.set_trace()
@@ -359,7 +364,7 @@ class weekly_decoder(base_decoder):
             self.shuffle_test_c()
 
     '''This method goes down the regression path and assesses the performance of the model all along the way: Returns the 'optimal' alpha'''
-    def _path_slope_regression(self,do_plot=False):
+    def _path_slope_regression(self,do_plot=False,suppress_vars=0.2):
         assess_traj = []
         
         internal_train_y, internal_test_y, internal_train_c, internal_test_c = train_test_split(self.train_set_y,self.train_set_c,train_size=0.6,shuffle=True)
@@ -388,7 +393,7 @@ class weekly_decoder(base_decoder):
         
         ## Find the max of the r^2 for our optimal alpha
         optimal_alpha = path[0][np.argmax(score_traj_vec)] #This merely does an R^2 optimal
-        lamb = 1/10 * 0.2
+        lamb = 1/10 * suppress_vars
         lamb2 = 1
         optimal_alpha = path[0][np.argmax(slope_traj_vec - lamb * total_coeffs + lamb2*score_traj_vec)]
         
@@ -505,7 +510,7 @@ class weekly_decoderCV(weekly_decoder):
             active_coeffs.append([ii.coef_])
         
         active_coeffs = np.array(active_coeffs).squeeze()
-        average_model = np.median(active_coeffs,axis=0)
+        average_model = np.mean(active_coeffs,axis=0)
         #average_model = np.zeros(shape=active_coeffs.shape)
         
         #return the average model with the stats for each coefficient
@@ -628,7 +633,7 @@ class weekly_decoderCV(weekly_decoder):
         plt.plot(average_model)
         plt.hlines(0,-2,11,linestyle='dotted')
         plt.ylim((-0.2,0.2))
-        plt.xlim((-1,10))
+        plt.xlim((-1,len(self.do_feats)*2))
             
         
 class controller_analysis:
@@ -716,3 +721,71 @@ class controller_analysis:
         
     def roc_auc(self):
         pass
+
+
+#%%
+class feat_check(base_decoder):
+    def __init__(self,**kwargs):
+        self.YFrame = kwargs['BRFrame']
+        self.fvect = self.YFrame.data_basis['F']
+        self.do_feats = ['Delta','Theta','Alpha','Beta*','Gamma1','SHarm','THarm','Stim','Clock','fSlope','nFloor','GCratio']
+        self.pts = ['901','903','905','906','907','908']
+        
+        
+        self.filter_recs()
+    def calculate_states_in_set(self,data_set):
+        state_vector = []
+        
+        for rr in data_set:
+            psd_poly_done = {ch: dbo.poly_subtr_vect(fvect=self.fvect,inp_psd=rr['Data'][ch],polyord=5)[0] for ch in rr['Data'].keys()}
+            
+            feat_vect = np.zeros(shape=(len(self.do_feats),self.ch_num))
+            for ff,featname in enumerate(self.do_feats):
+                dofunc = dbo.feat_dict[featname]
+                feat_calc = dofunc['fn'](psd_poly_done,self.fvect,dofunc['param'])
+                #except Exception as e: print(e);pdb.set_trace()
+                feat_vect[ff,:] = np.array([feat_calc[ch] for ch in ['Left','Right']])
+                
+            # We need to flatten the state between channels...
+            #Then we go ahead and append it to the state vector
+            state_vector.append(np.reshape(feat_vect,-1,order='F')) #we want our FEATURE index to change quickest so we go (0,0) -> (1,0) -> (2,0) -> ... (4,1)
+
+            #pt_ph_vector.append(rr['Patient'],rr['Phase'])
+        return np.array(state_vector)
+    
+    
+    def check_stim_corr(self,band='Beta*',artifact='THarm',pt='ALL'):
+        band_idx = self.do_feats.index(band)
+        stim_idx = self.do_feats.index(artifact)
+        
+        if pt == 'ALL':
+            do_pts = self.pts
+        else:
+            do_pts = [pt]
+        
+        use_rec_list = [x for x in self.active_rec_list if x['Patient'] in do_pts]
+        B_rec_list = [x for x in use_rec_list if x['Phase'][0] == 'B']
+        C_rec_list = [x for x in use_rec_list if x['Phase'][0] == 'C']
+        
+        B_state = self.calculate_states_in_set(B_rec_list)
+        C_state = self.calculate_states_in_set(C_rec_list)
+
+        #get this vector
+        colors = ['r','g']
+        phases = ['B','C']
+        plt.figure()
+        for ss,side in enumerate(['Left','Right']):
+            plt.subplot(1,2,ss+1)
+            for seti,state_vect in enumerate([B_state,C_state]):
+                band_vect = state_vect[:,band_idx+ss*len(self.do_feats)]
+                stim_vect = state_vect[:,stim_idx+ss*len(self.do_feats)]
+                corr = stats.pearsonr(band_vect,stim_vect)
+                #pdb.set_trace()
+                plt.scatter(band_vect,stim_vect,color=colors[seti],label=phases[seti])
+                plt.xlabel(band)
+                plt.ylabel(artifact)
+                plt.title(side + ' ' + str(corr))
+                plt.legend()
+            
+        
+        plt.suptitle('Patient: ' + pt)

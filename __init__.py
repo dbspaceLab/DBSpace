@@ -244,7 +244,7 @@ def get_pow(Pxx,F,frange,cmode=np.median):
     
     #return is going to be a dictionary with same elements
 
-    return out_feats
+    return out_feats #This returns the out_feats which are 10*log(Pxx)
 
 
 def get_ratio(Pxx,F,f_r_set,cmode=np.median):
@@ -254,7 +254,7 @@ def get_ratio(Pxx,F,f_r_set,cmode=np.median):
         bandpow[bb] = get_pow(Pxx,F,frange,cmode=cmode)
         
     
-    ret_ratio = {ch:bandpow[1][ch]/bandpow[0][ch] for ch in bandpow[0].keys()}
+    ret_ratio = {ch:bandpow[1][ch]-bandpow[0][ch] for ch in bandpow[0].keys()}
     return ret_ratio
 
 

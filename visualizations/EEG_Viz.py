@@ -249,7 +249,7 @@ def maya_band_display(band,montage='dense'):
     nodes.glyph.scale_mode = 'scale_by_vector'
     
     #Have to bring band from (-1,1) to (0,1) for mayavi color bullshit
-    band_norm = band / 2
+    band_norm = band / np.max(band)
     band_norm += 1/2
     #band_norm = 0.5 * np.tanh(band * 5) + 0.5
     

@@ -138,7 +138,7 @@ def spot_SG(fname,chann_labels=['Left','Right']):
     F,T,SG[chann_labels[cc]] = sig.spectrogram(Container['TS']['Y'][nlims[0]:nlims[1],cc],nperseg=NFFT,noverlap=NFFT*0.5,window=sig.get_window('blackmanharris',NFFT),fs=422)
     
 
-def spot_check(fname=[],tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']):
+def spot_check(fname=[],tlims=(0,-1),plot_sg=False,plot_channs=['Left','Right']):
     ''' Spotcheck function
     tlims - In seconds. -1 implies end of the recording
     '''
@@ -159,16 +159,18 @@ def spot_check(fname=[],tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']
     if tlims[1] == -1:
         nlims[1] == -1
     
+    all_channs = ['Left','Right']
     
     ## Do spectrogram stuff
-    SG = defaultdict(dict)
-    Pxx = defaultdict(dict)
-    for cc,side in enumerate(chann_labels):
+    SG = nestdict()
+    Pxx = nestdict()
+    # Go ahead and calculate it for both channels because otherwise there are major problems downstream due to sloppy code
+    for cc,side in enumerate(all_channs): 
         #first, let's do the PWelch
-        Fpsd,Pxx[chann_labels[cc]] = sig.welch(Container[side][nlims[0]:nlims[1]],fs,window='blackmanharris',nperseg=NFFT,noverlap=0,nfft=NFFT)
+        Fpsd,Pxx[all_channs[cc]] = sig.welch(Container[side][nlims[0]:nlims[1]],fs,window='blackmanharris',nperseg=NFFT,noverlap=0,nfft=NFFT)
         
         
-        F,T,SG[side] = sig.spectrogram(Container[side][nlims[0]:nlims[1]],nperseg=NFFT,noverlap=0,window=sig.get_window('blackmanharris',NFFT),fs=422)    
+        F,T,SG[side] = sig.spectrogram(Container[side][nlims[0]:nlims[1]],nperseg=NFFT,noverlap=NFFT-10,window=sig.get_window('blackmanharris',NFFT),fs=422)    
         #Need to transpose for the segmentation approach to work, retranspose in the plotting
     #%%
     polycorr = False
@@ -177,18 +179,21 @@ def spot_check(fname=[],tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']
         #if we want to do polynomial corrections
         if polycorr:
             print('Polynom Correction!')
-            for chann in SG.keys():
+            for chann in plot_channs:
                 corr_sg = dbo.poly_SG(SG[chann],F)
             
         #Now we want to plot
         else:
-            for cc,side in enumerate(['Left']):
+            for cc,side in enumerate(plot_channs):
                 plt.subplot(2,1,1)
-                plt.plot(Container[side][:])
+                length_ts = Container[side][:].shape[0]
+                plt.plot(np.linspace(0,np.int(length_ts/422),length_ts),Container[side][:])
+                
                 plt.subplot(2,1,2)
+                #pdb.set_trace()
                 plt.pcolormesh(T,F,10*np.log10(SG[side]),rasterized=True)
                 #plt.clim((-200,-100))
-                plt.title('Channel ' + chann_labels[cc])
+                plt.title('Channel ' + plot_channs[cc])
                 
             #plt.suptitle('Raw TS: ' + fname.split('/')[-1])
             
@@ -203,6 +208,12 @@ def spot_check(fname=[],tlims=(0,-1),plot_sg=False,chann_labels=['Left','Right']
 #Unit test for the methods above. TODO make this all more OOP
     
 if __name__ == '__main__':
+    
+    _ = spot_check('/home/virati/MDD_Data/Benchtop/VRT_Saline_VSweep/demo_2018_04_24_17_15_20__MR_0.txt',plot_sg=True)
+    
+
+if __name__ == '__unit__':
+    
     patients = ['901']#,'903','905','906','907','908']
     #file chooser
     patient=  '905'

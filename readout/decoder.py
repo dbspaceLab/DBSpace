@@ -32,6 +32,7 @@ import scipy.signal as sig
 
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import matplotlib.pylab as pl
 
 import random
 
@@ -77,8 +78,8 @@ class base_decoder:
         self.do_shuffle_null = kwargs['shuffle_null']
         
         #here we decide which features we want to do for this analysis
-        self.do_feats = ['Delta','Theta','Alpha','Beta*','Gamma1','GCratio']# 
-        #self.do_feats = dbo.feat_order
+        #self.do_feats = ['Delta','Theta','Alpha','Beta*','Gamma1','THarm']# 
+        self.do_feats = dbo.feat_order
         
         self.feat_labels = ['L' + feat for feat in self.do_feats] + ['R' + feat for feat in self.do_feats]
         
@@ -380,11 +381,8 @@ class weekly_decoder(base_decoder):
             slope = stats.linregress(internal_test_c.squeeze(),predict_c)
             assess_traj.append({'Alpha':alpha,'Slope':slope,'Score':score})
         #now do the path, this should match up with above
-
         self._path_slope_results = assess_traj, path
-        
 
-        
         # Figure out how many coefficients are around
         coeff_present = (np.abs(path[1].squeeze().T) > 0).astype(np.int)
         total_coeffs = np.sum(coeff_present,axis=1)
@@ -399,23 +397,29 @@ class weekly_decoder(base_decoder):
         
         if self.global_plotting and do_plot:
             fig,ax1 = plt.subplots()
-            
+
             ax1.plot(-np.log(path[0]),slope_traj_vec,label='Slope');plt.title('Slope of readout, Score of readout')
             ax1.plot(-np.log(path[0]),score_traj_vec,label='Score');plt.legend()
+        
             plt.vlines(-np.log(optimal_alpha), 0, 0.3, linewidth=10)
             ax2 = ax1.twinx()
             ax2.plot(-np.log(path[0]),total_coeffs)
             
             fig,ax1 = plt.subplots()
-            ax1.plot(-np.log(path[0]),path[1].squeeze().T);plt.title('Regularization Path')
+            colors = pl.cm.jet(np.linspace(0,1,path[1].squeeze().T.shape[1]))
+             
+            for ii in range(path[1].squeeze().T.shape[1]):
+                ax1.plot(-np.log(path[0]),path[1].squeeze().T[:,ii],color=colors[ii]);plt.title('Regularization Path')
             ax1.legend(labels=self.feat_labels)
             ax2 = ax1.twinx()
+           
+            
             ax2.plot(-np.log(path[0]),total_coeffs)
             plt.vlines(-np.log(optimal_alpha), 0, 0.3, linewidth=10)
 
         
         return optimal_alpha
-
+        
 class weekly_decoderCV(weekly_decoder):
     def __init__(self,*args,**kwargs):
         print('Initialized the Weekly CV decoder')
@@ -425,6 +429,7 @@ class weekly_decoderCV(weekly_decoder):
             
             
             self.regression_algo = linear_model.ElasticNet
+            #self.regression_algo = linear_model.Lasso
             #self.model_args = {'alpha':np.e **-3.4,'l1_ratio':0.8} #5/28, good stats, visual is small
             self.model_args = {'alpha':np.e ** kwargs['alpha'],'l1_ratio':0.8}
             print('Running ENR_CV w/:' + str(self.model_args['l1_ratio']))
@@ -473,8 +478,6 @@ class weekly_decoderCV(weekly_decoder):
             combo_test_c = [b for (b,c) in zip(self.train_set_c,self.train_set_pt) if c not in pt_combo]
             
             #quick coeff path
-            
-            
             #model_performance_combos[run] = decode_model_combos[run].score(combo_test_y,combo_test_c)
             #pred_c = decode_model_combos[run].predict(combo_test_y)
             #model_performance_combos[run] = mean_absolute_error(combo_test_c,pred_c)
@@ -510,7 +513,7 @@ class weekly_decoderCV(weekly_decoder):
             active_coeffs.append([ii.coef_])
         
         active_coeffs = np.array(active_coeffs).squeeze()
-        average_model = np.mean(active_coeffs,axis=0)
+        average_model = np.median(active_coeffs,axis=0)
         #average_model = np.zeros(shape=active_coeffs.shape)
         
         #return the average model with the stats for each coefficient
@@ -584,6 +587,7 @@ class weekly_decoderCV(weekly_decoder):
         pearson = stats.pearsonr(self.test_set_c.squeeze(),predicted_c.squeeze())
         r2score = self.decode_model.score(self.test_set_y,self.test_set_c)
         mse = mean_squared_error(self.test_set_c,predicted_c)
+        
         plt.figure()
         plt.plot([0,1],[0,1],color='gray',linestyle='dotted')
         ax = sns.regplot(x=self.test_set_c,y=predicted_c)
@@ -670,8 +674,13 @@ class controller_analysis:
     def classif_runs(self,):
         aucs = []
         roc_curves = []
+        
+        null_aucs = []
+        null_roc_curves = []
         for ii in range(100):
             test_subset_y, test_subset_c, test_subset_pt, test_subset_ph = zip(*random.sample(list(zip(self.readout_model.test_set_y,self.readout_model.test_set_c,self.readout_model.test_set_pt,self.readout_model.test_set_ph)),np.ceil(0.8 * len(self.readout_model.test_set_y)).astype(np.int)))
+            #THIS IS WHERE WE NEED TO SHUFFLE TO TEST THE READOU
+            #test_subset_y, test_subset_c, test_subset_pt, test_subset_ph = shuffle(test_subset_y, test_subset_c, test_subset_pt, test_subset_ph)
             #pdb.set_trace()
             predicted_c = self.readout_model.decode_model.predict(test_subset_y)
             if self.binarized_type == 'threshold':
@@ -680,15 +689,26 @@ class controller_analysis:
                 aucs.append(auc)
                 roc_curves.append(roc_curve)
                 
-            elif self.binarized_type == 'stim_change':
+            elif self.binarized_type == 'stim_changes':
+                #test_subset_pt = shuffle(test_subset_pt);print('PR_Classif: Shuffling Data')
                 binarized_c = self.gen_binarized_state(approach = 'stim_changes',input_ptph = list(zip(test_subset_pt,test_subset_ph)))
+                #shuffle?
+                #pdb.set_trace()
+                #binarized_c = shuffle(binarized_c);print('PR_Classif: Shuffling binarization')
+                coinflip = np.random.choice([0,1],size=(len(test_subset_pt),),p=[0.5,0.5])
                 precision, recall = self.pr_classif(binarized_c,predicted_c)
-                aucs.append(0)
+                
+                #Do the nulls here
+                n1p,n1r = self.pr_classif(binarized_c,coinflip)
+                
+                aucs.append(metrics.auc(recall,precision))
                 roc_curves.append((precision,recall))
                 
-
-    
+                null_aucs.append(metrics.auc(n1r,n1p))
+                null_roc_curves.append((n1p,n1r))
+            
         self.plot_classif_runs(aucs, roc_curves)
+        self.plot_classif_runs(null_aucs,null_roc_curves)
         
     def plot_classif_runs(self,aucs,roc_curves):
         plt.figure()
@@ -710,6 +730,7 @@ class controller_analysis:
         tprs_upper = np.minimum(mean_tpr + std_tpr,1)
         tprs_lower = np.maximum(mean_tpr - std_tpr,0)
         
+        #pdb.set_trace()
         ax.plot(mean_fpr,mean_tpr)
         ax.fill_between(mean_fpr,tprs_lower,tprs_upper,alpha=0.2)
         ax.plot(mean_fpr,mean_fpr,linestyle='dotted')
@@ -789,3 +810,26 @@ class feat_check(base_decoder):
             
         
         plt.suptitle('Patient: ' + pt)
+        
+        
+class weakly_decoderCV_Lasso(weekly_decoderCV):
+    def __init__(self,*args,**kwargs):
+        print('Initialized the Weekly CV decoder')
+        super().__init__(*args,**kwargs)
+        
+        if kwargs['algo'] == 'ENR':
+            
+            self.regression_algo = linear_model.Lasso
+            #self.model_args = {'alpha':np.e **-3.4,'l1_ratio':0.8} #5/28, good stats, visual is small
+            self.model_args = {'alpha':np.e ** kwargs['alpha']}
+            print('Running Lasso')
+            
+            #BEFORE 5/28
+            #self.regression_algo = linear_model.ElasticNetCV
+            #self.model_args = {'alphas':np.linspace(0.01,0.04,20),'l1_ratio':np.linspace(0.1,0.3,10),'cv':10}
+            
+        self.pt_CV_sets(n=3)
+    
+    def _path_slope_regression(self,do_plot=False,suppress_vars=0.2):
+        alpha = 0.1
+        return alpha

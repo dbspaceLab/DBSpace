@@ -355,7 +355,7 @@ class sim_amp:
         plt.ylabel('Power (dB)')
         plt.ylim((-200,-20))
     
-    def simulate(self,Z1,Z3):
+    def simulate(self,Z1,Z3,use_windowing='blackmanharris'):
         diff_out = sig.decimate(self.diff_inst.V_out(Z1,Z3)['sim_1'],10)
         Fs = self.diff_inst.Fs
         
@@ -373,7 +373,7 @@ class sim_amp:
         noverlap = self.noverlap
         
         self.F,self.T,self.SGout = sig.spectrogram(self.sim_output_signal,nperseg=nperseg,noverlap=noverlap,window=sig.get_window('blackmanharris',nperseg),fs=422)
-        _,_,self.SGdiff = sig.spectrogram(self.sig_amp_gain*diff_out,nperseg=nperseg,noverlap=noverlap,window=sig.get_window('blackmanharris',nperseg),fs=4220/10)
+        _,_,self.SGdiff = sig.spectrogram(self.sig_amp_gain*diff_out,nperseg=nperseg,noverlap=noverlap,window=sig.get_window(use_windowing,nperseg),fs=4220/10)
     
     '''
     Plotting Functions

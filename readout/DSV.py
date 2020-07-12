@@ -1827,7 +1827,7 @@ class FSpect_Readout: # This is the ELASTIC NET - FULL SPECTRUM class
             #play around here
             #THIS WORKS WELL#l_ratio = np.linspace(0.2,0.3,20)
             #l_ratio = np.linspace(0.3,0.5,30)
-            l_ratio = np.linspace(0.2,0.5,30)
+            l_ratio = np.linspace(0.2,0.3,30)
             alpha_list = alphas
             self.norm_func = unity
             

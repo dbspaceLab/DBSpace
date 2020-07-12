@@ -22,7 +22,7 @@ startfs = 1e6
 endfs = 4220
 
 #bvasic load of a 1/10th stim snippet
-tenth_sec_stim = np.load('/home/virati/tenth_sec_ipg.npy')
+tenth_sec_stim = np.load('/home/virati/Dropbox/projects/Research/MDD-DBS/Data/StimEphys/tenth_sec_ipg.npy')
 
 
 
@@ -32,7 +32,7 @@ tlen = tframe[1] - tframe[0]
 full_stim = np.tile(tenth_sec_stim,10*21)[0:int(startfs*tlen)]
 tvect = np.linspace(-10,11,full_stim.shape[0])
 
-
+#%%
 
 if 0:
     expon = sig.exponential(1000,0,500,False)
@@ -48,9 +48,7 @@ conv_stim = sig.lfilter(bl,al,conv_stim)
 bh,ah = sig.butter(2,10/startfs,btype='highpass')
 conv_stim = sig.lfilter(bh,ah,conv_stim)
 
-plt.figure()
-plt.plot(tvect[0:int(startfs*20)],full_stim[0:int(startfs*20)],label='Full Stim')
-plt.plot(tvect[0:int(startfs*20)],conv_stim[0:int(startfs*20)],label = 'Post Conv')
+#%%
 
 #Now we're sampling the above convolved waveform
 skip_ts = 238
@@ -58,17 +56,24 @@ meas_stim = conv_stim[0::skip_ts][0:(endfs*20)]
 meas_stim[0:endfs*10] = 0
 ds_tvect = np.linspace(-10,10,meas_stim.shape[0])
 
-plt.plot(ds_tvect,meas_stim,label='Sampled 4220Hz (Post Conv)')
-plt.legend()
-
-np.save('/home/virati/Dropbox/projects/Research/MDD-DBS/Data/StimEphys/stim_wform',meas_stim)
+if 0 :
+    plt.figure()
+    plt.plot(tvect[0:int(startfs*20)],full_stim[0:int(startfs*20)],label='Full Stim')
+    plt.plot(tvect[0:int(startfs*20)],conv_stim[0:int(startfs*20)],label = 'Post Conv')
+    
+    
+    plt.plot(ds_tvect,meas_stim,label='Sampled 4220Hz (Post Conv)')
+    plt.legend()
+    
+    np.save('/home/virati/Dropbox/projects/Research/MDD-DBS/Data/StimEphys/stim_wform',meas_stim)
 
 #%%
 
 
 #%%
 
-nois_meas_stim = meas_stim + 0.01 * np.array(f_noise(endfs*20))
+#nois_meas_stim = meas_stim + 0.01 * np.array(f_noise(endfs*20))
+nois_meas_stim = meas_stim
 
 # b,a = sig.butter(5,100/422,btype='lowpass')
 # meas_stim = sig.lfilter(b,a,meas_stim)

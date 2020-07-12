@@ -24,6 +24,7 @@ from DBSpace.visualizations import EEG_Viz
 
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 import mayavi.mlab as mlab
 from mayavi.mlab import *
@@ -474,28 +475,28 @@ def plot_support_model(EEG_support,pt,voltage=3,condit='OnT'):
     display_vox_loc = EEG_support['display_vox_loc']
     
     #%%
-    # Here we'll plot...
+    # Here we'll plot using matplotlib
     
-    fig = plt.figure()
-    ax = fig.add_subplot(111,projection='3d')
-    ax._axis3don = False
-    ax.scatter(parcel_coords[:,0],parcel_coords[:,1],parcel_coords[:,2],s=200,alpha=0.5)
-    plt.title('Coordinates of the brain regions')
-    ax.scatter(display_vox_loc[:,0],display_vox_loc[:,1],display_vox_loc[:,2],alpha=0.7,s=100)
-    ax.scatter(parcel_coords[prior_locs,0],parcel_coords[prior_locs,1],parcel_coords[prior_locs,2],s=500,color='r')
     
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_zticks([])
-    ax.grid(False)
-    plt.title('matplotlib Head Model')
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111,projection='3d')
+    # ax._axis3don = False
+    # ax.scatter(parcel_coords[:,0],parcel_coords[:,1],parcel_coords[:,2],s=200,alpha=0.5)
+    # plt.title('Coordinates of the brain regions')
+    # ax.scatter(display_vox_loc[:,0],display_vox_loc[:,1],display_vox_loc[:,2],alpha=0.7,s=100)
+    # ax.scatter(parcel_coords[prior_locs,0],parcel_coords[prior_locs,1],parcel_coords[prior_locs,2],s=500,color='r')
     
-    #%%
+    # ax.set_xticks([])
+    # ax.set_yticks([])
+    # ax.set_zticks([])
+    # ax.grid(False)
+    # plt.title('matplotlib Head Model')
+    
 #    
 #    
 #    #%% Now we move to the EEG scaling
 #    #Now overlay the EEG channels
-    EEG_Viz.plot_3d_locs(np.ones((257,)),ax,scale=eeg_scale,animate=False)
+#    EEG_Viz.plot_3d_locs(np.ones((257,)),ax,scale=eeg_scale,animate=False)
     chann_mask = EEG_support['primary']
     second_chann_mask = EEG_support['secondary']
     #EEG_Viz.plot_3d_scalp(chann_mask,ax,scale=eeg_scale,alpha=0.5,unwrap=False)
@@ -528,17 +529,17 @@ def plot_support_model(EEG_support,pt,voltage=3,condit='OnT'):
     ## NEED TO PRETTY THIS UP with plot_3d_scalp updates that give much prettier OnT/OffT pictures
     # First, we plot the tracts from the DTI
     #EEG_Viz.plot_tracts(display_vox_loc,active_mask=[True]*display_vox_loc.shape[0],color=(1.,0.,0.))
-    EEG_Viz.plot_coords(display_vox_loc,active_mask=[True]*display_vox_loc.shape[0],color=(1.,0.,0.),plot_overlay=False)
+    EEG_Viz.plot_coords(display_vox_loc,active_mask=[True]*display_vox_loc.shape[0],color=(1.,0.,0.),plot_overlay=False,alpha=0.1) #this plots the tracts
     
     # Next, we plot the parcellation nodes from TVB
-    EEG_Viz.plot_coords(parcel_coords,active_mask=[],color=(0.,0.,0.),plot_overlay=False,alpha=0.1)
+    EEG_Viz.plot_coords(parcel_coords,active_mask=[],color=(0.,0.,0.),plot_overlay=False,alpha=0.3)
 
-    EEG_Viz.plot_coords(parcel_coords,active_mask=prior_locs,color=(0.,1.,0.),plot_overlay=False)
+    EEG_Viz.plot_coords(parcel_coords,active_mask=prior_locs,color=(0.,1.,0.),plot_overlay=False) 
     EEG_Viz.plot_coords(parcel_coords,active_mask=second_locs,color=(0.,0.,1.),plot_overlay=False)
         
     # Finally, we plot the EEG channels with their primary and secondary masks
-    EEG_Viz.plot_maya_scalp(chann_mask,color=(1.,0.,0.),scale=10,alpha=0.5,unwrap=False)
-    EEG_Viz.plot_maya_scalp(second_chann_mask,color=(0.,0.,1.),scale=10,alpha=0.3,unwrap=False)
+    EEG_Viz.plot_maya_scalp(chann_mask,color=(1.,0.,0.),scale=10,alpha=1,unwrap=False)
+    EEG_Viz.plot_maya_scalp(second_chann_mask,color=(0.,0.,1.),scale=10,alpha=1,unwrap=False)
     
     #%%
 #    plt.figure()

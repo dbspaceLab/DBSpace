@@ -88,6 +88,80 @@ class CStruct:
         #save our baseline values
         self.pt_baseline_depression = baseline_values
     
+    def gen_DSC(self):
+        print('Generating DSC Measure')
+        allptX = []
+        
+        #get phase lookup table
+        ph_lut = dbo.all_phases
+        
+        # this is the dictionary of optimal decompositions
+        opt_lam_dict = defaultdict(dict)
+        pt_ll = defaultdict(dict)
+        
+        for pp,pat in enumerate(self.pt_list):
+            llscore = np.zeros(50)
+            pthd = self.get_pt_scale_timeline(pat,'HDRS17')/30
+            ptgaf = self.get_pt_scale_timeline(pat,'GAF')/100
+            ptmd = self.get_pt_scale_timeline(pat,'MADRS')[np.arange(0,32,1)]/45
+            ptbdi = self.get_pt_scale_timeline(pat,'BDI')/60
+            #ptmhd = self.get_pt_scale_timeline(pat,'mHDRS')/25
+            
+            sX = np.vstack((pthd,ptmd,ptbdi,ptgaf)).T
+    
+            #lump it into a big observation vector AS WELL and do the rPCA on the large one later
+            allptX.append(sX)
+            
+            min_changes = 100
+            for ll,lmbda_s in enumerate(np.linspace(0.3,0.5,50)):
+                #lmbda = 0.33 did very well here
+                RPCA = r_pca.R_pca(sX,lmbda=lmbda_s)
+                L,S = RPCA.fit()
+                Srcomp, Srevals, Srevecs = pca(S)
+                Lrcomp, Lrevals, Lrevecs = pca(L)
+                
+                #compare sparse component numbers of nonzero
+                #derivative is best bet here
+                sdiff = np.diff(Srcomp,axis=0)[:,0] #grab just the HDRS sparse deviations
+                
+                num_changes = np.sum(np.array(sdiff > 0.006).astype(np.int))
+                
+                exp_probs = 3
+                nchange_diff = np.abs(num_changes - exp_probs)
+                
+                if nchange_diff <= min_changes:
+                    opt_sparseness = num_changes
+                    min_changes = nchange_diff
+                    best_lmbda_s = lmbda_s
+                    
+                #shift_srcomp = Srcomp - np.median(Srcomp,0)
+                #llscore[ll] = num_changes[pp] - len(np.where(np.sum(np.abs(shift_srcomp),1) < 1e-6))
+            opt_lam_dict[pat] = {'Deviation': min_changes,'Lambda':best_lmbda_s,'Sparseness':opt_sparseness}
+            
+            #We have the "optimal" lambda now and we'll do the final rPCA to generate our components
+            RPCA = r_pca.R_pca(sX,lmbda=opt_lam_dict[pat]['Lambda'])
+            L,S = RPCA.fit()
+            Srcomp, Srevals, Srevecs = pca(S)
+            Lrcomp, Lrevals, Lrevecs = pca(L)
+            
+            #This generates our DSC scores which are just the negative of the mean of the low rank component
+            DSC_scores = -np.mean(Lrcomp[:,:],axis=1)
+            
+            #This is our OUTPUT and it goes into DSS_dict
+            for phph in range(DSC_scores.shape[0]):
+                self.depr_dict[pat][ph_lut[phph]]['DSC'] = DSC_scores[phph]
+
+    '''Generate our mHDRS scales'''
+    def gen_mHDRS(self):
+        print('Generating mHDRS')
+        ph_lut = dbo.all_phases        
+    
+        #Cycle through !! THIS USES DSS DICT
+        for pat in self.pt_list:
+            mhdrs_tser = sig.medfilt(self.get_pt_scale_timeline(pat,'pHDRS17'),5)
+            for phph in range(mhdrs_tser.shape[0]):
+                self.depr_dict[pat][ph_lut[phph]]['mHDRS'] = mhdrs_tser[phph]
+                
     def get_binary_depressed(self,pt,phase,scale='HDRS17'):
         return self.depr_dict[pt][phase][scale] > self.pt_baseline_depression[pt][scale] / 2
     
@@ -103,35 +177,40 @@ class CStruct:
         return np.array([self.get_depression_measure(pt,scale,phase) for phase in self.phase_list])
 
     '''PLOTTING FUNCTIONS'''
-    def plot_pt_timeline(self,pt,scale='HDRS17',overlay_binary=False):
-        if pt[0:3] != 'DBS': raise Exception;
-        
-        y = np.array([self.depr_dict[pt][phase][scale] for phase in self.phase_list])
+    def plot_pt_timeline(self,pts,scale='HDRS17',overlay_binary=False,plot_stim_changes=True):
         plt.figure()
-        plt.plot(y,alpha=0.8,linewidth=10)
-        plt.plot(self.get_pt_binary_timeline(pt),alpha=0.5,linewidth=10)
-        plt.xticks(np.arange(0,32),self.phase_list,rotation=90)
-        plt.title('Plotting ' + scale + ' for ' + pt)
-        plt.ylabel(scale + ' Value')
-        plt.xlabel('Phase')
+        for pt in pts:
+            if pt[0:3] != 'DBS': raise Exception;
+            
+            y = np.array([self.depr_dict[pt][phase][scale] for phase in self.phase_list])
+
+            plt.plot(y,alpha=0.8,linewidth=10,label=pt)
+            if overlay_binary: plt.plot(self.get_pt_binary_timeline(pt),alpha=0.5,linewidth=10)
+            if plot_stim_changes: 
+                stim_changes = np.array([self.query_stim_change(pt,self.phase_list[pp]) for pp in range(self.get_pt_binary_timeline(pt).shape[0])]).astype(np.int)
+                plt.stem(stim_changes)
+                #plt.setp(stemlines, 'color', 'red')
+           
+            plt.xticks(np.arange(0,32),self.phase_list,rotation=90)
+            plt.title('Plotting ' + scale + ' for ' + pt)
+            plt.ylabel(scale + ' Value')
+            plt.xlabel('Phase')
+        plt.legend()
         
     def query_stim_change(self,pt,ph):
-        stim_change_list = self.Stim_Change_Table()
-        return ('DBS'+pt,ph) in stim_change_list
-
+        if pt[0:3] != 'DBS': pt = 'DBS' + pt;
         
+        stim_change_list = self.Stim_Change_Table()
+        return (pt,ph) in stim_change_list
+
     def load_stim_changes(self):
         #this is where we'll load in information of when stim changes were done so we can maybe LABEL them in figures
         self.stim_change_mat = sio.loadmat('/home/virati/Dropbox/stim_changes.mat')['StimMatrix']
         # remove the voltage DECREASES?? from DBS905
     
     def Stim_Change_Table(self):
-        #return stim changes in a meaningful format
-        
-        #Diff vector belongs in first part of the diff_matrix
-        # Key thing to check for: CHanges are in B04, and DBS907 change is at C15
-        #see: https://docs.google.com/spreadsheets/d/1HLZfMoE83ulHm0dc3j8c3ZEDk4LaF-0qQztnavgmAQw/edit#gid=0
-        
+        #return stim changes in a meaningful format            
+    
         diff_matrix = np.hstack((np.diff(self.stim_change_mat) > 0,np.zeros((6,1)).astype(np.bool)))
         #find the phase corresponding to the stim change
         bump_phases = np.array([np.array(dbo.all_phases)[0:][idxs] for idxs in diff_matrix])
@@ -472,20 +551,20 @@ class CFrame:
             #plt.plot(recall,precision)
             #plt.annotate('Average precision for ' + str(scales[ii]) + ': ' + str(avg_precision)  + ' AUC: ' + str(prauc),(-2,2-(ii/4)),fontsize=8)
             ax.text(0.1, 0.95 - ii/4, 'AvgPrec ' + str(scale_labels[ii]) + ': ' + str(avg_precision)  + ' \nAUC: ' + str(prauc), transform=ax.transAxes, fontsize=14,verticalalignment='top', bbox=props)
-        
-        
-        
-        ## do the derived algorithms now
-        ii=2
-        min_algo = np.max(np.vstack((self.big_v_change_list[0,:],self.big_v_change_list[1,:])),axis=0)
-        precision,recall,_ = precision_recall_curve(self.big_v_change_list[2],min_algo)
-        plt.plot(recall,precision)
+            
+        plt.ylim((0,1))
+        # This does some other algorithm that runs on just the clinical scales
+        # ## do the derived algorithms now
+        # ii=2
+        # min_algo = np.max(np.vstack((self.big_v_change_list[0,:],self.big_v_change_list[1,:])),axis=0)
+        # precision,recall,_ = precision_recall_curve(self.big_v_change_list[2],min_algo)
+        # plt.plot(recall,precision)
 
-        prauc = auc(recall,precision)
-        prauc = np.sum(precision) / recall.shape[0]
-        avg_precision = average_precision_score(self.big_v_change_list[2],min_algo,average="micro")
-        #plt.annotate('Average precision for ' + str(scales[ii]) + ': ' + str(avg_precision) + ' AUC: ' + str(prauc),(-2,1),fontsize=8)
-        ax.text(0.1, 0.95 - 3/4, 'AvgPrec ' + str(scale_labels[ii]) + ': ' + str(avg_precision)  + ' \nAUC: ' + str(prauc), transform=ax.transAxes, fontsize=14,verticalalignment='top', bbox=props)
+        # prauc = auc(recall,precision)
+        # prauc = np.sum(precision) / recall.shape[0]
+        # avg_precision = average_precision_score(self.big_v_change_list[2],min_algo,average="micro")
+        # #plt.annotate('Average precision for ' + str(scales[ii]) + ': ' + str(avg_precision) + ' AUC: ' + str(prauc),(-2,1),fontsize=8)
+        # ax.text(0.1, 0.95 - 3/4, 'AvgPrec ' + str(scale_labels[ii]) + ': ' + str(avg_precision)  + ' \nAUC: ' + str(prauc), transform=ax.transAxes, fontsize=14,verticalalignment='top', bbox=props)
         
 
     def load_stim_changes(self):
@@ -557,7 +636,11 @@ class CFrame:
 ''' Unit Test for CFrame '''
 if __name__=='__main__':
     TestStruct = CStruct()
-    TestStruct.plot_pt_timeline('DBS901','pHDRS17',overlay_binary=True)
+    TestStruct.gen_DSC()
+    TestStruct.gen_mHDRS()
+    TestStruct.plot_pt_timeline(['DBS901','DBS903','DBS905','DBS906','DBS907','DBS908'],'DSC',overlay_binary=False)
+    
+    
     #binarization_test = TestStruct.get_pt_binary_timeline('DBS901')
     #plt.plot(binarization_test)
     
@@ -565,7 +648,8 @@ def plot_c_vs_c():
     TestFrame = CFrame(norm_scales=False)
     for c2 in ['mHDRS','GAF','BDI','MADRS','DSC']:
         TestFrame.c_vs_c_plot(c1='HDRS17',c2=c2)
-    #TestFrame.plot_scale(scale='DSC')
-    #TestFrame.plot_scale(scale='HDRS17')
-    #TestFrame.c_dict()
+    TestFrame.plot_scale(scale='DSC')
+    TestFrame.plot_scale(scale='HDRS17')
+    TestFrame.c_dict()
     plt.show()
+

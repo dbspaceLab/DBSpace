@@ -86,7 +86,7 @@ class DTI:
             plotting.plot_glass_brain(new_img)
 
 if __name__ == '__main__':
-    
-    V_DTI = DTI(do_pts=['906'])
+    do_pts = ['907']
+    V_DTI = DTI(do_pts=do_pts)
     V_DTI.load_data()
-    V_DTI.plot_V_DTI()
+    V_DTI.plot_V_DTI(pt=do_pts[0],merged=True)

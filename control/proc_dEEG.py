@@ -21,6 +21,7 @@ import scipy.signal as sig
 
 import scipy.stats as stats
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
 from sklearn.utils import resample
 plt.close('all')
@@ -317,7 +318,7 @@ class proc_dEEG:
         print(reshaped.shape)
         plt.plot(np.linspace(0,1000/2,1025),np.mean(20*np.log10(reshaped.T),axis=1),alpha=0.9)
         plt.plot(np.linspace(0,1000/2,1025),20*np.log10(reshaped.T)[:,np.random.randint(0,256,size=(30,))],alpha=0.2)
-        plt.xlim((0,160))
+        plt.xlim((0,300))
         
     #Median dimensionality reduction here; for now rPCA
     def distr_response(self,pt='POOL'):
@@ -451,6 +452,7 @@ class proc_dEEG:
             plt.violinplot(ch_bl_mean)
             plt.violinplot(ch_stim_mean)
     
+    
     def topo_median_response(self,pt='POOL',band='Alpha',do_condits=[],use_maya=False):
         band_i = dbo.feat_order.index(band)
        
@@ -492,12 +494,12 @@ class proc_dEEG:
     '''
     def support_analysis(self,support_struct,pt='POOL',condit='OnT',voltage='3',band='Alpha'):
         #support_struct = pickle.load(open('/tmp/'+ pt + '_' + condit + '_' + voltage,'rb'))
-        if band == 'Alpha':
-            medians = self.median_response(pt=pt)['OnT'] #if we want to use the standard median Alpha change
-            band_i = dbo.feat_order.index(band)
-        elif band == 'rP0':    
+        if band == 'rP0':    
             medians = self.dyn_L.swapaxes(0,1) #if we want to use the 0th component of the dyn_rPCA eigenvector
             band_i = 0
+        else:
+            medians = self.OBSmedian_response(pt=pt)['OnT'] #if we want to use the standard median Alpha change
+            band_i = dbo.feat_order.index(band)
             
         #medians = np.median(self.targ_response[pt][condit],axis=0)
         fig = plt.figure()
@@ -523,22 +525,27 @@ class proc_dEEG:
         EEG_Viz.plot_3d_scalp(support_struct['secondary'],fig,scale=10,alpha=0.5,unwrap=True)
         plt.title('Secondary Channels')
         
+        labels = []
+        def add_label(violin, label):
+            color = violin["bodies"][0].get_facecolor().flatten()
+            labels.append((mpatches.Patch(color=color), label))
+            
         plt.figure()
         bins = np.linspace(-2,2,20)
         #plt.hist(primary_distr,bins=bins,alpha=0.5,label='Primary')
         print('Primary mean: ' + str(np.median(primary_distr)))
-        plt.violinplot(primary_distr)
+        add_label(plt.violinplot(primary_distr),'Primary Nodes')
         #pdb.set_trace()
         
         #plt.hist(secondary_distr,bins=bins,alpha=0.5,label='Secondary')
         print('Secondary mean: ' + str(np.median(secondary_distr)))
-        plt.violinplot(secondary_distr)
-        plt.legend(['Primary','Secondary'])
+        add_label(plt.violinplot(secondary_distr),'Secondary Nodes')
+        plt.legend(*zip(*labels),loc=2)
         
         print(stats.ks_2samp(primary_distr,secondary_distr))
         
         #plt.hist(full_distr,bins=bins,alpha=0.5,label='FULL')
-        plt.legend(['Primary','','','Secondary'])
+        #plt.legend(['Primary','','','Secondary'])
         plt.title(pt + ' ' + condit + ' ' + band)
     
     '''I guess this is about developing a rPCA approach to *dynamic* response without oscillations?'''
@@ -857,8 +864,8 @@ class proc_dEEG:
         plt.plot(expl_var)
         plt.ylim((0,1))
         plt.subplot(222)
-        for ii in range(4): #this loops through our COMPONENTS to find the end
-            plt.plot(coeffs[ii,:],linewidth=5-ii,alpha=0.2)#,alpha=expl_var[ii])
+        for cc in range(4): #this loops through our COMPONENTS to find the end
+            plt.plot(coeffs[cc,:],linewidth=5-cc,alpha=0.2)#,alpha=expl_var[ii])
         plt.ylim((-1,1))
         plt.hlines(0,0,3)
         plt.legend(['PC0','PC1','PC2','PC3','PC4'])
@@ -886,8 +893,10 @@ class proc_dEEG:
             plt.title('Sparse Components')
             
         if kwargs['plot_maya']:
-            response_dict = np.median(L,axis=0)[:,comp].squeeze()      
-            EEG_Viz.maya_band_display(response_dict)
+            #response_dict = np.median(L,axis=0)#[:,comp].squeeze()
+            response = L[:,1].squeeze()
+            EEG_Viz.maya_band_display(response)
+            #EEG_Viz.plot_3d_scalp(response)
     
     def dict_all_obs(self,condits=['OnT']):
         full_stack = nestdict()
@@ -1288,14 +1297,14 @@ class proc_dEEG:
         return segs_feats
 
     '''Plot the population medians'''
-    def pop_meds(self,response=True):
+    def pop_meds(self,response=True,pt='POOL'):
         print('Doing Population Meds/Mads on Oscillatory RESPONSES')
         
         #THIS IS THE OLD WAY: #dsgn_X = self.shape_GMM_dsgn(self.gen_GMM_Osc(self.gen_GMM_stack(stack_bl='normalize')['Stack']),band='All')
         if response:
-            dsgn_X = self.osc_bl_norm['POOL']
+            dsgn_X = self.osc_bl_norm[pt]
         else:
-            dsgn_X = self.osc_stim['POOL']
+            dsgn_X = self.osc_stim[pt]
         
         X_med = nestdict()
         X_mad = nestdict()
@@ -1492,7 +1501,11 @@ class proc_dEEG:
             plt.title('Plotting component ' + str(cc))
             plt.suptitle('ICA rotated results for OnT')
             
-            
+    
+    '''gets us a histogram of the mads'''
+    def band_mads(self):
+        pass
+    
     def band_distr(self):
         print('Plotting Distribution for Bands')
         
@@ -1529,6 +1542,8 @@ class proc_dEEG:
             print(rsres)
         
         #plt.suptitle(condit)
+        plt.ylim((-50,50))
+        plt.hlines(0,-1,4,linestyle='dotted')
         plt.legend(['OnTarget','OffTarget'])
         
     def plot_meds(self,band='Alpha',flatten=True,condits=['OnT','OffT']):
@@ -1600,8 +1615,6 @@ class proc_dEEG:
             EEG_Viz.plot_3d_scalp(band_median[condit],fig,label=condit + '_med',animate=False,clims=(-0.2,0.2),unwrap=flatten)
             plt.suptitle('Median of Cortical Response across all ' + condit + ' segments | Band is ' + band)
             
-        
-        
         for condit in self.condits:
             #let's plot the exterior matrix for this
             fig = plt.figure()
@@ -1609,8 +1622,6 @@ class proc_dEEG:
             #pdb.set_trace()
             plt.imshow(band_corr_matr,vmin=-0.01,vmax=0.05)
             plt.colorbar()
-        
-
         
         #plot the scalp EEG changes
         for condit in self.condits:

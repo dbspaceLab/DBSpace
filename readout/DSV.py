@@ -310,8 +310,6 @@ class DSV: # This is the old DSV class
             
         self.Zscore_Results = pt_zscored
         
-    #def plot_performance(self):
-        
     def plot_performance(self,plot_indiv=False,doplot = True,ranson=True):
         ###############
         #Old way
@@ -369,7 +367,7 @@ class DSV: # This is the old DSV class
                 plt.suptitle(pt + ' ' + 'ENR')
                 sns.despine()
         
-        if doplot:
+        if 0:
             
             x,y = (1,1)
             if ranson:
@@ -429,6 +427,15 @@ class DSV: # This is the old DSV class
         predicted = stats.zscore(self.ENet.Ys[0],axis=0)
         actuals = stats.zscore(self.ENet.Ys[1],axis=0)
         plt.scatter(actuals,predicted)
+        plt.plot([-10,10],[-10,10],linestyle='dotted')
+        plt.title('Predicted vs Actual')
+        
+        slope,intercept,rval,pval,stderr = stats.mstats.linregress(predicted,actuals)
+        xreal = np.linspace(-1,1,100)
+        plt.plot(xreal,slope * xreal + intercept,color='red')
+        plt.xlim((-3,3))
+        plt.ylim((-3,3))
+        print(slope)
         
     def plot_trains(self):
         

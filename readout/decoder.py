@@ -221,12 +221,12 @@ class base_decoder:
         test_y = test_y.squeeze()
         true_c = true_c.squeeze()
         predicted_c = predicted_c.squeeze()
-        p_stats = stats.pearsonr(true_c,predicted_c)
+        p_stats = stats.pearsonr(predicted_c,true_c)
         #Spearman
-        s_stats = stats.spearmanr(true_c,predicted_c)
+        s_stats = stats.spearmanr(predicted_c,true_c)
         
         #Linear Regression
-        regr_model = linear_model.LinearRegression().fit(true_c.reshape(-1,1),predicted_c.reshape(-1,1))
+        regr_model = linear_model.LinearRegression().fit(predicted_c.reshape(-1,1), true_c.reshape(-1,1))#true_c.reshape(-1,1),predicted_c.reshape(-1,1))
         lr_slope = regr_model.coef_[0]
         #Robust regression
         #ransac = linear_model.RANSACRegressor().fit(true_c.reshape(-1,1),predicted_c.reshape(-1,1))
@@ -583,14 +583,16 @@ class weekly_decoderCV(weekly_decoder):
     def plot_test_regression_figure(self):
         #do a final test on *all* the data for plotting purposes
         predicted_c = self.decode_model.predict(self.test_set_y)
-        slope = stats.linregress(self.test_set_c.squeeze(),predicted_c.squeeze())
-        pearson = stats.pearsonr(self.test_set_c.squeeze(),predicted_c.squeeze())
+        slope = stats.linregress(predicted_c.squeeze(),self.test_set_c.squeeze())
+        pearson = stats.pearsonr(predicted_c.squeeze(),self.test_set_c.squeeze())
         r2score = self.decode_model.score(self.test_set_y,self.test_set_c)
         mse = mean_squared_error(self.test_set_c,predicted_c)
         
         plt.figure()
         plt.plot([0,1],[0,1],color='gray',linestyle='dotted')
-        ax = sns.regplot(x=self.test_set_c,y=predicted_c)
+        ax = sns.regplot(x=predicted_c,y=self.test_set_c.squeeze())
+        plt.xlabel('Predicted')
+        plt.ylabel('Actual')
         plt.title('R2:' + str(r2score) + '\n' + ' MSE:' + str(mse) + ' Slope:' + str(slope[0]) + ' Pearson:' + str(pearson))
         plt.xlim((0,1.1))
         plt.ylim((0,1.1))
@@ -688,6 +690,12 @@ class controller_analysis:
                 auc, roc_curve = self.bin_classif(binarized_c,predicted_c)
                 aucs.append(auc)
                 roc_curves.append(roc_curve)
+                
+                coinflip = np.random.choice([0,1],size=(len(test_subset_pt),),p=[0.5,0.5])
+                
+                n_auc,n_roc = self.bin_classif(binarized_c,coinflip)
+                null_aucs.append(n_auc)
+                null_roc_curves.append(n_roc)
                 
             elif self.binarized_type == 'stim_changes':
                 #test_subset_pt = shuffle(test_subset_pt);print('PR_Classif: Shuffling Data')

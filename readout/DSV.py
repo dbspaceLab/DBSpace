@@ -15,6 +15,7 @@ from sklearn import metrics
 from sklearn.metrics import roc_curve
 from sklearn.metrics import precision_recall_curve, average_precision_score, auc
 from sklearn.metrics import roc_auc_score
+from sklearn.metrics import r2_score as r2_score
 
 import warnings
 from collections import defaultdict
@@ -367,7 +368,7 @@ class DSV: # This is the old DSV class
                 plt.suptitle(pt + ' ' + 'ENR')
                 sns.despine()
         
-        if 0:
+        if 1:
             
             x,y = (1,1)
             if ranson:
@@ -378,7 +379,7 @@ class DSV: # This is the old DSV class
             
             #assesslr.fit(Ctest.reshape(-1,1),Cpredictions.reshape(-1,1))
             #THIS ELIMATES BROAD DECREASES OVER TIME, a linear detrend
-            assesslr.fit(Ctest,Cpredictions)
+            assesslr.fit(Cpredictions,Ctest)
             
             line_x = np.linspace(0,1,20).reshape(-1,1)
             line_y = assesslr.predict(line_x)
@@ -395,9 +396,9 @@ class DSV: # This is the old DSV class
             
             #FINALLY just do a stats package linear regression
             if ranson:
-                slsl,inin,rval,pval,stderr = stats.mstats.linregress(Ctest[inlier_mask].reshape(-1,1),Cpredictions[inlier_mask].reshape(-1,1))
+                slsl,inin,rval,pval,stderr = stats.mstats.linregress(Cpredictions[inlier_mask].reshape(-1,1),Ctest[inlier_mask].reshape(-1,1),)
             else:
-                slsl,inin,rval,pval,stderr = stats.mstats.linregress(Ctest.reshape(-1,1),Cpredictions.reshape(-1,1))
+                slsl,inin,rval,pval,stderr = stats.mstats.linregress(Cpredictions.reshape(-1,1),Ctest.reshape(-1,1))
             
             
             # if ranson:
@@ -406,8 +407,8 @@ class DSV: # This is the old DSV class
             print('ENR' + ' model has ' + str(slsl) + ' correlation with real score (p < ' + str(pval) + ')')
             
             plt.figure()
-            plt.scatter(Ctest[outlier_mask],Cpredictions[outlier_mask],alpha=scatter_alpha,color='gray')
-            plt.scatter(Ctest[inlier_mask],Cpredictions[inlier_mask],alpha=scatter_alpha)
+            plt.scatter(Cpredictions[outlier_mask],Ctest[outlier_mask],alpha=scatter_alpha,color='gray')
+            plt.scatter(Cpredictions[inlier_mask],Ctest[inlier_mask],alpha=scatter_alpha)
             plt.plot(np.linspace(0,x,2),np.linspace(0,y,2),alpha=0.2,color='gray')
             plt.plot(line_x,line_y,color='red')
             plt.ylim((-4,4))
@@ -426,16 +427,31 @@ class DSV: # This is the old DSV class
         plt.figure()
         predicted = stats.zscore(self.ENet.Ys[0],axis=0)
         actuals = stats.zscore(self.ENet.Ys[1],axis=0)
-        plt.scatter(actuals,predicted)
+        
+        predicted = Cpredictions
+        actuals = Ctest
+        
+        plt.scatter(predicted,actuals)
+        plt.xlabel('Predicted')
+        plt.ylabel('Actual')
+        
         plt.plot([-10,10],[-10,10],linestyle='dotted')
         plt.title('Predicted vs Actual')
         
         slope,intercept,rval,pval,stderr = stats.mstats.linregress(predicted,actuals)
-        xreal = np.linspace(-1,1,100)
+        assesslr = linear_model.LinearRegression(fit_intercept=True)
+        assesslr.fit(predicted,actuals)
+        r2_fit = r2_score(actuals,predicted)
+        
+        xreal = np.linspace(-10,10,100)
         plt.plot(xreal,slope * xreal + intercept,color='red')
         plt.xlim((-3,3))
         plt.ylim((-3,3))
-        print(slope)
+        print('Regression',assesslr.coef_)
+        print('Regression r2',r2_fit)
+        print('Slope',slope)
+        print('R2',rval**2)
+        
         
     def plot_trains(self):
         

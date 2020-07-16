@@ -468,7 +468,7 @@ class proc_dEEG:
                 plt.suptitle(pt)
     
     
-    def OBSsupport_analysis(self,pt='POOL',condit='OnT',voltage='3',band='Alpha'):
+    def OBSOBSsupport_analysis(self,pt='POOL',condit='OnT',voltage='3',band='Alpha'):
         support_struct = pickle.load(open('/tmp/'+ pt + '_' + condit + '_' + voltage,'rb'))
         distr = self.distr_response(pt=pt)
         #medians = np.median(self.targ_response[pt][condit],axis=0)

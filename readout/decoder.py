@@ -46,7 +46,7 @@ from sklearn import linear_model
 default_params = {'CrossValid':10}
 
 import seaborn as sns
-#sns.set_context("paper")
+sns.set_context("paper")
 
 sns.set(font_scale=4)
 sns.set_style("white")
@@ -78,8 +78,10 @@ class base_decoder:
         self.do_shuffle_null = kwargs['shuffle_null']
         
         #here we decide which features we want to do for this analysis
-        #self.do_feats = ['Delta','Theta','Alpha','Beta*','Gamma1','THarm']# 
-        self.do_feats = dbo.feat_order
+        if kwargs['FeatureSet'] == 'stim_alt':
+            self.do_feats = ['Delta','Theta','Alpha','Beta*','Gamma1','THarm']
+        elif kwargs['FeatureSet'] == 'main':
+            self.do_feats = dbo.feat_order
         
         self.feat_labels = ['L' + feat for feat in self.do_feats] + ['R' + feat for feat in self.do_feats]
         
@@ -365,7 +367,7 @@ class weekly_decoder(base_decoder):
             self.shuffle_test_c()
 
     '''This method goes down the regression path and assesses the performance of the model all along the way: Returns the 'optimal' alpha'''
-    def _path_slope_regression(self,do_plot=False,suppress_vars=0.2):
+    def _path_slope_regression(self,do_plot=False,suppress_vars=0.2,override_alpha=False):
         assess_traj = []
         
         internal_train_y, internal_test_y, internal_train_c, internal_test_c = train_test_split(self.train_set_y,self.train_set_c,train_size=0.6,shuffle=True)
@@ -378,7 +380,7 @@ class weekly_decoder(base_decoder):
             predict_c = run_model.predict(internal_test_y)
             score = run_model.score(internal_test_y,internal_test_c)
             #pdb.set_trace()
-            slope = stats.linregress(internal_test_c.squeeze(),predict_c)
+            slope = stats.linregress(internal_test_c.squeeze(),predict_c) #THIS IS BACKWARDS TO AVOID NAN #this used to be linregress(actual,predicted) which is I believe identical to the R^2 of the (predicted,actual) and reflects the percentage of the variance explained
             assess_traj.append({'Alpha':alpha,'Slope':slope,'Score':score})
         #now do the path, this should match up with above
         self._path_slope_results = assess_traj, path
@@ -391,9 +393,15 @@ class weekly_decoder(base_decoder):
         
         ## Find the max of the r^2 for our optimal alpha
         optimal_alpha = path[0][np.argmax(score_traj_vec)] #This merely does an R^2 optimal
-        lamb = 1/10 * suppress_vars
-        lamb2 = 1
-        optimal_alpha = path[0][np.argmax(slope_traj_vec - lamb * total_coeffs + lamb2*score_traj_vec)]
+        lamb = suppress_vars
+        lamb2 = 10
+        optimal_alpha = path[0][np.argmax(lamb2*score_traj_vec - lamb * total_coeffs )] #REMOVED SLOPE FROM THIS
+        print('Optimal Alpha: ',optimal_alpha)
+        if override_alpha:
+            print('But Overriding Alpha with ',override_alpha)
+            optimal_alpha = override_alpha
+            
+        #optimal_alpha = path[0][np.argmin(np.abs(slope_traj_vec - 1))]
         
         if self.global_plotting and do_plot:
             fig,ax1 = plt.subplots()
@@ -606,7 +614,7 @@ class weekly_decoderCV(weekly_decoder):
         plt.vlines(np.mean([a['Score'] for a in self.test_stats]), 0, 10,linewidth=10)
         plt.title('R2 Score')
         plt.subplot(312)
-        plt.hist([a['Pearson'][0] for a in self.test_stats]);
+        #plt.hist([a['Pearson'][0] for a in self.test_stats]);
         plt.vlines(np.mean([a['Pearson'][0] for a in self.test_stats]), 0, 10,linewidth=10)
         plt.title('Pearson')
         #plt.subplot(313)
@@ -716,7 +724,7 @@ class controller_analysis:
                 null_roc_curves.append((n1p,n1r))
             
         self.plot_classif_runs(aucs, roc_curves)
-        self.plot_classif_runs(null_aucs,null_roc_curves)
+        #self.plot_classif_runs(null_aucs,null_roc_curves) # if you want a sanity check with a coinflip null
         
     def plot_classif_runs(self,aucs,roc_curves):
         plt.figure()

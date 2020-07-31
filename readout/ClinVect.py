@@ -612,7 +612,7 @@ class CFrame:
         hdrs_info = nestdict()
         
         for pt in self.do_pts:
-            pt_hdrs_traj = [a for a in self.DSS_dict['DBS'+pt]['HDRS17raw']][8:]
+            pt_hdrs_traj = [a for a in self.DSS_dict['DBS'+pt]['HDRS17']][8:]
             
             hdrs_info[pt]['max']['index'] = np.argmax(pt_hdrs_traj)
             hdrs_info[pt]['min']['index'] = np.argmin(pt_hdrs_traj)

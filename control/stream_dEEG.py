@@ -401,7 +401,7 @@ class streamEEG:
         if train_type == 'cleaned':
             self.clf = pickle.load(open('/home/virati/SVMModel_' + ctype,'rb'))
         elif train_type == 'stream':
-            self.clf = pickle.load(open('/home/virati/Stream_SVMModel_' + ctype,'rb'))
+            self.clf = pickle.load(open('/home/virati/Dropbox/Data/Stream_SVMModel_' + ctype,'rb'))
    
     def calc_baseline(self,intv=(20,40)):
         #Which segments are with stim off?

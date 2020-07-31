@@ -464,7 +464,7 @@ class proc_dEEG:
             if use_maya:
                 EEG_Viz.maya_band_display(response_dict[:,band_i])
             else:
-                EEG_Viz.plot_3d_scalp(response_dict[:,band_i],plt.figure(),label=condit + ' Mean Response ' + band + ' | ' + pt,unwrap=True,scale=100,clims=(-2,2),alpha=0.3,marker_scale=5)
+                EEG_Viz.plot_3d_scalp(response_dict[:,band_i],plt.figure(),label=condit + ' Mean Response ' + band + ' | ' + pt,unwrap=True,scale=100,clims=(-1,1),alpha=0.3,marker_scale=5)
                 plt.suptitle(pt)
     
     
@@ -1506,7 +1506,7 @@ class proc_dEEG:
     def band_mads(self):
         pass
     
-    def band_distr(self):
+    def band_distr(self,do_moment='meds'):
         print('Plotting Distribution for Bands')
         
         meds = nestdict()
@@ -1526,7 +1526,11 @@ class proc_dEEG:
                 
                 #plt.scatter((bb+(cc-0.5)/10)*np.ones_like(meds[condit][:,bb]),meds[condit][:,bb],marker=marker[cc],color=color[cc],s=100,alpha=0.2)
             #plt.boxplot(meds[condit][:,:],positions=np.arange(5)+(cc-0.5)/10,labels=dbo.feat_order)
-            parts = ax2.violinplot(meds[condit][:,:],positions=np.arange(5)+(cc-0.5)/10)
+            if do_moment == 'meds':
+                parts = ax2.violinplot(meds[condit][:,:],positions=np.arange(5)+(cc-0.5)/10)
+            elif do_moment == 'mads':
+                parts = ax2.violinplot(mads[condit][:,:],positions=np.arange(5)+(cc - 0.5)/10)
+                
             for pc in parts['bodies']:
                 pc.set_facecolor(color[cc])
                 pc.set_edgecolor(color[cc])

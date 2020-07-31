@@ -230,7 +230,7 @@ def plot_tracts(band, active_mask=[],rad= [],color=[0.,0.,0.],alpha=1):
     #plot3d(band[:,0],band[:,1],band[:,2],color=color,opacity=0.8)
     points3d(band[:,0],band[:,1],band[:,2], rad2,color=color,colormap="copper", scale_factor=.4,opacity=alpha/2)
     
-def maya_band_display(band,montage='dense'):
+def maya_band_display(band,montage='dense',label=''):
     if montage == 'dense':
         fname = '/home/virati/Dropbox/GSN-HydroCel-257.sfp'
     elif montage == 'standard':
@@ -257,6 +257,7 @@ def maya_band_display(band,montage='dense'):
     #This sets the colors for the nodes themselves to the band  changes after normalization into [0,1]
     nodes.mlab_source.dataset.point_data.scalars = (band_norm)
     #show()
+    mlab.title(label)
     
 def plot_maya_scalp(band,n=1,clims=(0,0),color=(1.,0.,0.),scale=1,label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense',alpha=1):
     

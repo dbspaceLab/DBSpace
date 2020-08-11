@@ -17,6 +17,7 @@ import pandas as pd
 from collections import defaultdict
 import scipy.signal as sig
 import random
+import pywt
 
 # IF you want to do OR related analyses, this needs to be uncommented
 #from brpylib import NsxFile
@@ -190,6 +191,42 @@ def gen_SG(inpX,Fs=422,nfft=2**10,plot=False,overlap=True):
         plot_TF(outSG,chs=inpX.keys())
     
     return outSG
+
+def gen_CWT(inpX,Fs=422,nfft=2**10,plot=False,overlap=True):
+    outCWT = defaultdict(dict)
+    waveletname = 'cmor1.5-1.0'
+    scales = np.arange(1,128)
+    dt = 1/Fs
+    cmap = plt.cm.seismic
+    
+    for chann in inpX.keys():
+        signal = inpX[chann]
+        time = np.arange(0,signal.shape[0]) * dt
+        [coefficients, frequencies] = pywt.cwt(signal, scales, waveletname, dt)
+        power = (abs(coefficients)) ** 2
+        period = 1. / frequencies
+        levels = [0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8]
+        contourlevels = np.log2(levels)
+        
+        fig, ax = plt.subplots(figsize=(15, 10))
+        im = ax.contourf(time, np.log2(period), np.log2(power), contourlevels, extend='both',cmap=cmap)
+        
+        #ax.set_title(title, fontsize=20)
+        #ax.set_ylabel(ylabel, fontsize=18)
+        #ax.set_xlabel(xlabel, fontsize=18)
+        
+        yticks = 2**np.arange(np.ceil(np.log2(period.min())), np.ceil(np.log2(period.max())))
+        ax.set_yticks(np.log2(yticks))
+        ax.set_yticklabels(yticks)
+        ax.invert_yaxis()
+        ylim = ax.get_ylim()
+        ax.set_ylim(ylim[0], -1)
+        
+        cbar_ax = fig.add_axes([0.95, 0.5, 0.03, 0.25])
+        fig.colorbar(im, cax=cbar_ax, orientation="vertical")
+        plt.show()
+        
+    return outCWT
 
 '''
 Single method that takes an inputX.channels dictionary and outputs the oscillatory state, no fuss

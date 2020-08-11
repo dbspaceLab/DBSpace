@@ -19,6 +19,8 @@ import matplotlib.pyplot as plt
 import scipy.signal as sig
 from scipy.ndimage.filters import gaussian_filter1d
 
+from DBSpace.readout.PAC.PyPAC import *
+
 import pdb
 
 #plt.close('all')
@@ -52,10 +54,12 @@ class brain_sig:
     def do_1f(self):
         self.bg_1f = self.bg_1f_strength * np.array(f_noise(self.tvect.shape[0]))
         
-    def do_osc(self):
+    def do_osc(self,smear=False):
         #this one makes the core sine wave oscillations
-        self.brain_osc = self.amplit * np.sin(2 * np.pi * self.center_freq * self.tvect)
-
+        if smear:
+            self.brain_osc = 10*self.amplit * np.sin(2 * np.pi * self.center_freq * self.tvect) * np.exp(-(self.tvect**2)/(2))
+        else:
+            self.brain_osc = self.amplit * np.sin(2 * np.pi * self.center_freq * self.tvect)
 class stim_sig():
     def __init__(self,fs,stim_ampl=6,wform='sine',stim_freq=130,zero_onset=True):
         self.center_freq = stim_freq
@@ -167,7 +171,8 @@ class sim_diff:
         self.c23 = 1
         
         
-        self.osc_params = {'x_1':[12,3e-7],'x_3':[0,0],'x_2':[0,0]}
+        #self.osc_params = {'x_1':[12,3e-7],'x_3':[0,0],'x_2':[0,0]} #FOR PAPER
+        self.osc_params = {'x_1':[18,7e-7],'x_3':[0,0],'x_2':[0,0]}
         self.set_brain()
         self.set_stim(wform=wform,zero_onset=zero_onset,freq=stim_freq,stim_ampl=stim_v)
         self.clockflag = clock
@@ -280,6 +285,7 @@ class sim_amp:
         if self.family == 'perfect':
             self.Tfunc = unity
         elif self.family == 'pwlinear':
+
             self.Tfunc = hard_amp
         elif self.family == 'tanh':
             self.Tfunc = np.tanh
@@ -353,6 +359,7 @@ class sim_amp:
         plt.plot(F,Pend,color='green')
         plt.xlabel('Frequency (Hz)')
         plt.ylabel('Power (dB)')
+
         plt.ylim((-200,-20))
     
     def simulate(self,Z1,Z3,use_windowing='blackmanharris'):
@@ -460,12 +467,24 @@ class sim_amp:
         
         plt.subplot(2,2,2)
         plt.clim(-120,0)
+
         plt.pcolormesh(self.T+diff_obj.tlims[0],self.F,10*np.log10(SGout),rasterized=True)
         plt.title('Imperfect Amp Output')
         #plt.colorbar()
         
-        
+    def plot_PAC(self, time_start, time_end,title=''):
+        freqForAmp = 1.5*np.arange(2,100); freqForPhase = np.arange(2,100)/2+1;
+        Fs = 422
+        sig1 = self.sim_output_signal[422*time_start:422*time_end]
+        plt.figure()
+        plt.plot(sig1)
+        plt.figure()
+        MIs, comodplt = GLMcomod(sig1,sig1,freqForAmp,freqForPhase,Fs,bw=1.5);
+        #MIs, comodplt = GLMcomodCWT(sig1,sig1,freqForAmp,freqForPhase,Fs,sd_rel_phase=0.14,sd_rel_amp=40);
+        plt.suptitle(title)
+        plt.show()
     
+        
     def plot_osc_power(self):
         #Now we move on to the oscillatory analyses
         plt.figure()
@@ -660,7 +679,8 @@ class sim_amp:
 #%%
 
 if __name__ == '__main__':
-    diff_run = sim_diff(Ad=500,wform='moresine4',clock=True,stim_v=6,stim_freq=160)
+    plt.close('all')
+    diff_run = sim_diff(Ad=2000,wform='moresine4',clock=True,stim_v=6,stim_freq=130)
     #diff_run.set_brain()
     #diff_run.set_stim(wform='ipg')
     
@@ -669,12 +689,17 @@ if __name__ == '__main__':
     #diff_run.plot_V_out(1000,1200)
     #diff_out = diff_run.V_out(1000,1100)['sim_1']
     Z1 = 1200
-    Z3 = 1300
+    Z3 = 1240
     
     amp_run.simulate(Z1,Z3)
     amp_run.plot_time_dom()
-    amp_run.plot_freq_dom()
-    amp_run.plot_tf_dom()
+    amp_run.plot_freq_dom();plt.suptitle(str(Z1) + ' diff ' + str(Z3))
+    amp_run.plot_tf_dom();plt.suptitle(str(Z1) + ' diff ' + str(Z3))
     
     #amp_run.PAPER_plot_V_out(diff_run,Z1,Z3)
     
+    
+    #Do some PAC here..?
+    amp_run.plot_PAC(time_start = 5, time_end = 8,title='No Stim')
+    
+    amp_run.plot_PAC(time_start = 12, time_end = 15, title='Stim')

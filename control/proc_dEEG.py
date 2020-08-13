@@ -2056,8 +2056,9 @@ class proc_dEEG:
         #randomlt sample the validation set
         validation_accuracy = []
         rocs_auc = []
+        total_segments = self.Xva.shape[0]
         for ii in range(100):
-            Xva_ss,Yva_ss = resample(self.Xva,self.Yva,replace=True)
+            Xva_ss,Yva_ss = resample(self.Xva,self.Yva,n_samples=int(round(total_segments * 0.6)),replace=False)
             validation_accuracy.append(best_model['Model'].score(Xva_ss,Yva_ss))
             predicted_Y = best_model['Model'].predict(Xva_ss)
             fpr,tpr,_ = roc_curve(Yva_ss,predicted_Y)
@@ -2137,9 +2138,18 @@ class proc_dEEG:
             sns.violinplot(y=tot_var_bands,positions=np.arange(5))
             
         else:
-            coeffs = stats.zscore(np.sum(self.bin_classif['Model'].coef_.reshape(257,5,order='C'),axis=1))
             plt.figure()
-            self.import_mask = coeffs > 0.68
+            for ii in range(4):
+                #plt.hist(self.bin_classif['Model'].coef_[:,ii])
+                plt.scatter(ii,self.bin_classif['Model'].coef_[:,ii])
+            
+            #BELOW IS CORRECT since before, in the features, we collapse to a feature vector that is all 257 deltas, then all 257 thetas, etc...
+            #So when we want to reshape that to where we are now, we have to either 'C': (5,257) where C means the last index changes fastest; or 'F': (257,5) where the first index changes fastest.
+            coeffs = stats.zscore(np.sum(self.bin_classif['Model'].coef_.reshape(5,257,order='C'),axis=0)) #what we have here is a reshape where the FEATURE VECTOR is [257 deltas... 257 gammas]
+
+            plt.figure();plt.hist(coeffs)
+            #plt.figure()
+            self.import_mask = np.abs(coeffs) > 1.5
             EEG_Viz.plot_3d_scalp(coeffs,unwrap=True)
             EEG_Viz.plot_3d_scalp(self.import_mask.astype(np.int),unwrap=True)
             plt.suptitle('Just looking at the coefficients')

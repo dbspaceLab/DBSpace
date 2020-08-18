@@ -280,5 +280,5 @@ def plot_maya_scalp(band,n=1,clims=(0,0),color=(1.,0.,0.),scale=1,label='generic
     linewidths[highlight] = 5
     #REMOVED a 10* z component here, I think it was originally added to help visualization
     
-    points3d(etrodes[:,0],etrodes[:,1],etrodes[:,2], 20*band, color=color, scale_factor=.25,opacity=0.2)
-    points3d(etrodes[:,0],etrodes[:,1],etrodes[:,2], 20*np.abs(1-band), color=(1.,1.,1.), scale_factor=.25,opacity=0.2)
+    points3d(etrodes[:,0],etrodes[:,1],etrodes[:,2], 20*band, color=color, scale_factor=.25,opacity=alpha)
+    points3d(etrodes[:,0],etrodes[:,1],etrodes[:,2], 20*np.abs(1-band), color=(1.,1.,1.), scale_factor=.25,opacity=alpha)

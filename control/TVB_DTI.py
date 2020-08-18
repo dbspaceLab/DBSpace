@@ -256,17 +256,17 @@ class head_model:
 
 
 
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 def DTI_support_model(pt,voltage,dti_parcel_thresh=70,eeg_thresh=70,condit='OnT'):
     Etrode_map = DTI.Etrode_map
     # Load in the coordinates for the parcellation
-    parcel_coords = 0.84 * np.load('/home/virati/Dropbox/TVB_192_coord.npy')
+    parcel_coords = 0.9 * np.load('/home/virati/Dropbox/TVB_192_coord.npy') #usually 0.84 factor
     # Load in the DTI coordinates
-    brain_offset = 25
-    tract_offset = 40 #this gives us forward/backward offset?
+    brain_offset = 20 #25 normally
+    tract_offset = 20 #40 normally; this gives us forward/backward offset?
     #horizontal scaling for tractography
     tract_horiz = 1.4
-    dti_scale_factor = 1.0
+    dti_scale_factor = 1.2 #1 normally
     
     
     data = nestdict()
@@ -304,6 +304,9 @@ def DTI_support_model(pt,voltage,dti_parcel_thresh=70,eeg_thresh=70,condit='OnT'
     y_translate[:,1] = 1
     display_vox_loc += brain_offset * z_translate + tract_offset * y_translate
     
+    #z_translate_parcel = np.zeros_like(parcel_coords);
+    #z_translate_parcel[:,2] = 1
+    #parcel_coords = parcel_coords * [1,1.5,1] + brain_offset*z_translate_parcel
     
     dist_to_closest_tract = [None] * parcel_coords.shape[0]
     for ii in range(parcel_coords.shape[0]):
@@ -445,9 +448,8 @@ def plot_support_model(EEG_support,pt,voltage=3,condit='OnT'):
     prior_locs= EEG_support['prior_locs']
     eeg_scale = EEG_support['eeg_scale']
     
-    
-    
-    #pdb.set_trace()
+
+    #THE BELOW USED TO BE UNCOMMENTED BUT DEVIATES FROM THE CALCULATION METHOD OUTPUT
     z_translate = np.zeros_like(parcel_coords);
     z_translate[:,2] = 1
     parcel_coords = parcel_coords * [1,1.5,1] + brain_offset*z_translate

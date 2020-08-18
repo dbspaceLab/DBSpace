@@ -1877,62 +1877,6 @@ class proc_dEEG:
         plt.plot(tsize,np.mean(tscore,axis=1))
         plt.plot(tsize,np.mean(vscore,axis=1))
         plt.legend(['Training Score','Cross-validation Score'])
-        
-    def OBSanalyse_binSVM(self,approach='rpca'):
-        bin_coeff = self.binSVM.coef_.reshape(-1,5)
-        # First, we'll plot the coefficients for each band
-        for bb,band in enumerate(dbo.feat_order):
-            fig = plt.figure()
-            EEG_Viz.plot_3d_scalp(bin_coeff[:,bb],fig,label=band + ' SVM Coefficients',unwrap=True,animate=False)
-            
-        # next, we plot the l2 energy of each channel's coefficient, to see which one is "largest"
-        #fig = plt.figure()
-        #EEG_Viz.plot_3d_scalp(np.linalg.norm(bin_coeff[:,:],axis=1,ord=2),fig,label=band + ' SVM Coefficients',unwrap=False,animate=False)
-        #plt.suptitle('L2 of all bands')
-        
-        # next, we'll do a pca rotation
-        if approach == 'rpca':
-            #we first do a rpca step to rid ourselves of outliers in the original 2d coefficient plot
-            rpca = r_pca.R_pca(bin_coeff)
-            L,S = rpca.fit()
-            
-            ##We treated rpca as a filtering step, so now we work solely with the low-rank component using the same procedure as above in the 'pca' block
-            #definitely a more elegant way of merging these steps, good luck next grad student
-            
-            #Srcomp, Srevals, Srevecs = simple_pca(S)
-            #Lrcomp, Lrevals, Lrevecs = simple_pca(L)
-        else:
-            L = bin_coeff
-            
-        svm_pca = PCA()
-        svm_pca.fit(L)
-        SVM_coeff_L = svm_pca.fit_transform(L)
-        
-        plt.figure();
-        plt.subplot(221)
-        plt.imshow(svm_pca.components_,cmap=plt.cm.jet,vmax=1,vmin=-1)
-        plt.colorbar()
-        plt.subplot(222)
-        plt.plot(svm_pca.components_)
-        plt.ylim((-1,1))
-        plt.legend(['PC0','PC1','PC2','PC3','PC4'])
-        plt.xticks(np.arange(0,5),['Delta','Theta','Alpha','Beta','Gamma1'])
-        plt.subplot(223)
-        
-        plt.plot(svm_pca.explained_variance_ratio_)
-        plt.ylim((0,1))
-        
-        
-        #plt.figure()
-        #plt.hist(SVM_coeff_L[:,0],bins=np.linspace(-0.05,0.05,100))
-        for cc in range(2):
-            fig=plt.figure()
-            big_coeffs = np.where(np.abs(SVM_coeff_L[:,cc]) > 0.007)
-            print(big_coeffs)
-            EEG_Viz.plot_3d_scalp(SVM_coeff_L[:,cc],fig,animate=False,unwrap=True,highlight=big_coeffs)
-            plt.title('Plotting component ' + str(cc))
-            plt.suptitle(approach + ' rotated results')
-    
     
     ''' Learning curve for the Binary SVM'''
     def learning_binSVM(self,mask=False):
@@ -2146,10 +2090,13 @@ class proc_dEEG:
             #BELOW IS CORRECT since before, in the features, we collapse to a feature vector that is all 257 deltas, then all 257 thetas, etc...
             #So when we want to reshape that to where we are now, we have to either 'C': (5,257) where C means the last index changes fastest; or 'F': (257,5) where the first index changes fastest.
             coeffs = stats.zscore(np.sum(self.bin_classif['Model'].coef_.reshape(5,257,order='C'),axis=0)) #what we have here is a reshape where the FEATURE VECTOR is [257 deltas... 257 gammas]
+            
+            avg_coeffs = np.mean(np.array(self.bin_classif['Coeffs']),axis=0).reshape(5,257,order='C')
+            coeffs = stats.zscore(np.sum(avg_coeffs**2,axis=0))
 
-            plt.figure();plt.hist(coeffs)
+            plt.figure();plt.hist(coeffs,bins=50,range=(0,1))
             #plt.figure()
-            self.import_mask = np.abs(coeffs) > 1.5
+            self.import_mask = coeffs > 0
             EEG_Viz.plot_3d_scalp(coeffs,unwrap=True)
             EEG_Viz.plot_3d_scalp(self.import_mask.astype(np.int),unwrap=True)
             plt.suptitle('Just looking at the coefficients')

@@ -262,11 +262,12 @@ def DTI_support_model(pt,voltage,dti_parcel_thresh=70,eeg_thresh=70,condit='OnT'
     # Load in the coordinates for the parcellation
     parcel_coords = np.load('/home/virati/Dropbox/TVB_192_coord.npy') #usually 0.84 factor
     # Load in the DTI coordinates
-    brain_offset = 25 #25 normally #higher = further up
+    brain_offset = 5 #25 normally #higher = further up
     tract_offset = 20 #40 normally; this gives us forward/backward offset? #higher = further forward
     #horizontal scaling for tractography
     tract_horiz = 1.4
-    dti_scale_factor = 1.2 #1 normally
+    dti_scale_factor = 1.5 #1 normally
+    parcel_scale_factor = 0.9
     eeg_scale = 10
     
     data = nestdict()
@@ -307,12 +308,15 @@ def DTI_support_model(pt,voltage,dti_parcel_thresh=70,eeg_thresh=70,condit='OnT'
     #Translate and scale parcellations
     z_translate_parcel = np.zeros_like(parcel_coords);
     z_translate_parcel[:,2] = 1
-    parcel_coords = parcel_coords * 0.9*[1,1.5,1] + brain_offset*z_translate_parcel #DISPLAYED
+    parcel_coords = parcel_coords * parcel_scale_factor*[1,1.5,1] + brain_offset*z_translate_parcel #DISPLAYED
     
     #%%
     #scale both display vox and parcel coords in the vertical direction
     #display_vox_loc[:,2] = 1.4 * display_vox_loc[:,2]
     #parcel_coords[:,2] = 1.4 * parcel_coords[:,2]
+    
+    #display_vox_loc[:,1] = 1.4 * display_vox_loc[:,1]
+    #parcel_coords[:,1] = 1.4 * parcel_coords[:,1]
     
     #%%
     # EEG Scaling stuff

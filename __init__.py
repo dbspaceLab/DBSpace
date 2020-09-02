@@ -291,7 +291,7 @@ def get_ratio(Pxx,F,f_r_set,cmode=np.median):
         bandpow[bb] = get_pow(Pxx,F,frange,cmode=cmode)
         
     
-    ret_ratio = {ch:bandpow[1][ch]-bandpow[0][ch] for ch in bandpow[0].keys()}
+    ret_ratio = {ch:bandpow[1][ch]/bandpow[0][ch] for ch in bandpow[0].keys()}
     return ret_ratio
 
 
@@ -415,11 +415,11 @@ feat_dict = {
                 'Gamma':{'fn':get_pow,'param':(30,100)},
                 'Stim':{'fn':get_pow,'param':(129,131)},
                 'SHarm':{'fn':get_pow,'param':(30,34)}, #Secondary Harmonic
-                'THarm':{'fn':get_pow,'param':(62,66)}, #Tertiary Harmonic
+                'THarm':{'fn':get_pow,'param':(64,68)}, #Tertiary Harmonic
                 'Clock':{'fn':get_pow,'param':(104.5,106.5)},
                 'fSlope':{'fn':get_slope,'param':{'frange':(1,20),'linorder':1}},
                 'nFloor':{'fn':get_slope,'param':{'frange':(50,200),'linorder':0}},
-                'GCratio':{'fn':get_ratio,'param':((30,34),(62,66))}
+                'GCratio':{'fn':get_ratio,'param':((30,34),(64,68))}
             }
 
 

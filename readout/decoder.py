@@ -35,6 +35,8 @@ import matplotlib.cm as cm
 import matplotlib.pylab as pl
 
 import random
+np.random.seed(seed=2013)
+random.seed(2013)
 
 #import sys
 #sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
@@ -78,7 +80,7 @@ class base_decoder:
         self.do_shuffle_null = kwargs['shuffle_null']
         
         #here we decide which features we want to do for this analysis
-        if kwargs['FeatureSet'] == 'stim_alt':
+        if kwargs['FeatureSet'] == 'stim_check':
             self.do_feats = ['Delta','Theta','Alpha','Beta*','Gamma1','THarm']
         elif kwargs['FeatureSet'] == 'main':
             self.do_feats = dbo.feat_order
@@ -393,9 +395,13 @@ class weekly_decoder(base_decoder):
         
         ## Find the max of the r^2 for our optimal alpha
         optimal_alpha = path[0][np.argmax(score_traj_vec)] #This merely does an R^2 optimal
+        
+        # IF YOU WANT TO ALSO SUPPRESS number of variables
         lamb = suppress_vars
         lamb2 = 10
-        optimal_alpha = path[0][np.argmax(lamb2*score_traj_vec - lamb * total_coeffs )] #REMOVED SLOPE FROM THIS
+        #optimal_alpha = path[0][np.argmax(lamb2*score_traj_vec - lamb * total_coeffs )] #REMOVED SLOPE FROM THIS
+        
+        
         print('Optimal Alpha: ',optimal_alpha)
         if override_alpha:
             print('But Overriding Alpha with ',override_alpha)

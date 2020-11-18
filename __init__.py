@@ -414,8 +414,8 @@ feat_dict = {
                 'Gamma2':{'fn':get_pow,'param':(60,100)},
                 'Gamma':{'fn':get_pow,'param':(30,100)},
                 'Stim':{'fn':get_pow,'param':(129,131)},
-                'SHarm':{'fn':get_pow,'param':(30,34)}, #Secondary Harmonic
-                'THarm':{'fn':get_pow,'param':(64,68)}, #Tertiary Harmonic
+                'SHarm':{'fn':get_pow,'param':(30,34)}, #Secondary Harmonic is at 32Hz
+                'THarm':{'fn':get_pow,'param':(64,68)}, #Tertiary Harmonic is at 66Hz!!!
                 'Clock':{'fn':get_pow,'param':(104.5,106.5)},
                 'fSlope':{'fn':get_slope,'param':{'frange':(1,20),'linorder':1}},
                 'nFloor':{'fn':get_slope,'param':{'frange':(50,200),'linorder':0}},

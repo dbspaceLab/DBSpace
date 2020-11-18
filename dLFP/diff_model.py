@@ -689,7 +689,7 @@ if __name__ == '__main__':
     #diff_run.plot_V_out(1000,1200)
     #diff_out = diff_run.V_out(1000,1100)['sim_1']
     Z1 = 1200
-    Z3 = 1240
+    Z3 = 1300
     
     amp_run.simulate(Z1,Z3)
     amp_run.plot_time_dom()

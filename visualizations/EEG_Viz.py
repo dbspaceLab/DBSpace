@@ -146,6 +146,9 @@ def plot_3d_scalp(band,infig=[],n=1,clims=(0,0),scale=1,label='generic',animate=
         for ii in annotate_list:
             plt.annotate('E'+str(ii+1),(flat_etrodes[ii,0],flat_etrodes[ii,1]),size=12)
         
+        #THIS IS NEW 01/11/2021 see if it works properly
+        sc_top = plt.scatter(flat_etrodes[annotate_list,0],flat_etrodes[annotate_list,1],c=band[annotate_list],vmin=clims[0],vmax=clims[1],s=300,cmap=cm,alpha=1.0,linewidth=linewidths,marker='o')
+        
         plt.axis('off')        
         
         plt.colorbar(sc)

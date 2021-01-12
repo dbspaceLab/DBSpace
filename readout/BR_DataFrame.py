@@ -19,6 +19,8 @@ import DBSpace as dbo
 import pdb
 
 import numpy as np
+import random
+import scipy.signal as signal
 
 
 from collections import defaultdict
@@ -57,13 +59,13 @@ class BR_Data_Tree:
         self.ClinVect = clinvect
 
         self.data_basis = defaultdict()
-
-
+        
+        '''
         if preFrame == 'GENERATE':
             print('Generating the dataframe...')
             self.generate_sequence()
             #Save it now
-            self.Save_Frame(name_addendum='May2020')
+            self.Save_Frame(name_addendum='Dec2020')
             #Now just dump us out so we can do whatever we need to with the file above
 
         else:
@@ -74,7 +76,20 @@ class BR_Data_Tree:
 
         #how many seconds to take from the chronic recordings
 
-    def generate_sequence(self):
+        '''
+    def generate_TD_sequence(self):
+        self.build_phase_dict()
+        
+        #Here we go through all of our files in the dictionaries and put them into our database
+        self.list_files()
+        self.meta_files()
+        
+        #Load in our data (timeseries)
+        self.Load_Data(domain='T')
+        self.prune_meta()
+        self.check_empty_phases()
+        
+    def generate_sequence(self,domain='F'):
         # Here we build the dictionary with all of our phases and files
         self.build_phase_dict()
         
@@ -83,7 +98,7 @@ class BR_Data_Tree:
         self.meta_files()
         
         #Load in our data (timeseries)
-        self.Load_Data(domain='F')
+        self.Load_Data(domain=domain)
         #now go in and remove anything with a bad flag
         self.Remove_BadFlags()
         
@@ -312,7 +327,7 @@ class BR_Data_Tree:
         #np.save(self.im_root_dir + '/Chronic_Frame' + name_addendum + '.npy',self.file_meta)
 
         #Try pickling below
-        pickle.dump(self,open(im_root_dir + 'Chronic_Frame' + name_addendum + '.pickle',"wb"))
+        pickle.dump(self,open(self.im_root_dir + '/Chronic_Frame' + name_addendum + '.pickle',"wb"))
 
 
     '''Here we load in the file *AND* do some preliminary Fourier analysis'''
@@ -340,7 +355,7 @@ class BR_Data_Tree:
             #This saves a lot of RAM but obviously has its caveats
             #for this, we want to call the DBS_Osc method for doing FFTs
             #The return from gen_psd is a dictionary eg: {'Left':{'F','PSD'},'Right':{'F','PSD'}}
-            F = dbo.gen_psd(X)
+            F = dbo.gen_psd(X) #JUST CHANGED THIS TO abs 12/15/2020
             
                 
             return F
@@ -349,11 +364,28 @@ class BR_Data_Tree:
     # Plotting methods in the class
     def plot_file_PSD(self,fname=''):
         if fname != '':
-            psd_interest = [(rr['Data']['Left'],rr['Data']['Right']) for rr in DataFrame.file_meta if rr['Filename'] == fname]
+            psd_interest = [(rr['Data']['Left'],rr['Data']['Right']) for rr in self.file_meta if rr['Filename'] == fname]
         
         plt.figure()
         plt.plot(psd_interest)
     
+    def plot_TS(self,):
+        w = 10/211
+        tss = {'Left':[],'Right':[]}
+        for ch in ['Left','Right']:
+            for rr in self.file_meta:
+                if 'Data' in rr.keys() and rr['Phase'] in dbo.Phase_List('ephys'):
+                    tss[ch].append(rr['Data'][ch])
+        #choose a random sampling
+        total_recs = len(tss['Left'])
+        rnd_idxs = random.sample(range(1,total_recs),100)
+        for ii in rnd_idxs:
+            
+            b, a = signal.butter(5, w, 'low')
+            try: output = signal.filtfilt(b, a, tss['Right'][ii].squeeze())
+            except: pdb.set_trace()
+            plt.plot(output,alpha=0.5)
+            
     def plot_PSD(self,pt='901'):
         #generate out F vector
         fvect = np.linspace(0,211,513)
@@ -362,7 +394,8 @@ class BR_Data_Tree:
         #therapy_phases = dbo.all_phases
         psds = {'Left':0,'Right':0}
         for ch in ['Left','Right']:
-            psds[ch] = np.array([np.log10(rr['Data'][ch]) for rr in DataFrame.file_meta if rr['Patient'] == '901' and rr['Phase'] in dbo.Phase_List('ephys')]).T
+            try: psds[ch] = np.array([np.log10(rr['Data'][ch]) for rr in self.file_meta if rr['Patient'] == pt and rr['Phase'] in dbo.Phase_List('ephys')]).T
+            except: pdb.set_trace()
         
         #list2 = np.array([np.log10(rr['Data']['Left']) for rr in DataFrame.file_meta if rr['Patient'] == '901' and rr['Circadian'] == 'night' and rr['Phase'] in dbo.Phase_List('notherapy')]).T
         
@@ -377,11 +410,11 @@ class BR_Data_Tree:
         plt.legend({'Therapy','NoTherapy'})    
         
         #%%
-        [plt.plot(fvect,np.log10(rr['Data']['Left']),alpha=0.1) for rr in DataFrame.file_meta if rr['Patient'] == '901' and rr['Circadian'] == 'night']
+        [plt.plot(fvect,np.log10(rr['Data']['Left']),alpha=0.1) for rr in self.file_meta if rr['Patient'] == '901' and rr['Circadian'] == 'night']
         plt.title('Night')
         
         plt.figure()
-        [plt.plot(fvect,np.log10(rr['Data']['Left']),alpha=0.1) for rr in DataFrame.file_meta if rr['Patient'] == '901' and rr['Circadian'] == 'day']
+        [plt.plot(fvect,np.log10(rr['Data']['Left']),alpha=0.1) for rr in self.file_meta if rr['Patient'] == '901' and rr['Circadian'] == 'day']
         plt.title('Day')
         
             
@@ -389,3 +422,5 @@ if __name__ == '__main__':
     #Unit Test
     # Generate our dataframe
     DataFrame = BR_Data_Tree(preFrame='GENERATE')
+    DataFrame.generate_TD_sequence()
+    DataFrame.Save_Frame(name_addendum='Dec2020_T')

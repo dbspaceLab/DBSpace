@@ -197,11 +197,16 @@ class CStruct:
             plt.xlabel('Phase')
         plt.legend()
         
-    def query_stim_change(self,pt,ph):
+    def query_stim_change(self,pt,ph,include_init=False):
         if pt[0:3] != 'DBS': pt = 'DBS' + pt;
         
-        stim_change_list = self.Stim_Change_Table()
-        return (pt,ph) in stim_change_list
+        if include_init:
+            stim_change_list = self.Stim_Change_Table()
+            return (pt,ph) in stim_change_list
+        else:
+            stim_change_list = self.Stim_Change_Table()
+            stim_change_list_rem_init = [(aa,bb) for (aa,bb) in stim_change_list if bb[0] != 'B']
+            return (pt,ph) in stim_change_list_rem_init
 
     def load_stim_changes(self):
         #this is where we'll load in information of when stim changes were done so we can maybe LABEL them in figures

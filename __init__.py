@@ -91,7 +91,7 @@ def gen_psd(inpX,Fs=422,nfft=2**10,polyord=0):
         if inpX[chann].ndim > 1:
             for seg in range(inpX[chann].shape[-1]):
                 
-                psd = F_Domain(inpX[chann][:,seg].squeeze(),Fs=Fs,nfft=nfft)['Pxx']
+                psd = np.abs(F_Domain(inpX[chann][:,seg].squeeze(),Fs=Fs,nfft=nfft)['Pxx']) #Just enveloped this with np.abs 12/15/2020
                 
                     
                 fmatr[seg,:] = psd
@@ -304,7 +304,8 @@ def F_Domain(timeser,nperseg=512,noverlap=128,nfft=2**10,Fs=422):
     
     #what are the dimensions of the timeser we're dealing with?
     
-    Fvect,Pxx = sig.welch(timeser,Fs,window='blackmanharris',nperseg=nperseg,noverlap=noverlap,nfft=nfft)
+    try: Fvect,Pxx = sig.welch(timeser,Fs,window='blackmanharris',nperseg=nperseg,noverlap=noverlap,nfft=nfft)
+    except: pdb.set_trace()
     
     FreqReturn = {'F': Fvect,'Pxx': Pxx}
     
@@ -419,7 +420,7 @@ feat_dict = {
                 'Clock':{'fn':get_pow,'param':(104.5,106.5)},
                 'fSlope':{'fn':get_slope,'param':{'frange':(1,20),'linorder':1}},
                 'nFloor':{'fn':get_slope,'param':{'frange':(50,200),'linorder':0}},
-                'GCratio':{'fn':get_ratio,'param':((30,34),(64,68))}
+                'GCratio':{'fn':get_ratio,'param':((63,65),(65,67))}
             }
 
 

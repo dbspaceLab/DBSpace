@@ -434,7 +434,7 @@ def plot_EEG_masks(EEG_support):
     EEG_Viz.maya_band_display(1*primary_chann_mask - second_chann_mask)
     
     #%EEG_Viz.maya_band_display(-1*second_chann_mask)
-def plot_support_model(EEG_support,pt,voltage=3,condit='OnT'):
+def plot_support_model(EEG_support,pt,voltage=3,condit='OnT',layers=[1,1,1]):
     Etrode_map = DTI.Etrode_map
     #brain_offset = EEG_support['brain_offset']
     #dti_scale_factor = EEG_support['dti_scale_factor']
@@ -461,17 +461,20 @@ def plot_support_model(EEG_support,pt,voltage=3,condit='OnT'):
     ## NEED TO PRETTY THIS UP with plot_3d_scalp updates that give much prettier OnT/OffT pictures
     # First, we plot the tracts from the DTI
     #EEG_Viz.plot_tracts(display_vox_loc,active_mask=[True]*display_vox_loc.shape[0],color=(1.,0.,0.))
-    EEG_Viz.plot_coords(display_vox_loc,active_mask=[True]*display_vox_loc.shape[0],color=(1.,0.,0.),plot_overlay=False,alpha=0.1) #this plots the tracts
+    if layers[0]:
+        EEG_Viz.plot_coords(display_vox_loc,active_mask=[True]*display_vox_loc.shape[0],color=(1.,0.,0.),plot_overlay=False,alpha=0.1) #this plots the tracts
     
     # Next, we plot the parcellation nodes from TVB
-    EEG_Viz.plot_coords(parcel_coords,active_mask=[],color=(0.,0.,0.),plot_overlay=False,alpha=0.8)
+    if layers[1]:
+        EEG_Viz.plot_coords(parcel_coords,active_mask=[],color=(0.,0.,0.),plot_overlay=False,alpha=0.2)
 
-    EEG_Viz.plot_coords(parcel_coords,active_mask=primary_locs,color=(0.,1.,0.),alpha=0.5,plot_overlay=False) 
-    EEG_Viz.plot_coords(parcel_coords,active_mask=second_locs,color=(0.,0.,1.),alpha=0.5,plot_overlay=False)
+        EEG_Viz.plot_coords(parcel_coords,active_mask=primary_locs,color=(0.,1.,0.),alpha=0.8,plot_overlay=False) 
+        EEG_Viz.plot_coords(parcel_coords,active_mask=second_locs,color=(0.,0.,1.),alpha=0.8,plot_overlay=False)
         
     # Finally, we plot the EEG channels with their primary and secondary masks
-    EEG_Viz.plot_maya_scalp(primary_chann_mask,color=(1.,0.,0.),scale=10,alpha=.4,unwrap=False)
-    EEG_Viz.plot_maya_scalp(second_chann_mask,color=(0.,0.,1.),scale=10,alpha=0.4,unwrap=False)
+    if layers[2]:
+        EEG_Viz.plot_maya_scalp(primary_chann_mask,color=(1.,0.,0.),scale=10,alpha=.6,unwrap=False)
+        EEG_Viz.plot_maya_scalp(second_chann_mask,color=(0.,0.,1.),scale=10,alpha=0.6,unwrap=False)
 
     
 

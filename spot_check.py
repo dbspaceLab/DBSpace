@@ -6,6 +6,7 @@ Created on Thu Jan 19 11:23:07 2017
 @author: virati
 Spot check GUI. THIS STILL USES THE OLD DBSOsc and needs to be ported to new DBS_Osc library. But everything breaks for 50 reasons, so might be best to just start from scratch
 TODO This needs to be stripped to bare-minimum spot checking of an arbitrary BRadio File
+DISSERTATION FINAL
 """
 
 
@@ -21,6 +22,8 @@ from DBSpace import nestdict
 
 import pdb
 
+import scipy.signal as signal
+
 from tkinter.filedialog import askopenfilename
 import tkinter as tk
 
@@ -29,8 +32,6 @@ import matplotlib.pyplot as plt
 # Flist will be all the files we want to spotcheck, with the key as the experiment/info and the fname as the file loaded in
 #flist = {'DBS905_VSweep':{'fname':'/home/virati/MDD_Data/BR/905/Session_2015_09_29_Tuesday/Dbs905_2015_09_29_13_19_27__MR_0.txt'}}
 
-
-#%%
 
 font = {'weight' : 'bold',
         'size'   : 20}
@@ -44,25 +45,87 @@ plt.rcParams['image.cmap'] = 'jet'
 #band_scheme = 'Adjusted'
 #band_compute = 'median'
 
+ftypes = [
+    ('Text files', '*.txt')
+]
 
 
-#%%
 # General methods
 
-def gui_file_select():
-    curr_dir = '/run/media/virati/'
+def gui_file_select(n_files=0):
+    curr_dir = '/home/virati/MDD_Data/'
     notdone = True
     flist = []
     
+    fcounter = 0
     while notdone:
         fname = askopenfilename(initialdir=curr_dir)
         if fname == None or fname == '':
             notdone = False
         else:
+            fcounter += 1
             flist.append(fname)
             curr_dir = '/'.join(fname.split('/')[:-1])
-
+        
+        if n_files != 0:
+            notdone = not(fcounter == n_files)
+        
     return flist
+
+def quick_check(files=[],tdom=False):
+    if files == []:
+        files = gui_file_select()
+        
+    print(files)
+    fs = 422
+    NFFT = 2**9
+    for file in files:
+        if file[-7:] == 'LOG.txt':
+            print('IGNORING LOG FILE')
+        else:
+            print(file)
+            Container = dbo.load_BR_dict(file,sec_offset=0)
+            for side in ['Left']:
+                output = Container[side].squeeze()
+                
+                if tdom:
+                    plt.figure();plt.plot(output)
+                #Fpsd,Pxx = sig.welch(output,fs,window='blackmanharris',nperseg=NFFT,noverlap=,nfft=NFFT)
+                F,T,SG = sig.spectrogram(output,nperseg=NFFT,noverlap=np.round(NFFT/2).astype(np.int),window=sig.get_window('blackmanharris',NFFT),fs=fs)    
+                
+                plt.figure();plt.suptitle(side + file)
+                plt.pcolormesh(T,F,np.log10(SG),rasterized=True)
+#%%
+def gui_spot_check(filt=False):
+    files = gui_file_select(n_files=1)
+    fs = 422
+    NFFT = 2**11
+    w = 10/211
+    b, a = signal.butter(5, w, 'low')
+    for file in files:
+        print(file)
+        Container = dbo.load_BR_dict(file,sec_offset=0)
+        for side in ['Left','Right']:
+            if filt:
+                
+                output = signal.filtfilt(b, a, Container[side].squeeze())
+            else:
+                output = Container[side].squeeze()
+                
+            Fpsd,Pxx = sig.welch(output,fs,window='blackmanharris',nperseg=NFFT,noverlap=NFFT-10,nfft=NFFT)
+            F,T,SG = sig.spectrogram(output,nperseg=NFFT,noverlap=NFFT-10,window=sig.get_window('blackmanharris',NFFT),fs=fs)    
+            
+            plt.figure();plt.suptitle(side)
+            plt.subplot(311)
+            plt.plot(output)
+            plt.subplot(312)
+            plt.plot(Fpsd,np.log10(Pxx))
+            plt.subplot(313)
+            plt.pcolormesh(T,F,np.log10(SG))
+            
+
+
+
 
 def grab_median(TFcont,bigmed,osc_feat,tlim=(880,900),title='',do_corr=True,band_compute='median',band_scheme='Adjusted'):
     #Plot some PSDs
@@ -206,11 +269,42 @@ def spot_check(fname=[],tlims=(0,-1),plot_sg=False,plot_channs=['Left','Right'])
 
 #%%
 #Unit test for the methods above. TODO make this all more OOP
-    
+
+''' Key Files
+TARGETING OVER MONTHS
+['/home/virati/MDD_Data/BR/901/Session_2014_04_15_Tuesday/DBS901_2014_04_15_15_37_40__MR_0.txt', '/home/virati/MDD_Data/BR/901/Session_2014_04_15_Tuesday/DBS901_2014_04_15_16_23_37__MR_0.txt', '/home/virati/MDD_Data/BR/901/Session_2014_04_16_Wednesday/DBS901_2014_04_16_09_34_34__MR_0.txt', '/home/virati/MDD_Data/BR/901/Session_2014_05_16_Friday/DBS901_2014_05_16_15_51_38__MR_0.txt', '/home/virati/MDD_Data/BR/901/Session_2014_11_14_Friday/DBS901_2014_11_14_16_46_35__MR_0.txt']
+
+VOTLAGE/CURRENT
+['/home/virati/MDD_Data/BR/901/Session_2014_07_02_Wednesday/DBS901_2014_07_02_10_25_34__MR_0.txt', '/home/virati/MDD_Data/BR/901/Session_2014_07_02_Wednesday/DBS901_2014_07_02_09_29_58__MR_0.txt']
+'''
+
 if __name__ == '__main__':
-    
+    flist = quick_check(files=['/home/virati/MDD_Data/BR/901/Session_2014_04_15_Tuesday/DBS901_2014_04_15_15_37_40__MR_0.txt', #PO
+                               '/home/virati/MDD_Data/BR/901/Session_2014_04_15_Tuesday/DBS901_2014_04_15_16_23_37__MR_0.txt', #PO
+                               '/home/virati/MDD_Data/BR/901/Session_2014_04_16_Wednesday/DBS901_2014_04_16_09_34_34__MR_0.txt', #PO
+    #                           '/home/virati/MDD_Data/BR/901/Session_2014_05_16_Friday/DBS901_2014_05_16_16_25_07__MR_0.txt',
+                                '/home/virati/MDD_Data/BR/901/Session_2014_05_16_Friday/DBS901_2014_05_16_15_51_38__MR_0.txt'], #TurnON
+                                tdom=True) 
+    if 0:
+        import argparse
+        parser = argparse.ArgumentParser(description='What')
+        parser.add_argument('case',help='Which precoded case do you want to plot?')
+        
+        args = parser.parse_args()
+        
+        if args['case'] == 'saline':
+            _ = spot_check('/home/virati/MDD_Data/Benchtop/VRT_Saline_VSweep/demo_2018_04_24_17_15_20__MR_0.txt',plot_sg=True)
+        else:
+            flist = spot_check()
+
+#%%%
+
+
+
+
+if __name__ == '__ecg__':
     _ = spot_check('/home/virati/MDD_Data/Benchtop/VRT_Saline_VSweep/demo_2018_04_24_17_15_20__MR_0.txt',plot_sg=True)
-    
+
 
 if __name__ == '__unit__':
     
@@ -236,9 +330,7 @@ if __name__ == '__unit__':
     
     
     root.destroy()
-    
-    
-    #%%
+
     bigmed = plt.figure()
     osc_feat = plt.figure()
     

@@ -5,6 +5,7 @@ Created on Sat Mar 24 15:26:42 2018
 
 @author: virati
 Redo of the Z_mismatch -> Gain Compression work
+DISSERTATION FINAL
 """
 
 #import sys
@@ -292,7 +293,7 @@ class sim_amp:
         
     #THIS JUST FOCUsES ON THE ACTUAL SCALING AND AMPLIFIER PROCESS, ignore noise here
     def V_out(self,V_in):
-        self.tvect = np.linspace(self.tscale[0],self.tscale[1],V_in.shape[0]/10)
+        self.tvect = np.linspace(self.tscale[0],self.tscale[1],np.round(V_in.shape[0]/10).astype(np.int))
         #put some noise inside?
         V_out = self.sig_amp_gain * self.inscale * self.Tfunc(self.pre_amp_gain * V_in / self.inscale)
         

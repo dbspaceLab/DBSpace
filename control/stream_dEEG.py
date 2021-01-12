@@ -38,11 +38,11 @@ Targeting = defaultdict(dict)
 Targeting['All'] = {
         '901':{
                 'OnT':{
-                        'fname':'/home/extend/MDD_Data/hdEEG/Continuous/ALLMATS/DBS901_E52_On_Target_20151030_015625.mat',
+                        'fname':'/home/virati/MDD_Data/hdEEG/Continuous/ALLMATS/DBS901_E52_On_Target_20151030_015625.mat',
                         'lfp':'/home/virati/MDD_Data/BR/901/Session_2014_05_16_Friday/DBS901_2014_05_16_17_10_31__MR_0.txt',
                         'epochs':{'Bilat':(600,630),'PreBilat':(500,530)}},
                 'OffT':{
-                        'fname':'/home/extend/MDD_Data/hdEEG/Continuous/ALLMATS/DBS901_E52_Off_Target_20151030_022924.mat',
+                        'fname':'/home/virati/MDD_Data/hdEEG/Continuous/ALLMATS/DBS901_E52_Off_Target_20151030_022924.mat',
                         'lfp':'/home/virati/MDD_Data/BR/901/Session_2014_05_16_Friday/DBS901_2014_05_16_16_25_07__MR_0.txt',
                         'epochs':{'Bilat':(600,630),'PreBilat':(480,510)},
                 'Volt':{}}},
@@ -58,11 +58,11 @@ Targeting['All'] = {
                 'Volt':{}}},
         '905':{
                 'OnT':{
-                        'fname':'/home/extend/MDD_Data/hdEEG/Continuous/ALLMATS/DBS905_TurnOn_Day1_onTARGET_20150928_015403.mat',
+                        'fname':'/home/virati/MDD_Data/hdEEG/Continuous/ALLMATS/DBS905_TurnOn_Day1_onTARGET_20150928_015403.mat',
                         'lfp':'/home/virati/MDD_Data/BR/905/Session_2015_09_28_Monday/Dbs905_2015_09_28_13_51_42__MR_0.txt',
                         'epochs':{'Bilat':(610,640),'PreBilat':(561,591)}},
                 'OffT':{
-                        'fname':'/home/extend/MDD_Data/hdEEG/Continuous/ALLMATS/DBS905_TurnOn_OffTargetStims_20150929_123449.mat',
+                        'fname':'/home/virati/MDD_Data/hdEEG/Continuous/ALLMATS/DBS905_TurnOn_OffTargetStims_20150929_123449.mat',
                         'lfp':'/home/virati/MDD_Data/BR/905/Session_2015_09_29_Tuesday/Dbs905_2015_09_29_12_32_47__MR_0.txt' ,
                         'epochs':{'Bilat':(610,640),'PreBilat':(561,591)}},
                 'Volt':{}},
@@ -291,7 +291,7 @@ class streamEEG:
         
         #Proceed with standard code for EEG that should not break with LFP addition
         self.tvect = np.linspace(tlim[0],tlim[1],data_matr.shape[1])
-        self.fvect = np.linspace(0,self.fs/2,self.donfft/2+1)
+        self.fvect = np.linspace(0,np.round(self.fs/2).astype(np.int),np.round(self.donfft/2+1).astype(np.int))
                 
 
         self.re_ref_data = nestdict()
@@ -401,7 +401,7 @@ class streamEEG:
         if train_type == 'cleaned':
             self.clf = pickle.load(open('/home/virati/SVMModel_' + ctype,'rb'))
         elif train_type == 'stream':
-            self.clf = pickle.load(open('/home/virati/Dropbox/Data/Stream_SVMModel_' + ctype,'rb'))
+            self.clf = pickle.load(open('/home/virati/Dropbox/projects/Research/MDD-DBS/Data/Stream_SVMModel_' + ctype,'rb'))
    
     def calc_baseline(self,intv=(20,40)):
         #Which segments are with stim off?
@@ -418,6 +418,7 @@ class streamEEG:
         plt.xlabel('Segment number')
     
     def label_segments(self,baseline_calibration = True):
+        print('Labeling Segments')
         #go to every stim_feat segment WITHOUT stimulation and average them together. This is like a calibration
         
         no_stim_segs = self.stim_feat < 10
@@ -477,6 +478,7 @@ class streamEEG:
         pred_nums = np.array([labmap[label] for label in self.pred_labels])
         #pred_nums = sig.medfilt(pred_nums.astype(np.float64),5)
         
+        #pdb.set_trace()
         print('Accuracy: ' + str(sum(pred_nums == self.true_labels)/len(pred_nums)))
         #print(stats.mode(pred_nums))
         

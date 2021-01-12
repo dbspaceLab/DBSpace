@@ -162,7 +162,7 @@ class proc_dEEG:
 
         self.fs = temp_data['EEGSamplingRate'][0][0]
         self.donfft = 2**11
-        self.fvect = np.linspace(0,self.fs/2,self.donfft/2+1)
+        self.fvect = np.linspace(0,np.round(self.fs/2).astype(np.int),np.round(self.donfft/2+1).astype(np.int))
         
         return ts_data
         
@@ -216,6 +216,37 @@ class proc_dEEG:
         #Below is the oscillatory power
         #we should go through each osc_dict element and zero out the gamma
         self.osc_dict = osc_dict
+        
+    '''Generate Distributions across all channels for each band'''
+    def band_distrs(self,pt='POOL'):
+        print('Plotting Distribution for Bands')
+        
+        meds = nestdict()
+        mads = nestdict()
+        
+        marker=['o','s']
+        color = ['b','g']
+        plt.figure()
+        ax2 = plt.subplot(111)
+        for cc,condit in enumerate(['OnT','OffT']):
+            allsegs = np.median(self.osc_bl_norm[pt][condit][:,:],axis=0).squeeze()
+            #pdb.set_trace()
+            parts = ax2.violinplot(allsegs,positions=np.arange(5)+(cc-0.5)/10)
+            for pc in parts['bodies']:
+                pc.set_facecolor(color[cc])
+                pc.set_edgecolor(color[cc])
+                #pc.set_linecolor(color[cc])
+                                 
+            #plt.ylim((-0.5,0.5))
+        
+        for bb in range(5):
+            pass
+            #rsres = stats.ranksums(meds['OnT'][:,bb],meds['OffT'][:,bb])
+            #rsres = stats.wilcoxon(meds['OnT'][:,bb],meds['OffT'][:,bb])
+            #rsres = stats.ttest_ind(10**(meds['OnT'][:,bb]/10),10**(meds['OffT'][:,bb]/10))
+            #print(rsres)
+        
+        #plt.suptitle(condit)
     
     ''' This function sets the response vectors to the targets x patient'''
     def compute_response(self,do_pts=[],condits=['OnT','OffT']):
@@ -308,7 +339,7 @@ class proc_dEEG:
         self.osc_bl_norm['POOL'] = {condit:np.concatenate([self.osc_dict[pt][condit][keys_oi[condit][1]] - np.median(self.osc_dict[pt][condit][keys_oi[condit][0]],axis=0) for pt in self.do_pts]) for condit in self.condits}
    
         self.osc_stim = nestdict()
-        self.osc_stim_ = {pt:{condit:10**(self.osc_dict[pt][condit][keys_oi[condit][1]]/10) for condit in self.condits} for pt in self.do_pts}
+        self.osc_stim = {pt:{condit:10**(self.osc_dict[pt][condit][keys_oi[condit][1]]/10) for condit in self.condits} for pt in self.do_pts}
         self.osc_stim['POOL'] = {condit:np.concatenate([10**(self.osc_dict[pt][condit][keys_oi[condit][1]]/10) for pt in self.do_pts]) for condit in self.condits}
      
     def plot_psd(self,pt,condit,epoch):
@@ -498,14 +529,14 @@ class proc_dEEG:
             medians = self.dyn_L.swapaxes(0,1) #if we want to use the 0th component of the dyn_rPCA eigenvector
             band_i = 0
         else:
-            medians = self.OBSmedian_response(pt=pt)['OnT'] #if we want to use the standard median Alpha change
+            medians = self.OBSmedian_response(pt=pt)[condit] #if we want to use the standard median Alpha change
             band_i = dbo.feat_order.index(band)
             
         #medians = np.median(self.targ_response[pt][condit],axis=0)
         fig = plt.figure()
         #First, we'll plot what the medians actually are
         
-        EEG_Viz.plot_3d_scalp(medians[:,band_i],fig,label='OnT Mean Response ' + band,unwrap=True,scale=10)
+        EEG_Viz.plot_3d_scalp(medians[:,band_i],fig,label=condit + ' Mean Response ' + band,unwrap=True,scale=10)
         plt.suptitle(pt)
         
         full_distr = medians[:,band_i]# - np.mean(medians[:,band_i]) #this zeros the means of the distribution
@@ -1993,7 +2024,11 @@ class proc_dEEG:
         self.bin_classif['Model'] = best_model
         self.bin_classif['Coeffs'] = coeffs
         self.cv_folding = nfold
+        
+        #if we want to keep all of our models we can do that here
+        self.cv_bin_classif = models
     
+    '''This function ASSESSES the best SVM classifier using a bootstrap procedure'''
     def bootstrap_binSVM(self):
         best_model = self.bin_classif
         
@@ -2015,7 +2050,9 @@ class proc_dEEG:
         plt.plot(fpr,tpr)
         plt.subplot(313)
         plt.hist(rocs_auc)
-        
+        plt.suptitle('Bootstrapped SVM Assessment')
+    
+    '''One shot assessment of SVM classifier'''
     def oneshot_binSVM(self):
         best_model = self.bin_classif
         #Plotting of confusion matrix and coefficients
@@ -2042,8 +2079,9 @@ class proc_dEEG:
         
         plt.subplot(2,2,4)
         plt.plot(np.median(np.median(coeffs,axis=0),axis=0))
+        plt.suptitle('Oneshot SVM Assessment')
         
-        self.SVM_coeffs = coeffs
+        #self.SVM_coeffs = coeffs
     
     def assess_binSVM(self):
         best_model = self.bin_classif
@@ -2053,53 +2091,43 @@ class proc_dEEG:
             valid_accuracy = best_model.score(Xva,Yva)
             
     '''Analysis of the binary SVM coefficients should be here'''    
-    def analyse_binSVM(self,use_all_CVs = False):
-        if use_all_CVs:
-            coeffs = self.SVM_coeffs #if we want it for all the folds
-            
-            #Below is if we want to weight by the feature amplitudes themselves; important since the Gamma coefficients are non-zero (with L2 regularization at least)
-            
-            #get the median power in each of the bands so we can get a weighed idea of which channels are most important
-            var_pow = np.var(self.SVM_raw_stack,axis=0).reshape(-1,order='C')
-            tot_var_bands = np.multiply(np.median(coeffs,axis=0).reshape(-1,order='C'),var_pow).reshape(257,5,order='C')
-            tot_var = np.sum(np.multiply(np.median(coeffs,axis=0).reshape(-1,order='C'),var_pow).reshape(257,5,order='C'),axis=1)
-        
-            plt.figure()
-            plt.subplot(2,1,1)
-            plt.plot(np.abs(tot_var))
-            plt.subplot(2,1,2)
-            #EEG_Viz.plot_3d_scalp(np.abs(tot_var))      
-            plt.hist(np.abs(tot_var))
-            
-            self.tot_var = np.abs(tot_var)
-            plt.figure()
-            self.import_mask = np.abs(tot_var) > 0.10
-            EEG_Viz.plot_3d_scalp(self.import_mask.astype(np.int),unwrap=True)  
-            plt.suptitle('Looking at the coefficients mulitiplied by feature variances')
-            # Let's take a look at each band's distribution
-            plt.figure()
-            
-            sns.violinplot(y=tot_var_bands,positions=np.arange(5))
-            
-        else:
-            plt.figure()
-            for ii in range(4):
-                #plt.hist(self.bin_classif['Model'].coef_[:,ii])
-                plt.scatter(ii,self.bin_classif['Model'].coef_[:,ii])
-            
-            #BELOW IS CORRECT since before, in the features, we collapse to a feature vector that is all 257 deltas, then all 257 thetas, etc...
-            #So when we want to reshape that to where we are now, we have to either 'C': (5,257) where C means the last index changes fastest; or 'F': (257,5) where the first index changes fastest.
-            coeffs = stats.zscore(np.sum(self.bin_classif['Model'].coef_.reshape(5,257,order='C'),axis=0)) #what we have here is a reshape where the FEATURE VECTOR is [257 deltas... 257 gammas]
-            
-            avg_coeffs = np.mean(np.array(self.bin_classif['Coeffs']),axis=0).reshape(5,257,order='C')
-            coeffs = stats.zscore(np.sum(avg_coeffs**2,axis=0))
+    def analyse_binSVM(self, feature_weigh = False):
 
-            plt.figure();plt.hist(coeffs,bins=50,range=(0,1))
-            #plt.figure()
-            self.import_mask = coeffs > 0
-            EEG_Viz.plot_3d_scalp(coeffs,unwrap=True)
-            EEG_Viz.plot_3d_scalp(self.import_mask.astype(np.int),unwrap=True)
-            plt.suptitle('Just looking at the coefficients')
+        #What exactly is this trying to do here??
+        # plt.figure()
+        # for ii in range(4):
+        #     #plt.hist(self.bin_classif['Model'].coef_[:,ii])
+        #     plt.scatter(ii,self.bin_classif['Model'].coef_[:,ii])
+        
+        #BELOW (order = 'C') IS CORRECT since before, in the features, we collapse to a feature vector that is all 257 deltas, then all 257 thetas, etc...
+        #So when we want to reshape that to where we are now, we have to either 'C': (5,257) where C means the last index changes fastest; or 'F': (257,5) where the first index changes fastest.
+        
+        if not feature_weigh:
+            coeffs = stats.zscore(np.sum(np.abs(self.bin_classif['Model'].coef_.reshape(5,257,order='C')),axis=0)) #what we have here is a reshape where the FEATURE VECTOR is [257 deltas... 257 gammas]
+            self.import_mask = coeffs > 0.2
+            analysis_title = 'Pure Coefficients'
+        else:
+            avg_feat_value = np.abs(np.median(self.SVM_raw_stack,axis=0))
+            #pdb.set_trace()
+            coeffs = stats.zscore(np.sum(np.multiply(np.abs(self.bin_classif['Model'].coef_.reshape(5,257,order='C')),avg_feat_value.T),axis=0))
+            self.import_mask = coeffs > 0.1
+            analysis_title = 'Empirical Feature-weighed'
+            
+            
+        #WTF is this shit?
+        #avg_coeffs = np.mean(np.array(self.bin_classif['Coeffs']),axis=0).reshape(5,257,order='C')
+        #coeffs = stats.zscore(np.sum(avg_coeffs**2,axis=0))
+
+        plt.figure();plt.hist(coeffs,bins=50)#,range=(0,1))
+        #plt.figure()
+
+        EEG_Viz.plot_3d_scalp(coeffs,unwrap=True,alpha=0.4)
+        EEG_Viz.plot_3d_scalp(self.import_mask.astype(np.int),unwrap=True,alpha=0.2)
+        plt.suptitle('SVM Coefficients ' + analysis_title)
+            
+    '''Do a CV-level analysis here'''
+    def analysis_CV_binSVM(self):
+        pass
             
             
     # THE BELOW FUNCTION DOES NOT RUN, JUST HERE FOR REFERENCE AS THE SVM IS BEING RECODED ABOVE

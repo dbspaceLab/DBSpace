@@ -256,8 +256,6 @@ class base_decoder:
         mse = mean_squared_error(self.test_set_c,predicted_c)
         corr = stats.pearsonr(self.test_set_c.squeeze(),predicted_c.squeeze())
         
-        #%% Plot
-        
         plt.plot([0,1],[0,1],color='gray',linestyle='dotted')
         ax = sns.regplot(x=self.test_set_c,y=predicted_c)
         plt.title('R^2:' + str(r2score) + '\n' + ' MSE:' + str(mse) + '\n Corr:' + str(corr))
@@ -316,7 +314,59 @@ class base_decoder:
         plt.subplot(212)
         self.plot_decode_coeffs()
 
+#%%
+class var_decoder(base_decoder):
+    variance_analysis = True
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        
+    def train_setup(self):
+        print('Performing Training Setup for Weekly Decoder')
+    
+        self.train_set_y, self.train_set_c, self.train_set_pt, self.train_set_ph  = self.aggregate_weeks(self.train_set)
+    def test_setup(self):
+        print('Performing TESTING Setup for Weekly Decoder')
+        
+        self.test_set_y, self.test_set_c, self.test_set_pt, self.test_set_ph = self.aggregate_weeks(self.test_set)
+        if self.do_shuffle_null:
+            self.shuffle_test_c()
+    
+    def train_model(self,do_null):
+        self.decode_model = self.regression_algo().fit(self.train_set_y,self.train_set_c)
+        #print('Alpha: ' + str(self.decode_model.alpha_) + ' | L1r: ' + str(self.decode_model.l1_ratio_))
+        #self.plot_decode_coeffs(self.decode_model)
+    
+    def test_setup(self):
+        print('Performing TESTING Setup for Weekly Decoder')
+        
+        self.test_set_y, self.test_set_c, self.test_set_pt, self.test_set_ph = self.aggregate_weeks(self.test_set)
+        if self.do_shuffle_null:
+            self.shuffle_test_c()
+            
+    def aggregate_weeks(self,dataset):
+        #print('Performing Training Setup for Weekly Decoder')
+        #go through our training set and aggregate every recording within a given week
+        #train_set_y,train_set_c = self.calculate_states_in_set(self.train_set)
+        
+        running_list = []
+        for pt in self.pts:
+            for phase in self.filter_phases:
+                block_set = [rr for rr in dataset if rr['Patient'] == pt and rr['Phase'] == phase]
+                if block_set != []:
+                    y_set,c_set = self.calculate_states_in_set(block_set)
+                    weekly_y_set = np.mean(y_set,axis=0)
+                    
+                    running_list.append((weekly_y_set,c_set[0],pt,phase)) #all the c_set values should be the exact same
+        
+        y_state = np.array([a for (a,b,c,d) in running_list]) #outputs ~168 observed weeks x 10 features
+        c_state = np.array([b for (a,b,c,d) in running_list]).reshape(-1,1) #outputs ~168 observed weeks
+        pt_name = np.array([c for (a,b,c,d) in running_list])
+        phase_label = np.array([d for (a,b,c,d) in running_list])
+        
+        return y_state.reshape(-1,1), c_state.reshape(-1,1), pt_name, phase_label
+#%%
 class weekly_decoder(base_decoder):
+    variance_analysis = False
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
         
@@ -330,9 +380,11 @@ class weekly_decoder(base_decoder):
             self.regression_algo = linear_model.RidgeCV()
         elif kwargs['algo'] == 'Lasso':
             self.regression_algo = linear_model.LassoCV()
+            
+        if kwargs['variance'] == True:
+            self.variance_analysis = True
     
     def train_model(self):
-        
         self.decode_model = self.regression_algo(**self.model_args).fit(self.train_set_y,self.train_set_c)
         #print('Alpha: ' + str(self.decode_model.alpha_) + ' | L1r: ' + str(self.decode_model.l1_ratio_))
         #self.plot_decode_coeffs(self.decode_model)
@@ -348,7 +400,10 @@ class weekly_decoder(base_decoder):
                 block_set = [rr for rr in dataset if rr['Patient'] == pt and rr['Phase'] == phase]
                 if block_set != []:
                     y_set,c_set = self.calculate_states_in_set(block_set)
-                    weekly_y_set = np.mean(y_set,axis=0)
+                    if not self.variance_analysis:
+                        weekly_y_set = np.mean(y_set,axis=0)
+                    else:
+                        weekly_y_set = np.var(y_set,axis=0)
                     
                     running_list.append((weekly_y_set,c_set[0],pt,phase)) #all the c_set values should be the exact same
         
@@ -435,7 +490,7 @@ class weekly_decoder(base_decoder):
 
         
         return optimal_alpha
-        
+#%%
 class weekly_decoderCV(weekly_decoder):
     def __init__(self,*args,**kwargs):
         print('Initialized the Weekly CV decoder')

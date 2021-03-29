@@ -484,9 +484,25 @@ class proc_dEEG:
             plt.violinplot(ch_stim_mean)
     
     
-    def topo_median_response(self,pt='POOL',band='Alpha',do_condits=[],use_maya=False):
+    def topo_median_variability(self,pt='POOL',band='Alpha',do_condits=[],use_maya=False):
         band_i = dbo.feat_order.index(band)
        
+        #medians = self.median_response(pt=pt)
+
+        for condit in do_condits:
+            response_dict = np.median(self.osc_bl_norm[pt][condit][:,:,:],axis=0).squeeze()   
+            response_mask = (np.abs(response_dict) > 0.5).astype(np.int)
+            
+            var_dict = robust.mad(self.osc_bl_norm[pt][condit][:,:,:],axis=0).squeeze()      
+            #The old scatterplot approach
+            if use_maya:
+                EEG_Viz.maya_band_display(var_dict[:,band_i])
+            else:
+                EEG_Viz.plot_3d_scalp(response_mask[:,band_i]*var_dict[:,band_i],plt.figure(),label=condit + ' Response Var ' + band + ' | ' + pt,unwrap=True,scale=100,clims=(0,4),alpha=0.3,marker_scale=10)
+                plt.suptitle(pt)
+    
+    def topo_median_response(self,pt='POOL',band='Alpha',do_condits=[],use_maya=False,scale_w_mad=False):
+        band_i = dbo.feat_order.index(band)
         #medians = self.median_response(pt=pt)
 
         for condit in do_condits:
@@ -495,7 +511,13 @@ class proc_dEEG:
             if use_maya:
                 EEG_Viz.maya_band_display(response_dict[:,band_i])
             else:
-                EEG_Viz.plot_3d_scalp(response_dict[:,band_i],plt.figure(),label=condit + ' Mean Response ' + band + ' | ' + pt,unwrap=True,scale=100,clims=(-1,1),alpha=0.3,marker_scale=5)
+                if scale_w_mad:
+                    mad_scale = robust.mad(self.osc_bl_norm[pt][condit][:,:,:],axis=0).squeeze() 
+                    
+                    EEG_Viz.plot_3d_scalp(response_dict[:,band_i],plt.figure(),label=condit + ' Mean Response ' + band + ' | ' + pt,unwrap=True,scale=100,clims=(-1,1),alpha=0.3,marker_scale=10*np.tanh(mad_scale[:,band_i]-5))
+                    
+                else:
+                    EEG_Viz.plot_3d_scalp(response_dict[:,band_i],plt.figure(),label=condit + ' Mean Response ' + band + ' | ' + pt,unwrap=True,scale=100,clims=(-1,1),alpha=0.3,marker_scale=5)
                 plt.suptitle(pt)
     
     
@@ -639,6 +661,7 @@ class proc_dEEG:
         
         mode_model = {'L':L, 'S':S, 'Vectors':svm_ica_coeffs, 'Model':svm_ica, 'RotatedL':rotated_L}
         return mode_model
+    
     
     def OnT_alpha_modes_segs(self,pt='POOL',data_source=[],do_plot=False,band='Alpha'):
         seg_responses = self.osc_bl_norm[pt]['OnT'][:,:,dbo.feat_order.index(band)].squeeze()

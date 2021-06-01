@@ -95,7 +95,7 @@ def plot_3d_locs(band,ax,n=1,scale=1,clims=(0,0),label='generic',animate=False,u
             time.sleep(.3)
 
 # The goal of this is to plot the bands on the scalp
-def plot_3d_scalp(band,infig=[],n=1,clims=(0,0),scale=1,label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense',alpha=1,marker_scale=5):
+def plot_3d_scalp(band,infig=[],n=1,clims=(0,0),scale=1,label='generic',animate=False,unwrap=False,sparse_labels = True,highlight=[],montage='dense',alpha=1,marker_scale=5,anno_top=True,binary_mask=False):
     #fig = plt.figure()
     
     if montage == 'dense':
@@ -147,7 +147,10 @@ def plot_3d_scalp(band,infig=[],n=1,clims=(0,0),scale=1,label='generic',animate=
             plt.annotate('E'+str(ii+1),(flat_etrodes[ii,0],flat_etrodes[ii,1]),size=12)
         
         #THIS IS NEW 01/11/2021 see if it works properly
-        sc_top = plt.scatter(flat_etrodes[annotate_list,0],flat_etrodes[annotate_list,1],c=band[annotate_list],vmin=clims[0],vmax=clims[1],s=300,cmap=cm,alpha=1.0,linewidth=linewidths,marker='o')
+        if anno_top: sc_top = plt.scatter(flat_etrodes[annotate_list,0],flat_etrodes[annotate_list,1],c=band[annotate_list],vmin=clims[0],vmax=clims[1],s=300,cmap=cm,alpha=1.0,linewidth=linewidths,marker='o')
+        if binary_mask: 
+            ch_ones = np.where(band == 0)[0]
+            bin_mask = plt.scatter(flat_etrodes[ch_ones,0],flat_etrodes[ch_ones,1],c='black',vmin=0,vmax=1,s=300,cmap=cm,alpha=1.0,linewidth=linewidths,marker='o')
         
         plt.axis('off')        
         

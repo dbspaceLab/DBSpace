@@ -491,22 +491,27 @@ class proc_dEEG:
 
         for condit in do_condits:
             response_dict = np.median(self.osc_bl_norm[pt][condit][:,:,:],axis=0).squeeze()   
-            response_mask = (np.abs(response_dict) > 0.5).astype(np.int)
+
             
             var_dict = robust.mad(self.osc_bl_norm[pt][condit][:,:,:],axis=0).squeeze()      
+            var_mask = ((var_dict) > 2.5).astype(np.int)
             #The old scatterplot approach
+            bins = np.linspace(0,5,50)
+            plt.figure();plt.hist(var_dict[:,band_i],bins=bins)
+            plt.ylim((0,70))
             if use_maya:
                 EEG_Viz.maya_band_display(var_dict[:,band_i])
             else:
-                EEG_Viz.plot_3d_scalp(response_mask[:,band_i]*var_dict[:,band_i],plt.figure(),label=condit + ' Response Var ' + band + ' | ' + pt,unwrap=True,scale=100,clims=(0,4),alpha=0.3,marker_scale=10)
+                #EEG_Viz.plot_3d_scalp(response_mask[:,band_i]*var_dict[:,band_i],plt.figure(),label=condit + ' Response Var ' + band + ' | ' + pt,unwrap=True,scale=100,clims=(0,4),alpha=0.3,marker_scale=10)
+                EEG_Viz.plot_3d_scalp(var_mask[:,band_i],plt.figure(),label=condit + ' Response Var ' + band + ' | ' + pt,unwrap=True,scale=100,clims=(0,4),alpha=0.3,marker_scale=10,anno_top=False,binary_mask=True)
                 plt.suptitle(pt)
     
-    def topo_median_response(self,pt='POOL',band='Alpha',do_condits=[],use_maya=False,scale_w_mad=False):
+    def topo_median_response(self,pt='POOL',band='Alpha',do_condits=[],use_maya=False,scale_w_mad=False,avg_func=np.median):
         band_i = dbo.feat_order.index(band)
         #medians = self.median_response(pt=pt)
 
         for condit in do_condits:
-            response_dict = np.median(self.osc_bl_norm[pt][condit][:,:,:],axis=0).squeeze()      
+            response_dict = avg_func(self.osc_bl_norm[pt][condit][:,:,:],axis=0).squeeze()      
             #The old scatterplot approach
             if use_maya:
                 EEG_Viz.maya_band_display(response_dict[:,band_i])

@@ -121,7 +121,7 @@ def gui_spot_check(filt=False):
             plt.subplot(312)
             plt.plot(Fpsd,np.log10(Pxx))
             plt.subplot(313)
-            plt.pcolormesh(T,F,np.log10(SG))
+            plt.pcolormesh(T,F,np.log10(SG),rasterized=True)
             
 
 

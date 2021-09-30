@@ -1565,6 +1565,7 @@ class proc_dEEG:
     def band_mads(self):
         pass
     
+    '''Plot distribution of change for individual bands'''
     def band_distr(self,do_moment='meds'):
         print('Plotting Distribution for Bands')
         

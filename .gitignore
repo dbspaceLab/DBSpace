@@ -2,6 +2,3 @@ __pycache__
 *.pyc
 .DS_Store
 .ipynb_checkpoints
-__init__.pyc
-nohup.out
-spot_check.ipynb

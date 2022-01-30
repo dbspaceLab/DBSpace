@@ -4,25 +4,22 @@
 Created on Mon Jan  8 13:44:38 2018
 
 @author: virati
-DBS_Osc File for the analytical methodologies used in ALL Vineet project related analyses
+Main DBSpace module for SCCwm-DBS project
+This is the primary file with the methods needed for the rest of the libraries. Used to be called "DBS_Osc" or "DBSOsc".
 
 Copyright (C) 2018 Vineet Ravi Tiruvadi
-
-This is the primary file with the methods needed for the rest of the libraries. Used to be called "DBS_Osc" or "DBSOsc".
-    
 """
+
 print('Using DBSpace LATEST')
 import numpy as np
 import pandas as pd
 from collections import defaultdict
 import scipy.signal as sig
-import random
 import pywt
 
 # IF you want to do OR related analyses, this needs to be uncommented
 #from brpylib import NsxFile
 
-import pdb
 
 import matplotlib.pyplot as plt
 plt.rcParams['image.cmap'] = 'jet'
@@ -33,10 +30,10 @@ all_pts = ['901','903','905','906','907','908']
 
 # This is our map for the electrodes that each patient has for ONTarget and OFFTarget
 Etrode_map = {'OnT':{'901':(2,1),'903':(2,2),'905':(2,1),'906':(2,2),'907':(1,1),'908':(2,1)},'OffT':{'901':(1,2),'903':(1,1),'905':(1,2),'906':(1,1),'907':(2,2),'908':(1,2)}}
+# TODO This needs to be a config/yaml/whatever file in the chapter-specific repos
 
 #%%
 # BlackRock Methods
-
 def load_or_file(fname,**kwargs):
     #nsx_file = NsxFile(fname)
     
@@ -52,9 +49,6 @@ def load_or_file(fname,**kwargs):
     nsx_file.close()
     
     return cont_data
-
-def load_or_dict(fname,sec_win=(0,10),channels=[0]):
-    pass
 
 #%%
 # BRAIN RADIO METHODS
@@ -110,11 +104,6 @@ def gen_psd(inpX,Fs=422,nfft=2**10,polyord=0):
     #Return here is a dictionary with Nchann keys
     return outPSD
 
-def cmedian(inArray,axis=-1):
-    return  np.median(np.real(inArray),axis=axis) + 1j * np.median(np.imag(inArray),axis=axis)
-
-def l2_pow(x):
-    return np.sqrt(np.sum(x**2))
 
 #This function takes a PSD and subtracts out the PSD's fourth order polynomial fit
 #I THINK this is only used in EEG cortical signatures
@@ -228,11 +217,6 @@ def gen_CWT(inpX,Fs=422,nfft=2**10,plot=False,overlap=True):
         
     return outCWT
 
-'''
-Single method that takes an inputX.channels dictionary and outputs the oscillatory state, no fuss
-'''
-def osc_state(inpX):
-    pass
 
 ''' Return to us the power in an oscillatory feature'''
 def get_pow(Pxx,F,frange,cmode=np.median):
@@ -245,7 +229,6 @@ def get_pow(Pxx,F,frange,cmode=np.median):
         #JUST ADDED THIS
         chann_order = range(Pxx.shape[0])
         Pxx = {ch:Pxx[ch,:] for ch in chann_order}
-        #except: pdb.set_trace()
         
         #ThIS WAS WORKING BEFORE
         #Pxx = {0:Pxx}
@@ -273,11 +256,7 @@ def get_pow(Pxx,F,frange,cmode=np.median):
         #if we want the MEDIAN instead
         
         #log transforming this makes sense, since we find the median of the POLYNOMIAL CORRECTED Pxx, which is still ALWAYS positive
-        try:
-            out_feats[chann] = 10*np.log10(cmode(Pxx[chann][Fidxs]))
-        except Exception as e:
-            print(e)
-            pdb.set_trace()
+        out_feats[chann] = 10*np.log10(cmode(Pxx[chann][Fidxs]))
     
     #return is going to be a dictionary with same elements
 
@@ -304,8 +283,7 @@ def F_Domain(timeser,nperseg=512,noverlap=128,nfft=2**10,Fs=422):
     
     #what are the dimensions of the timeser we're dealing with?
     
-    try: Fvect,Pxx = sig.welch(timeser,Fs,window='blackmanharris',nperseg=nperseg,noverlap=noverlap,nfft=nfft)
-    except: pdb.set_trace()
+    Fvect,Pxx = sig.welch(timeser,Fs,window='blackmanharris',nperseg=nperseg,noverlap=noverlap,nfft=nfft)
     
     FreqReturn = {'F': Fvect,'Pxx': Pxx}
     
@@ -385,11 +363,8 @@ def get_slope(Pxx,F,params):
     Fidxs = np.where(np.logical_and(F > frange[0],F < frange[1]))
     
     for chans,psd in Pxx.items():
-        try:
-            logpsd = np.log10(psd[Fidxs])
-            logF = np.log10(F[Fidxs])
-        except FloatingPointError:
-            pdb.set_trace()
+        logpsd = np.log10(psd[Fidxs])
+        logF = np.log10(F[Fidxs])
             
         fitcoeffs = np.polyfit(logF,logpsd,linorder)
         
@@ -475,31 +450,7 @@ def plot_bands(bandM,bandLabels):
         plt.xticks(range(len(cc)))
         plt.xticklabels(bandLabels)
 
-'''
-SIMPLE FUNCTIONS
-Should probably be split off into a utils.py file...
-'''
-def unity(invar):
-    return invar
 
-
-def displog(values):
-    return 10*np.log10(values)
-
-''' Powerful structure that literally changed my life'''
-def nestdict():
-    return defaultdict(nestdict)
-
-
-''' Using Jack-knife for the median calculation'''
-def jk_median(inX,niter=100):
-    #assume first dim is SEGMENTS/OBSERVATIONS
-    med_vec = []
-    for ii in range(niter):
-        choose_idxs = random.sample(range(0,inX.shape[0]),np.floor(inX.shape[0]/2).astype(np.int))
-        med_vec.append(np.median(inX[choose_idxs,:],axis=0))
-        
-    return np.array(med_vec)
 
 ''' Higher order measures here'''
 # Make a coherence generation function
@@ -508,7 +459,6 @@ def gen_coher(inpX,Fs=422,nfft=2**10,polyord=0):
     outPLV = nestdict()
     outCSD = nestdict()
     
-    #What's our goddamn fvector
     fvect = np.linspace(0,Fs/2,nfft/2+1)
 
     for chann_i in inpX.keys():
@@ -545,8 +495,7 @@ def gen_coher(inpX,Fs=422,nfft=2**10,polyord=0):
             #Compute the normalized coherence/PLV
             outPLV[chann_i][chann_j] = plv
             #outPLV[chann_i][chann_j] = np.median(plv,axis=0)
-            #if chann_j == 176: pdb.set_trace()
-            #if chann_i > 10: pdb.set_trace()
+            
             ## PLV abs EEG -> 
             ## Coherence value
             
@@ -555,7 +504,7 @@ def gen_coher(inpX,Fs=422,nfft=2**10,polyord=0):
 ''' PCA function for merging rPCA results into final DSC 
 This is borrowed from online stackexchange somewhere, not the most efficient way to do it
 '''
-def simple_pca(data,numComps=None):
+def simple_pca(data,num_components=None):
     m,n = data.shape
     data -= data.mean(axis=0)
     R = np.cov(data,rowvar=False)
@@ -564,7 +513,7 @@ def simple_pca(data,numComps=None):
     evecs = evecs[:,idx]
     evals = evals[idx]
     
-    if numComps is not None:
-        evecs = evecs[:,:numComponents]
+    if num_components is not None:
+        evecs = evecs[:,:num_components]
     
     return np.dot(evecs.T,data.T).T,evals,evecs

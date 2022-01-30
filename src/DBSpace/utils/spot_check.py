@@ -17,8 +17,7 @@ import matplotlib.pyplot as plt
 import scipy.signal as sig
 import numpy as np
 import scipy.io as io
-from collections import defaultdict
-from DBSpace import nestdict
+from DBSpace.utils import nestdict
 
 import pdb
 

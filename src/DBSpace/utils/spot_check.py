@@ -4,8 +4,11 @@
 Created on Thu Jan 19 11:23:07 2017
 
 @author: virati
-Spot check GUI. THIS STILL USES THE OLD DBSOsc and needs to be ported to new DBS_Osc library. But everything breaks for 50 reasons, so might be best to just start from scratch
+Spot check GUI. 
+
+THIS STILL USES THE OLD DBSOsc and needs to be ported to new DBS_Osc library. But everything breaks for 50 reasons, so might be best to just start from scratch
 TODO This needs to be stripped to bare-minimum spot checking of an arbitrary BRadio File
+
 DISSERTATION FINAL
 """
 
@@ -19,8 +22,6 @@ import numpy as np
 import scipy.io as io
 from DBSpace.utils import nestdict
 
-import pdb
-
 import scipy.signal as signal
 
 from tkinter.filedialog import askopenfilename
@@ -31,7 +32,6 @@ import matplotlib.pyplot as plt
 # Flist will be all the files we want to spotcheck, with the key as the experiment/info and the fname as the file loaded in
 #flist = {'DBS905_VSweep':{'fname':'/home/virati/MDD_Data/BR/905/Session_2015_09_29_Tuesday/Dbs905_2015_09_29_13_19_27__MR_0.txt'}}
 
-
 font = {'weight' : 'bold',
         'size'   : 20}
 
@@ -39,10 +39,6 @@ matplotlib.rc('font', **font)
 matplotlib.rcParams['svg.fonttype'] = 'none'
 
 plt.rcParams['image.cmap'] = 'jet'
-
-#Parameters for analysis
-#band_scheme = 'Adjusted'
-#band_compute = 'median'
 
 ftypes = [
     ('Text files', '*.txt')
@@ -95,6 +91,8 @@ def quick_check(files=[],tdom=False):
                 plt.figure();plt.suptitle(side + file)
                 plt.pcolormesh(T,F,np.log10(SG),rasterized=True)
 #%%
+
+
 def gui_spot_check(filt=False):
     files = gui_file_select(n_files=1)
     fs = 422
@@ -277,7 +275,9 @@ VOTLAGE/CURRENT
 ['/home/virati/MDD_Data/BR/901/Session_2014_07_02_Wednesday/DBS901_2014_07_02_10_25_34__MR_0.txt', '/home/virati/MDD_Data/BR/901/Session_2014_07_02_Wednesday/DBS901_2014_07_02_09_29_58__MR_0.txt']
 '''
 
-if __name__ == '__main__':
+
+#@pytest.mark.parametrize
+def test_list_spot_check(load_list):
     flist = quick_check(files=['/home/virati/MDD_Data/BR/901/Session_2014_04_15_Tuesday/DBS901_2014_04_15_15_37_40__MR_0.txt', #PO
                                '/home/virati/MDD_Data/BR/901/Session_2014_04_15_Tuesday/DBS901_2014_04_15_16_23_37__MR_0.txt', #PO
                                '/home/virati/MDD_Data/BR/901/Session_2014_04_16_Wednesday/DBS901_2014_04_16_09_34_34__MR_0.txt', #PO
@@ -296,12 +296,7 @@ if __name__ == '__main__':
         else:
             flist = spot_check()
 
-#%%%
-
-
-
-
-if __name__ == '__ecg__':
+def test_spot_check():
     _ = spot_check('/home/virati/MDD_Data/Benchtop/VRT_Saline_VSweep/demo_2018_04_24_17_15_20__MR_0.txt',plot_sg=True)
 
 

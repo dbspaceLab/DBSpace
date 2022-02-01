@@ -44,10 +44,20 @@ ftypes = [
     ('Text files', '*.txt')
 ]
 
-
-# General methods
-
 def gui_file_select(n_files=0):
+'''
+    Load in a file with GUI selection
+
+    Inputs
+    ------
+
+
+
+    Outputs
+    -------
+        n_files
+'''
+
     curr_dir = '/home/virati/MDD_Data/'
     notdone = True
     flist = []

@@ -604,7 +604,6 @@ class weekly_decoder(base_decoder):
             zero_mean(self.train_set_c),
             eps=0.0001,
             n_alphas=1000,
-            # cv=True,
         )
         for alpha in path[0]:
             run_model = linear_model.ElasticNet(
@@ -739,7 +738,9 @@ class weekly_decoderCV(weekly_decoder):
             offset_train_c = combo_train_c - np.mean(combo_train_c)
 
             coeff_path[run] = decode_model_combos[run].path(
-                offset_train_y, offset_train_c, n_alphas=100, cv=True
+                offset_train_y,
+                offset_train_c,
+                n_alphas=100,
             )
 
             combo_test_y = [

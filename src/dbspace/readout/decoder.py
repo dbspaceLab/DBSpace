@@ -6,46 +6,35 @@ Created on Fri May 15 19:47:25 2020
 @author: virati
 NEW classes for readout training, testing, and validation
 """
-import sklearn
-from sklearn.linear_model import ElasticNet, ElasticNetCV
-from sklearn.utils import shuffle
-from sklearn.model_selection import train_test_split
-from sklearn import metrics
-from sklearn.metrics import roc_curve
-from sklearn.metrics import (
-    precision_recall_curve,
-    average_precision_score,
-    auc,
-    mean_squared_error,
-    mean_absolute_error,
-)
-from sklearn.metrics import roc_auc_score
+import random
 
-from scipy import interp
-
-import warnings
-from collections import defaultdict
-import itertools as itt
-from itertools import compress
-
-import json
-
-import numpy as np
-import scipy.stats as stats
-import scipy.signal as sig
-
-import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.pylab as pl
-
-import random
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.signal as sig
+import scipy.stats as stats
+import sklearn
+from scipy import interp
+from sklearn import metrics
+from sklearn.linear_model import ElasticNet, ElasticNetCV
+from sklearn.metrics import (
+    auc,
+    average_precision_score,
+    mean_absolute_error,
+    mean_squared_error,
+    precision_recall_curve,
+    roc_auc_score,
+    roc_curve,
+)
+from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
 
 np.random.seed(seed=2011)
 random.seed(2011)
 
 import dbspace as dbo
 from dbspace.utils import nestdict
-
 from sklearn import linear_model
 
 default_params = {"CrossValid": 10}
@@ -57,11 +46,8 @@ sns.set_context("paper")
 sns.set(font_scale=4)
 sns.set_style("white")
 
-import itertools
-
-import time
 import copy
-import pdb
+import itertools
 
 
 def zero_mean(inp):
@@ -208,7 +194,6 @@ class base_decoder:
         if do_null:
             shuffled_c = copy.deepcopy(self.train_set_c)
             np.random.shuffle(shuffled_c)
-            # pdb.set_trace()
             self.decode_model = self.regression_algo().fit(self.train_set_y, shuffled_c)
         else:
             self.decode_model = self.regression_algo().fit(
@@ -330,7 +315,6 @@ class base_decoder:
 
         plt.scatter(self.test_set_c, predicted_c)
 
-        # except Exception as e: print(e); pdb.set_trace()
         print(corr)
 
     """Plot the regression visualization of the test procedure"""
@@ -369,7 +353,6 @@ class base_decoder:
             for ff, featname in enumerate(self.do_feats):
                 dofunc = dbo.feat_dict[featname]
                 feat_calc = dofunc["fn"](psd_poly_done, self.fvect, dofunc["param"])
-                # except Exception as e: print(e);pdb.set_trace()
                 feat_vect[ff, :] = np.array([feat_calc[ch] for ch in ["Left", "Right"]])
 
             # We need to flatten the state between channels...
@@ -613,7 +596,6 @@ class weekly_decoder(base_decoder):
             # lin regression to identify slope
             predict_c = run_model.predict(internal_test_y)
             score = run_model.score(internal_test_y, internal_test_c)
-            # pdb.set_trace()
             slope = stats.linregress(
                 internal_test_c.squeeze(), predict_c
             )  # THIS IS BACKWARDS TO AVOID NAN #this used to be linregress(actual,predicted) which is I believe identical to the R^2 of the (predicted,actual) and reflects the percentage of the variance explained
@@ -889,7 +871,6 @@ class weekly_decoderCV(weekly_decoder):
                 ).squeeze()
                 for do_phase in self.filter_phases
             }
-            # pdb.set_trace()
             predicted = []
             actual = []
             for phase in self.filter_phases:
@@ -897,10 +878,8 @@ class weekly_decoderCV(weekly_decoder):
                     predicted.append(0)
                     actual.append(0)
                 else:
-                    try:
-                        predicted.append(sorted_inp[phase][0])
-                    except:
-                        pdb.set_trace()
+
+                    predicted.append(sorted_inp[phase][0])
                     actual.append(sorted_inp[phase][1])
 
             plt.plot(predicted)
@@ -922,7 +901,6 @@ class weekly_decoderCV(weekly_decoder):
         plt.figure()
         plt.plot([0, 1], [0, 1], color="gray", linestyle="dotted")
         ax = sns.regplot(x=predicted_c, y=self.test_set_c.squeeze())
-        # pdb.set_trace()
         for xx, yy, pp, cc in zip(
             predicted_c, self.test_set_c, self.test_set_pt, self.test_set_ph
         ):
@@ -980,7 +958,6 @@ class weekly_decoderCV(weekly_decoder):
         active_coeffs = np.array(active_coeffs).squeeze()
         plt.plot(active_coeffs.T, "r.", markersize=20)
 
-        # pdb.set_trace()
         # plt.plot()
         vp_obj = sns.violinplot(data=active_coeffs, scale="width")
         plt.setp(vp_obj.collections, alpha=0.3)
@@ -1076,7 +1053,6 @@ class controller_analysis:
                 input_ptph=list(zip(test_subset_pt, test_subset_ph)),
             )
             # shuffle?
-            # pdb.set_trace()
             # binarized_c = shuffle(binarized_c);print('PR_Classif: Shuffling binarization')
             coinflip = np.random.choice(
                 [0, 1], size=(len(test_subset_pt),), p=[0.5, 0.5]
@@ -1125,7 +1101,6 @@ class controller_analysis:
             )
             # THIS IS WHERE WE NEED TO SHUFFLE TO TEST THE READOU
             # test_subset_y, test_subset_c, test_subset_pt, test_subset_ph = shuffle(test_subset_y, test_subset_c, test_subset_pt, test_subset_ph)
-            # pdb.set_trace()
             predicted_c = self.readout_model.decode_model.predict(test_subset_y)
 
             binarized_c = self.gen_binarized_state(
@@ -1172,7 +1147,6 @@ class controller_analysis:
         tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
         tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
 
-        # pdb.set_trace()
         ax.plot(mean_fpr, mean_tpr)
         ax.fill_between(mean_fpr, tprs_lower, tprs_upper, alpha=0.2)
         ax.plot(mean_fpr, mean_fpr, linestyle="dotted")
@@ -1225,7 +1199,6 @@ class feat_check(base_decoder):
             for ff, featname in enumerate(self.do_feats):
                 dofunc = dbo.feat_dict[featname]
                 feat_calc = dofunc["fn"](psd_poly_done, self.fvect, dofunc["param"])
-                # except Exception as e: print(e);pdb.set_trace()
                 feat_vect[ff, :] = np.array([feat_calc[ch] for ch in ["Left", "Right"]])
 
             # We need to flatten the state between channels...
@@ -1263,7 +1236,6 @@ class feat_check(base_decoder):
                 band_vect = state_vect[:, band_idx + ss * len(self.do_feats)]
                 stim_vect = state_vect[:, stim_idx + ss * len(self.do_feats)]
                 corr = stats.pearsonr(band_vect, stim_vect)
-                # pdb.set_trace()
                 plt.scatter(
                     band_vect, stim_vect, color=colors[seti], label=phases[seti]
                 )

@@ -1,22 +1,6 @@
-feat_dict = {
-    "Delta": {"fn": get_pow, "param": (1, 4)},
-    "Alpha": {"fn": get_pow, "param": (8, 13)},
-    "Theta": {"fn": get_pow, "param": (4, 8)},
-    "Beta*": {"fn": get_pow, "param": (13, 20)},
-    "Beta": {"fn": get_pow, "param": (13, 30)},
-    "Gamma1": {"fn": get_pow, "param": (35, 60)},
-    "Gamma2": {"fn": get_pow, "param": (60, 100)},
-    "Gamma": {"fn": get_pow, "param": (30, 100)},
-    "Stim": {"fn": get_pow, "param": (129, 131)},
-    "SHarm": {"fn": get_pow, "param": (30, 34)},  # Secondary Harmonic is at 32Hz
-    "THarm": {"fn": get_pow, "param": (64, 68)},  # Tertiary Harmonic is at 66Hz!!!
-    "Clock": {"fn": get_pow, "param": (104.5, 106.5)},
-    "fSlope": {"fn": get_slope, "param": {"frange": (1, 20), "linorder": 1}},
-    "nFloor": {"fn": get_slope, "param": {"frange": (50, 200), "linorder": 0}},
-    "GCratio": {"fn": get_ratio, "param": ((63, 65), (65, 67))},
-}
-
-feat_order = ["Delta", "Theta", "Alpha", "Beta*", "Gamma1"]  # ,'fSlope','nFloor']
+import numpy as np
+import scipy.signal as sig
+import matplotlib.pyplot as plt
 
 # Function to go through and find all the features from the PSD structure of dbo
 def calc_feats(psdIn, yvect, dofeats="", modality="eeg", compute_method="median"):
@@ -108,6 +92,30 @@ def get_pow(Pxx, F, frange, cmode=np.median):
     return out_feats  # This returns the out_feats which are 10*log(Pxx)
 
 
+def get_slope(Pxx, F, params):
+    # method to get the fitted polynomial for the range desired
+    frange = params["frange"]
+    linorder = params["linorder"]
+
+    if isinstance(Pxx, np.ndarray):
+        Pxx = {0: Pxx}
+
+    out_feats = {keys: 0 for keys in Pxx.keys()}
+
+    Fidxs = np.where(np.logical_and(F > frange[0], F < frange[1]))
+
+    for chans, psd in Pxx.items():
+        logpsd = np.log10(psd[Fidxs])
+        logF = np.log10(F[Fidxs])
+
+        fitcoeffs = np.polyfit(logF, logpsd, linorder)
+
+        out_feats[chans] = fitcoeffs[-linorder]
+
+    # return is going to be a dictionary with same channel keys
+    return out_feats
+
+
 def get_ratio(Pxx, F, f_r_set, cmode=np.median):
     bandpow = [None] * len(f_r_set)
     # first get the power for each of the individual bands
@@ -118,7 +126,7 @@ def get_ratio(Pxx, F, f_r_set, cmode=np.median):
     return ret_ratio
 
 
-def F_Domain(timeser, nperseg=512, noverlap=128, nfft=2**10, Fs=422):
+def F_Domain(timeseries, nperseg=512, noverlap=128, nfft=2**10, Fs=422):
 
     # assert isinstance(timeser,dbs.timeseries)
     # Window size is about 1 second (512 samples is over 1 sec)
@@ -126,7 +134,7 @@ def F_Domain(timeser, nperseg=512, noverlap=128, nfft=2**10, Fs=422):
     # what are the dimensions of the timeser we're dealing with?
 
     Fvect, Pxx = sig.welch(
-        timeser,
+        timeseries,
         Fs,
         window="blackmanharris",
         nperseg=nperseg,
@@ -139,11 +147,16 @@ def F_Domain(timeser, nperseg=512, noverlap=128, nfft=2**10, Fs=422):
     return FreqReturn
 
 
-def TF_Domain(timeser, fs=422, nperseg=2**10, noverlap=2**10 - 50):
+def TF_Domain(
+    timeseries: np.ndarray,
+    fs: int = 422,
+    nperseg: int = 2**10,
+    noverlap: int = 2**10 - 50,
+):
     # raise Exception
     # assert isinstance(timeser,dbs.timeseries)
     F, T, SG = sig.spectrogram(
-        timeser,
+        timeseries,
         nperseg=nperseg,
         noverlap=noverlap,
         window=sig.get_window("blackmanharris", nperseg),
@@ -153,3 +166,118 @@ def TF_Domain(timeser, fs=422, nperseg=2**10, noverlap=2**10 - 50):
     TFreqReturn = {"T": T, "F": F, "SG": SG}
 
     return TFreqReturn
+
+
+def poly_subtr(input_psd: np.ndarray, fvect: np.ndarray = None, polyord: int = 4):
+    # This function takes in a raw PSD, Log transforms it, poly subtracts, and then returns the unloged version.
+    # log10 in_psd first
+    if fvect is None:
+        fvect = np.linspace(0, 1, input_psd.shape[0])
+
+    log_psd = 10 * np.log10(input_psd)
+    pfit = np.polyfit(fvect, log_psd, polyord)
+    pchann = np.poly1d(pfit)
+
+    bl_correction = pchann(fvect)
+
+    return 10 ** ((log_psd - bl_correction) / 10), pfit
+
+
+def grab_median_psd(
+    TFcont,
+    bigmed,
+    osc_feat,
+    tlim=(880, 900),
+    title="",
+    do_corr=True,
+    band_compute="median",
+    band_scheme="Adjusted",
+):
+    # Plot some PSDs
+    # plt.figure()
+    chann_label = ["Left", "Right"]
+    pf_lPSD = nestdict()
+
+    if do_corr:
+        psd_lim = (-20, 50)
+    else:
+        psd_lim = (-220, -70)
+
+    # Make the big figure that will have both channels
+    plt.figure(bigmed.number)
+    for cc in range(2):
+        chann = chann_label[cc]
+        plt.subplot(2, 2, cc + 1)
+        T = TFcont["TF"]["T"]
+        F = TFcont["TF"]["F"]
+        SG = TFcont["TF"]["SG"]
+
+        t_idxs = np.where(np.logical_and(T > tlim[0], T < tlim[1]))
+
+        med_psd = np.median(10 * np.log10(SG[chann][:, t_idxs]).squeeze(), axis=1)
+        var_psd = np.var(10 * np.log10(SG[chann][:, t_idxs]).squeeze(), axis=1).reshape(
+            -1, 1
+        )
+        corr_psd = {chann_label[cc]: 10 ** (med_psd / 10)}
+
+        if do_corr:
+            # do polynomial subtraction
+            fixed_psd, polyitself = dbo.poly_subtr(corr_psd, F)
+            pf_lPSD[chann_label[cc]] = fixed_psd[chann_label[cc]].reshape(-1, 1)
+        else:
+            correct_psd, polyitself = dbo.poly_subtr(corr_psd, F)
+
+            pf_lPSD[chann_label[cc]] = 10 ** (med_psd / 10).reshape(-1, 1)
+            plt.plot(F, polyitself, label="Polynomial Fit", color="black")
+
+        plt.plot(F, 10 * np.log10(pf_lPSD[chann_label[cc]]), label=title)
+        plt.title("Channel " + chann_label[cc] + " psd")
+        # try: plt.fill_between(F,(10*np.log10(pf_lPSD[chann_label[cc]]))+var_psd,(10*np.log10(pf_lPSD[chann_label[cc]]))-var_psd)
+
+        plt.ylim(psd_lim)
+
+        plt.subplot(2, 2, 2 + (cc + 1))
+        plt.plot(F, 10 * np.log10(var_psd), label=title)
+        plt.title("Variance in PSD across time: " + chann_label[cc])
+    plt.subplot(2, 2, 4)
+    plt.legend()
+
+    if band_scheme == "Standard":
+        band_wins = ["Delta", "Theta", "Alpha", "Beta", "Gamma"]
+    elif band_scheme == "Adjusted":
+        band_wins = ["Delta", "Theta", "Alpha", "Beta*", "Gamma1"]
+
+    fcalced, bands = dbo.calc_feats(
+        pf_lPSD, F, dofeats=band_wins, modality="lfp", compute_method=band_compute
+    )
+
+    plt.figure(osc_feat.number)
+    plt.subplot(1, 2, 1)
+    plt.plot(fcalced[:, 0], label=title)
+
+    plt.title("Left")
+    plt.subplot(1, 2, 2)
+    plt.plot(fcalced[:, 1], label=title)
+    plt.title("Right")
+    plt.suptitle("Features " + band_compute + " " + band_scheme)
+
+
+feat_dict = {
+    "Delta": {"fn": get_pow, "param": (1, 4)},
+    "Alpha": {"fn": get_pow, "param": (8, 13)},
+    "Theta": {"fn": get_pow, "param": (4, 8)},
+    "Beta*": {"fn": get_pow, "param": (13, 20)},
+    "Beta": {"fn": get_pow, "param": (13, 30)},
+    "Gamma1": {"fn": get_pow, "param": (35, 60)},
+    "Gamma2": {"fn": get_pow, "param": (60, 100)},
+    "Gamma": {"fn": get_pow, "param": (30, 100)},
+    "Stim": {"fn": get_pow, "param": (129, 131)},
+    "SHarm": {"fn": get_pow, "param": (30, 34)},  # Secondary Harmonic is at 32Hz
+    "THarm": {"fn": get_pow, "param": (64, 68)},  # Tertiary Harmonic is at 66Hz!!!
+    "Clock": {"fn": get_pow, "param": (104.5, 106.5)},
+    "fSlope": {"fn": get_slope, "param": {"frange": (1, 20), "linorder": 1}},
+    "nFloor": {"fn": get_slope, "param": {"frange": (50, 200), "linorder": 0}},
+    "GCratio": {"fn": get_ratio, "param": ((63, 65), (65, 67))},
+}
+
+feat_order = ["Delta", "Theta", "Alpha", "Beta*", "Gamma1"]  # ,'fSlope','nFloor']

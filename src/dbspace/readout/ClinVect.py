@@ -17,7 +17,8 @@ import r_pca
 
 
 import dbspace as dbo
-from dbspace.utils import nestdict
+from dbspace.utils.structures import nestdict
+from dbspace.utils.stats import pca
 
 import scipy.stats as stats
 import scipy.signal as sig
@@ -25,10 +26,6 @@ import scipy.io as sio
 
 import matplotlib.pyplot as plt
 from sklearn.metrics import precision_recall_curve, average_precision_score, auc
-
-""" PCA function for merging rPCA results into final DSC """
-
-"""New class for clinical measurements"""
 
 
 class CStruct:

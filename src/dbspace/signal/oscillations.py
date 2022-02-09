@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.signal as sig
 import matplotlib.pyplot as plt
+from dbspace.utils.costs import l2_pow
 
 # Function to go through and find all the features from the PSD structure of dbo
 def calc_feats(psdIn, yvect, dofeats="", modality="eeg", compute_method="median"):
@@ -262,6 +263,113 @@ def grab_median_psd(
     plt.suptitle("Features " + band_compute + " " + band_scheme)
 
 
+# Function to go through and find all the features from the PSD structure of dbo
+def calc_feats(psdIn, yvect, dofeats="", modality="eeg", compute_method="median"):
+    # psdIn is a VECTOR, yvect is the basis vector
+    if dofeats == "":
+        dofeats = feat_order
+
+    if modality == "eeg":
+        ch_list = np.arange(0, 257)
+    elif modality == "lfp":
+        ch_list = ["Left", "Right"]
+
+    feat_vect = []
+    for feat in dofeats:
+        # print(feat_dict[feat]['param'])
+        # dofunc = feat_dict[feat]['fn']
+        if compute_method == "median":
+            computed_featinspace = feat_dict[feat]["fn"](
+                psdIn, yvect, feat_dict[feat]["param"]
+            )
+        elif compute_method == "mean":
+            computed_featinspace = feat_dict[feat]["fn"](
+                psdIn, yvect, feat_dict[feat]["param"], cmode=np.mean
+            )
+
+        cfis_matrix = [computed_featinspace[ch] for ch in ch_list]
+        feat_vect.append(cfis_matrix)
+        # feat_dict[feat] = dofunc['fn'](datacontainer,yvect,dofunc['param'])[0]
+
+    feat_vect = np.array(feat_vect).squeeze()
+
+    return feat_vect, dofeats
+
+
+# Convert a feat dict that comes from a get feature function (WHERE IS IT?!)
+def featDict_to_Matr(featDict):
+    # structure of feat dict is featDict[FEATURE][CHANNEL] = VALUE
+    ret_matr = np.array(
+        [(featDict[feat]["Left"], featDict[feat]["Right"]) for feat in feat_order]
+    )
+
+    # assert that the size is as expected?
+    # should be number of feats x number of channels!
+    assert ret_matr.shape == (len(feat_order), 2)
+
+    return ret_matr
+
+
+""" Higher order measures here"""
+# Make a coherence generation function
+def gen_coher(inpX, Fs=422, nfft=2**10, polyord=0):
+    print("Starting a coherence run...")
+    outPLV = nestdict()
+    outCSD = nestdict()
+
+    fvect = np.linspace(0, Fs / 2, nfft / 2 + 1)
+
+    for chann_i in inpX.keys():
+        print(chann_i)
+        for chann_j in inpX.keys():
+            csd_ensemble = np.zeros(
+                (inpX[chann_i].shape[1], len(feat_order)), dtype=complex
+            )
+            plv = np.zeros((inpX[chann_i].shape[1], len(feat_order)))
+
+            for seg in range(inpX[chann_i].shape[1]):
+                # First we get the cross spectral density
+                csd_out = sig.csd(
+                    inpX[chann_i][:, seg], inpX[chann_j][:, seg], fs=Fs, nperseg=512
+                )[1]
+
+                # normalize the entire CSD for the total power in input signals
+                norm_ms_csd = np.abs(csd_out) / np.sqrt(
+                    l2_pow(inpX[chann_i][:, seg]) * l2_pow(inpX[chann_j][:, seg])
+                )
+
+                # Are we focusing on a band or doing the entire CSD?
+
+                for bb, band in enumerate(feat_order):
+                    # what are our bounds?
+                    band_bounds = feat_dict[band]["param"]
+                    band_idxs = np.where(
+                        np.logical_and(fvect >= band_bounds[0], fvect <= band_bounds[1])
+                    )
+                    csd_ensemble[seg, bb] = cmedian(csd_out[band_idxs])
+                    plv[seg, bb] = np.max(norm_ms_csd[band_idxs])
+
+                # Below brings in the entire csd, but this is dumb
+                # csd_ensemble[seg] = csd_out
+
+                # Compute the PLV
+
+            # Here we find the median across segments
+            # outCSD[chann_i][chann_j] = cmedian(csd_ensemble,axis=0)
+            outCSD[chann_i][chann_j] = csd_ensemble
+
+            # Compute the normalized coherence/PLV
+            outPLV[chann_i][chann_j] = plv
+            # outPLV[chann_i][chann_j] = np.median(plv,axis=0)
+
+            ## PLV abs EEG ->
+            ## Coherence value
+
+    return outCSD, outPLV
+
+
+#%%
+# Variables related to what we're soft-coding as our feature library
 feat_dict = {
     "Delta": {"fn": get_pow, "param": (1, 4)},
     "Alpha": {"fn": get_pow, "param": (8, 13)},

@@ -1,17 +1,11 @@
 # DBSpace
-A library to bridge clinical electrophysiology with dynamical/control systems modeling in deep brain stimulation.
-
+A model-centric Python library to study the dynamics and control of deep brain stimulation.
 
 ## Overview
-Deep brain stimulation (DBS) is growing rapidly as a therapy for neurological and psychiatric disorders, but we aren't sure how it works and what it does to the brain.
-My PhD work was in 'reverse-engineering' the effects and efficacy of SCCwm-DBS for depression \cite{} and this library was a product of that work.
 
-This library is meant to focus on the link between the messay world of clinical electrophysiology and the goals of dynamical neuroscience.
-As such, it prioritizes an 'n=1' inference approach where our goal is to see how well individual patients fit the clinical models being used to treat them.
-While the results of this work may be generalizable to broad neuropsychiatric care, this is not the primary goal.
-Indeed, this library and its toolset are meant to embrace false-positive errors in the effort to generate models for further focused study in parallel with clinical care.
+## Structure
 
-## Running Spot Check
+## Example
 
 ### Choosing files
 spot_check.py is meant to be a quick option to view an LFP recording. It can be run (F5) without any arguments to open up a file chooser and select an LFP recording. Once chosen, the file chooser adds the file to a running list of files to visualize. The file chooser then opens again to enable further selection of files.

@@ -9,6 +9,7 @@ Tractography Class to preprocess and package DTI data relevant to project
 
 
 import json
+from tkinter import W
 
 import dbspace as dbo
 import matplotlib.pyplot as plt
@@ -24,21 +25,24 @@ class engaged_tractography:
     def __init__(
         self,
         do_pts=["901", "903", "905", "906", "907", "908"],
+        v_list=range(2,8),:W
         do_condits=["OnT", "OffT"],
+        electrode_map=None,
     ):
         self.do_pts = do_pts
-        self.v_list = [2, 3, 4, 5, 6, 7]
+        self.v_list = list(v_list)
         self.do_condits = do_condits
         self.stim_configurations = ["L", "R"]
+
+        self.load_electrode_map(electrode_map)
 
     def load_dti(self):
         dti_file = nestdict()
         data = nestdict()
         data_arr = np.zeros(
             (
-                len(self.do_pts),
-                len(self.do_condits),
                 len(self.v_list),
+                len(self.do_condits),
                 len(self.stim_configurations),
                 182,
                 218,
@@ -93,8 +97,8 @@ class engaged_tractography:
             self.electrode_map = json.load(electrode_map)
 
     def plot_V_thresh(self, pt="906", condit="OnT"):
-        #%%
-        # plot the
+        vstim = 2
+
         new_img = nilearn.image.new_img_like(
             self.data[pt][condit][vstim]["L"], (self.middle_idx)
         )
@@ -105,8 +109,12 @@ class engaged_tractography:
     """
 
     def plot_engaged_DTI(self, pt, condit="OnT"):
-        combined = self.combined
+        """
+        Engaged DTI is defined to be the average throughout 2-7V
+        Previous called 'DTI Flow'
 
+        """
+        combined = self.combined
         stacked = image.math_img()
 
     def plot_V_DTI(self, pt="906", condit="OnT", v_select=2, merged=False):

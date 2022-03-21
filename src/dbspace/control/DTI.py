@@ -38,22 +38,12 @@ class engaged_tractography:
 
     def load_dti(self):
         dti_file = nestdict()
-        data = nestdict()
-        data_arr = np.zeros(
-            (
-                len(self.v_list),
-                len(self.do_condits),
-                len(self.stim_configurations),
-                182,
-                218,
-                182,
-            )
-        )
-        combined = nestdict()
+        data_arr = nestdict()
 
         for pp, pt in enumerate(self.do_pts):
             for cc, condit in enumerate(self.do_condits):
                 for vv, vstim in enumerate(self.v_list):
+                    dti_file = {key:[] for key in self.stim_configurations}
                     for ss, side in enumerate(self.stim_configurations):
                         cntct = dbo.Etrode_map[condit][pt][ss] + 1
                         fname = (
@@ -67,31 +57,16 @@ class engaged_tractography:
                             + "V.bin.nii.gz"
                         )
                         dti_file[pt][condit][vstim][side] = fname
+                        dti_file[side] = fname
+                    
+                    dti_data = {side: image.load_img(dti_file[side]) for side in self.stim_configurations}
 
-                        # data[pt][condit][vstim][side] = image.smooth_img(dti_file[pt][condit][vstim][side],fwhm=1)
-                        data[pt][condit][vstim][side] = image.load_img(
-                            dti_file[pt][condit][vstim][side]
-                        )
-
-                        data_arr[pp, cc, vv, ss, :, :, :] = np.array(
-                            data[pt][condit][vstim][side].dataobj
-                        )
-                    combined[pt][condit][vstim] = image.math_img(
-                        "img1+img2",
-                        img1=data[pt][condit][vstim]["L"],
-                        img2=data[pt][condit][vstim]["R"],
-                    )
-
-                stim_mask = np.sum(data_arr, axis=3).squeeze()
-
-                middle = (stim_mask > 0).astype(np.int)
-                middle_idx = np.argmax(middle, axis=0)
-
-        self.combined = combined
-        self.stim_mask = stim_mask
-        self.middle_idx = middle_idx
-        self.data = data
-
+                    bilateral_dti_data_at_v = image.math_img("img1+img2",img1=dti_data[self.stim_configurations[0]], img2=dti_data[self.stim_configurations[1]])
+                    if vstim != 2:
+                        data_arr[pt][condit] = image.math_img("img1+img2", img1=data_arr[pt][condit], img2=bilateral_dti_data_at_v)
+                    else:
+                        data_arr[pt][condit] = copy(bilateral_dti_data_at_v)
+        
     def load_electrode_map(self, target_map_config):
         with open(target_map_config, "r") as electrode_map:
             self.electrode_map = json.load(electrode_map)

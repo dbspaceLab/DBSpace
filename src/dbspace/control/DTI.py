@@ -10,6 +10,7 @@ Tractography Class to preprocess and package DTI data relevant to project
 
 import json
 from tkinter import W
+import tqdm
 
 import dbspace as dbo
 import matplotlib.pyplot as plt
@@ -19,31 +20,33 @@ import nilearn.image as image
 import numpy as np
 from dbspace.utils.structures import nestdict
 from nilearn import image, plotting
+import copy
+import itertools
 
 
 class engaged_tractography:
     def __init__(
         self,
+        target_electrode_map,
         do_pts=["901", "903", "905", "906", "907", "908"],
-        v_list=range(2,8),:W
+        v_list=range(2, 8),
         do_condits=["OnT", "OffT"],
-        electrode_map=None,
     ):
         self.do_pts = do_pts
         self.v_list = list(v_list)
         self.do_condits = do_condits
         self.stim_configurations = ["L", "R"]
 
-        self.load_electrode_map(electrode_map)
+        self.load_electrode_map(target_electrode_map)
 
     def load_dti(self):
-        dti_file = nestdict()
         data_arr = nestdict()
 
         for pp, pt in enumerate(self.do_pts):
+            print(pt)
             for cc, condit in enumerate(self.do_condits):
-                for vv, vstim in enumerate(self.v_list):
-                    dti_file = {key:[] for key in self.stim_configurations}
+                for vv, vstim in tqdm.tqdm(enumerate(self.v_list)):
+                    dti_file = {key: [] for key in self.stim_configurations}
                     for ss, side in enumerate(self.stim_configurations):
                         cntct = dbo.Etrode_map[condit][pt][ss] + 1
                         fname = (
@@ -56,17 +59,29 @@ class engaged_tractography:
                             + str(vstim)
                             + "V.bin.nii.gz"
                         )
-                        dti_file[pt][condit][vstim][side] = fname
                         dti_file[side] = fname
-                    
-                    dti_data = {side: image.load_img(dti_file[side]) for side in self.stim_configurations}
 
-                    bilateral_dti_data_at_v = image.math_img("img1+img2",img1=dti_data[self.stim_configurations[0]], img2=dti_data[self.stim_configurations[1]])
+                    dti_data = {
+                        side: image.load_img(dti_file[side])
+                        for side in self.stim_configurations
+                    }
+
+                    bilateral_dti_data_at_v = image.math_img(
+                        "img1+img2",
+                        img1=dti_data[self.stim_configurations[0]],
+                        img2=dti_data[self.stim_configurations[1]],
+                    )
                     if vstim != 2:
-                        data_arr[pt][condit] = image.math_img("img1+img2", img1=data_arr[pt][condit], img2=bilateral_dti_data_at_v)
+                        data_arr[pt][condit] = image.math_img(
+                            "img1+img2",
+                            img1=data_arr[pt][condit],
+                            img2=bilateral_dti_data_at_v,
+                        )
                     else:
-                        data_arr[pt][condit] = copy(bilateral_dti_data_at_v)
-        
+                        data_arr[pt][condit] = copy.copy(bilateral_dti_data_at_v)
+
+        self.dti_data = data_arr
+
     def load_electrode_map(self, target_map_config):
         with open(target_map_config, "r") as electrode_map:
             self.electrode_map = json.load(electrode_map)
@@ -83,44 +98,55 @@ class engaged_tractography:
     This method plots the DTI for a given patient x condition combination
     """
 
-    def plot_engaged_DTI(self, pt, condit="OnT"):
-        """
-        Engaged DTI is defined to be the average throughout 2-7V
-        Previous called 'DTI Flow'
+    def plot_engaged_tractography(self, condits=["OnT", "OffT"]):
 
-        """
-        combined = self.combined
-        stacked = image.math_img()
+        for cc, condit in enumerate(condits):
 
-    def plot_V_DTI(self, pt="906", condit="OnT", v_select=2, merged=False):
-        combined = self.combined
-        vidx = self.v_list.index(v_select)
-
-        condit = "OnT"
-
-        if merged:
-            stacked = image.math_img(
-                "img1+img2+img3+img4+img5+img6",
-                img1=combined[pt][condit][2],
-                img2=combined[pt][condit][3],
-                img3=combined[pt][condit][4],
-                img4=combined[pt][condit][5],
-                img5=combined[pt][condit][6],
-                img6=combined[pt][condit][7],
-            )
+            engaged_tracto = self.get_engaged_tractography(condit=condit)
 
             plotting.plot_glass_brain(
-                stacked,
+                engaged_tracto,
                 black_bg=True,
                 title=condit + " Tractography",
                 vmin=-15,
                 vmax=15,
             )
-        else:
-            new_img = nilearn.image.new_img_like(
-                self.data[pt][condit][v_select]["L"], (self.middle_idx)
+
+    def get_engaged_tractography(self, condit):
+        dti_data = self.dti_data
+
+        avg_image = [dti_data[pt][condit] for pt in self.do_pts]
+
+        keys = [f"img{n}" for n, pt in enumerate(self.do_pts)]
+        sum_string = "+".join(keys)
+        sum_args = {f"img{n}": dti_data[pt][condit] for n, pt in enumerate(self.do_pts)}
+
+        return image.math_img(sum_string, **sum_args)
+
+    def plot_preference_mask(self, condits=["OnT", "OffT"], thresh=0.05):
+        if len(condits) != 2:
+            raise ValueError("Preference Mask needs two conditions to compare...")
+
+        diff_map = nestdict()
+        dti_data = {key: self.get_engaged_tractography(condit=key) for key in condits}
+        for ccs in itertools.product(condits, repeat=2):
+
+            diff_map[ccs[0]] = image.math_img(
+                "img1 > img2+" + str(thresh),
+                img1=dti_data[ccs[0]],
+                img2=dti_data[ccs[1]],
             )
-            plotting.plot_glass_brain(new_img)
+
+        for target in condits:
+            plotting.plot_glass_brain(
+                diff_map[target],
+                black_bg=True,
+                title=target + " Engaged Preference Mask",
+                vmin=-1,
+                vmax=1,
+            )
+
+    plt.show()
 
 
 if __name__ == "__main__":

@@ -118,21 +118,23 @@ class engaged_tractography:
         avg_image = [dti_data[pt][condit] for pt in self.do_pts]
 
         keys = [f"img{n}" for n, pt in enumerate(self.do_pts)]
-        sum_string = "+".join(keys)
+        # sum_string = "+".join(keys)
+        mean_string = "np.mean(np.array([" + ",".join(keys) + "]),axis=0)"
         sum_args = {f"img{n}": dti_data[pt][condit] for n, pt in enumerate(self.do_pts)}
 
-        return image.math_img(sum_string, **sum_args)
+        return image.math_img(mean_string, **sum_args)
 
-    def plot_preference_mask(self, condits=["OnT", "OffT"], thresh=0.05):
+    def plot_preference_mask(self, condits=["OnT", "OffT"], threshold=0.05):
         if len(condits) != 2:
             raise ValueError("Preference Mask needs two conditions to compare...")
 
         diff_map = nestdict()
         dti_data = {key: self.get_engaged_tractography(condit=key) for key in condits}
         for ccs in itertools.product(condits, repeat=2):
-
+            if ccs[0] == ccs[1]:
+                continue
             diff_map[ccs[0]] = image.math_img(
-                "img1 > img2+" + str(thresh),
+                "img1 > img2+" + str(threshold),
                 img1=dti_data[ccs[0]],
                 img2=dti_data[ccs[1]],
             )

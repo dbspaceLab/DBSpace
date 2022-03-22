@@ -19,6 +19,7 @@ import nilearn
 import nilearn.image as image
 import numpy as np
 from dbspace.utils.structures import nestdict
+from dbspace.utils.functions import unity
 from nilearn import image, plotting
 import copy
 import itertools
@@ -39,13 +40,17 @@ class engaged_tractography:
 
         self.load_electrode_map(target_electrode_map)
 
-    def load_dti(self):
+    def load_dti(self, hide_progress=False):
         data_arr = nestdict()
 
+        if hide_progress:
+            progress_fn = unity
+        else:
+            progress_fn = tqdm.tqdm
         for pp, pt in enumerate(self.do_pts):
             print(pt)
             for cc, condit in enumerate(self.do_condits):
-                for vv, vstim in tqdm.tqdm(enumerate(self.v_list)):
+                for vv, vstim in progress_fn(enumerate(self.v_list)):
                     dti_file = {key: [] for key in self.stim_configurations}
                     for ss, side in enumerate(self.stim_configurations):
                         cntct = dbo.Etrode_map[condit][pt][ss] + 1

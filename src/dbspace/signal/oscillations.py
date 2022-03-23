@@ -3,6 +3,92 @@ import scipy.signal as sig
 import matplotlib.pyplot as plt
 from dbspace.utils.costs import l2_pow
 
+
+#%%
+# Basic functions for rotating recordings into particular frames
+
+
+def gen_T(inpX, Fs=422, nfft=2**10):
+    outT = defaultdict(dict)
+    for chann in inpX.keys():
+        outT[chann] = {
+            "T": np.linspace(0, inpX[chann].shape[0] / Fs, inpX[chann].shape[0]),
+            "V": inpX[chann],
+        }
+
+    return outT
+
+
+""" gen_psd outputs a PSD, not a LogPSD """
+""" This function WRAPS F_Domain"""
+
+
+def gen_psd(inpX, Fs=422, nfft=2**10, polyord=0):
+    # inp X is going to be assumed to be a dictionary with different keys for different channels
+    outPSD = defaultdict(dict)
+    outPoly = defaultdict(dict)
+    # assume input is time x seg
+    for chann in inpX.keys():
+        # The return here is a dictionary with two keys: F and PSD
+        # check the size of the matrix now; it could be that we need to do this many times for each "segment"
+        fmatr = np.zeros((inpX[chann].shape[-1], int(nfft / 2) + 1))
+        polysub = np.zeros((inpX[chann].shape[-1], polyord + 1))
+
+        if inpX[chann].ndim > 1:
+            for seg in range(inpX[chann].shape[-1]):
+
+                psd = np.abs(
+                    F_Domain(inpX[chann][:, seg].squeeze(), Fs=Fs, nfft=nfft)["Pxx"]
+                )  # Just enveloped this with np.abs 12/15/2020
+
+                fmatr[seg, :] = psd
+        else:
+            psd = F_Domain(inpX[chann], Fs=Fs, nfft=nfft)["Pxx"]
+            fmatr = psd
+
+        outPSD[chann] = fmatr.squeeze()
+
+        # do polysub here
+    if polyord != 0:
+        print("Polynomial Correcting Stack")
+        outPSD = poly_subtr(outPSD, np.linspace(0, Fs / 2, nfft / 2 + 1))
+
+    # Return here is a dictionary with Nchann keys
+    return outPSD
+
+
+#%%
+"""Below used to be called poly_subtrLFP, unclear whether it was being used, now renamed and look for errors elsewhere"""
+
+
+def poly_SG(inSG, fVect, order=4):
+    out_sg = np.zeros_like(inSG)
+
+    for seg in range(inSG.shape[1]):
+        inpsd = 10 * np.log10(inpPSD[chann][seg, :])
+        polyCoeff = np.polyfit(fVect, inpsd, order)
+        polyfunc = np.poly1d(polyCoeff)
+        polyitself = polyfunc(fVect)
+        out_sg[:, seg] = 10 ** ((curr_psd - polyitself) / 10)
+
+    return out_sg
+
+
+def gen_SG(inpX, Fs=422, nfft=2**10, plot=False, overlap=True):
+    outSG = defaultdict(dict)
+    for chann in inpX.keys():
+        if overlap == True:
+            outSG[chann] = TF_Domain(inpX[chann])
+        else:
+            outSG[chann] = TF_Domain(inpX[chann], noverlap=0, nperseg=422 * 2)
+
+    if plot:
+        plot_TF(outSG, chs=inpX.keys())
+
+    return outSG
+
+
+#%%
 # Function to go through and find all the features from the PSD structure of dbo
 def calc_feats(psdIn, yvect, dofeats="", modality="eeg", compute_method="median"):
     # psdIn is a VECTOR, yvect is the basis vector
@@ -389,3 +475,52 @@ feat_dict = {
 }
 
 feat_order = ["Delta", "Theta", "Alpha", "Beta*", "Gamma1"]  # ,'fSlope','nFloor']
+
+
+#%%
+# Plotting functions
+
+
+def plot_TF(TFR, chs=["Left", "Right"]):
+    plt.figure()
+    for cc, chann in enumerate(chs):
+        plt.subplot(1, len(chs), cc + 1)
+        aTFR = TFR[chann]
+
+        plt.pcolormesh(aTFR["T"], aTFR["F"], 10 * np.log10(aTFR["SG"]))
+        plt.xlabel("Time")
+        plt.ylabel("Frequency")
+
+
+# This function plots the median/mean across time of the TF representation to get the Frequency representation
+# Slightly different than doing the Welch directly
+def plot_F_fromTF(TFR, chs=["Left", "Right"]):
+    plt.figure()
+    for cc, chann in enumerate(chs):
+        plt.subplot(1, len(chs), cc + 1)
+        aTFR = TFR[chann]
+
+        for ss in range(aTFR["SG"].shape[1]):
+            plt.plot(aTFR["F"], 10 * np.log10(aTFR["SG"])[:, ss], alpha=0.1)
+
+        plt.plot(aTFR["F"], np.median(10 * np.log10(aTFR["SG"]), axis=1))
+        plt.xlabel("Frequency")
+        plt.ylabel("Power")
+
+
+def plot_T(Tser):
+    plt.figure()
+    for cc, chann in enumerate(Tser.keys()):
+        plt.subplot(1, len(Tser.keys()), cc + 1)
+        aT = Tser[chann]
+        plt.plot(aT["T"], aT["V"])
+
+        plt.xlabel("Time")
+
+
+def plot_bands(bandM, bandLabels):
+    plt.figure()
+    for cc in bandM:
+        plt.bar(cc)
+        plt.xticks(range(len(cc)))
+        plt.xticklabels(bandLabels)

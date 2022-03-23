@@ -2,14 +2,14 @@ import numpy as np
 import scipy.signal as sig
 import matplotlib.pyplot as plt
 from dbspace.utils.costs import l2_pow
-
+from dbspace.utils.structures import nestdict
 
 #%%
 # Basic functions for rotating recordings into particular frames
 
 
 def gen_T(inpX, Fs=422, nfft=2**10):
-    outT = defaultdict(dict)
+    outT = nestdict(dict)
     for chann in inpX.keys():
         outT[chann] = {
             "T": np.linspace(0, inpX[chann].shape[0] / Fs, inpX[chann].shape[0]),
@@ -25,8 +25,8 @@ def gen_T(inpX, Fs=422, nfft=2**10):
 
 def gen_psd(inpX, Fs=422, nfft=2**10, polyord=0):
     # inp X is going to be assumed to be a dictionary with different keys for different channels
-    outPSD = defaultdict(dict)
-    outPoly = defaultdict(dict)
+    outPSD = nestdict()
+    outPoly = nestdict()
     # assume input is time x seg
     for chann in inpX.keys():
         # The return here is a dictionary with two keys: F and PSD
@@ -75,7 +75,7 @@ def poly_SG(inSG, fVect, order=4):
 
 
 def gen_SG(inpX, Fs=422, nfft=2**10, plot=False, overlap=True):
-    outSG = defaultdict(dict)
+    outSG = nestdict(dict)
     for chann in inpX.keys():
         if overlap == True:
             outSG[chann] = TF_Domain(inpX[chann])
@@ -309,10 +309,10 @@ def grab_median_psd(
 
         if do_corr:
             # do polynomial subtraction
-            fixed_psd, polyitself = dbo.poly_subtr(corr_psd, F)
+            fixed_psd, polyitself = poly_subtr(corr_psd, F)
             pf_lPSD[chann_label[cc]] = fixed_psd[chann_label[cc]].reshape(-1, 1)
         else:
-            correct_psd, polyitself = dbo.poly_subtr(corr_psd, F)
+            correct_psd, polyitself = poly_subtr(corr_psd, F)
 
             pf_lPSD[chann_label[cc]] = 10 ** (med_psd / 10).reshape(-1, 1)
             plt.plot(F, polyitself, label="Polynomial Fit", color="black")
@@ -334,7 +334,7 @@ def grab_median_psd(
     elif band_scheme == "Adjusted":
         band_wins = ["Delta", "Theta", "Alpha", "Beta*", "Gamma1"]
 
-    fcalced, bands = dbo.calc_feats(
+    fcalced, bands = calc_feats(
         pf_lPSD, F, dofeats=band_wins, modality="lfp", compute_method=band_compute
     )
 
@@ -389,69 +389,9 @@ def featDict_to_Matr(featDict):
         [(featDict[feat]["Left"], featDict[feat]["Right"]) for feat in feat_order]
     )
 
-    # assert that the size is as expected?
-    # should be number of feats x number of channels!
     assert ret_matr.shape == (len(feat_order), 2)
 
     return ret_matr
-
-
-""" Higher order measures here"""
-# Make a coherence generation function
-def gen_coher(inpX, Fs=422, nfft=2**10, polyord=0):
-    print("Starting a coherence run...")
-    outPLV = nestdict()
-    outCSD = nestdict()
-
-    fvect = np.linspace(0, Fs / 2, nfft / 2 + 1)
-
-    for chann_i in inpX.keys():
-        print(chann_i)
-        for chann_j in inpX.keys():
-            csd_ensemble = np.zeros(
-                (inpX[chann_i].shape[1], len(feat_order)), dtype=complex
-            )
-            plv = np.zeros((inpX[chann_i].shape[1], len(feat_order)))
-
-            for seg in range(inpX[chann_i].shape[1]):
-                # First we get the cross spectral density
-                csd_out = sig.csd(
-                    inpX[chann_i][:, seg], inpX[chann_j][:, seg], fs=Fs, nperseg=512
-                )[1]
-
-                # normalize the entire CSD for the total power in input signals
-                norm_ms_csd = np.abs(csd_out) / np.sqrt(
-                    l2_pow(inpX[chann_i][:, seg]) * l2_pow(inpX[chann_j][:, seg])
-                )
-
-                # Are we focusing on a band or doing the entire CSD?
-
-                for bb, band in enumerate(feat_order):
-                    # what are our bounds?
-                    band_bounds = feat_dict[band]["param"]
-                    band_idxs = np.where(
-                        np.logical_and(fvect >= band_bounds[0], fvect <= band_bounds[1])
-                    )
-                    csd_ensemble[seg, bb] = cmedian(csd_out[band_idxs])
-                    plv[seg, bb] = np.max(norm_ms_csd[band_idxs])
-
-                # Below brings in the entire csd, but this is dumb
-                # csd_ensemble[seg] = csd_out
-
-                # Compute the PLV
-
-            # Here we find the median across segments
-            # outCSD[chann_i][chann_j] = cmedian(csd_ensemble,axis=0)
-            outCSD[chann_i][chann_j] = csd_ensemble
-
-            # Compute the normalized coherence/PLV
-            outPLV[chann_i][chann_j] = plv
-            # outPLV[chann_i][chann_j] = np.median(plv,axis=0)
-
-            ## PLV abs EEG ->
-            ## Coherence value
-
-    return outCSD, outPLV
 
 
 #%%

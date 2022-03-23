@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "DBSpace"
+version = "0.1.0"
+description = "Library for data-driven, network-level modeling of clinical DBS dynamics"
+authors = ["Vineet Tiruvadi <virati@gmail.com>"]
+license = "GLPv3"
+
+[tool.poetry.dependencies]
+python = "^3.8.12"
+numpy = "^1.21.2"
+scipy = "^1.7.1"
+matplotlib = "^3.4.3"
+seaborn = "^0.11.2"
+sklearn = "^0.0"
+scikit-learn = "^1.0"
+nilearn = "^0.8.1"
+nibabel = "^3.2.1"
+setuptools = "49.2.1"
+
+[tool.poetry.dev-dependencies]
+setuptools = "49.2.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0","setuptools>=49.2.1"]
+build-backend = "poetry.core.masonry.api"

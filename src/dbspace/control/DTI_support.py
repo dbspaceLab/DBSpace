@@ -464,7 +464,8 @@ def DTI_support_model(
     # alt thresholding
     second_locs = np.logical_and(second_order > first_order, second_order > 20)
     second_normed = second_order / np.max(np.abs(second_order))
-    # plt.figure()
+
+    plt.figure()
     # plt.hist(first_order,bins=20)
     plt.hist(second_normed, bins=20)
     primary_locs = np.logical_and(

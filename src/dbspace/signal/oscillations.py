@@ -75,7 +75,7 @@ def poly_SG(inSG, fVect, order=4):
 
 
 def gen_SG(inpX, Fs=422, nfft=2**10, plot=False, overlap=True):
-    outSG = nestdict(dict)
+    outSG = nestdict()
     for chann in inpX.keys():
         if overlap == True:
             outSG[chann] = TF_Domain(inpX[chann])

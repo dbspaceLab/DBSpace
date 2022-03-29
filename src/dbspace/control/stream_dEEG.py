@@ -6,134 +6,36 @@ Created on Sun Mar 25 17:41:48 2018
 @author: virati
 Streaming Class
 """
-import scipy.io as scio
-import numpy as np
-import pandas as pds
+import logging
+import pickle
 from collections import defaultdict
-import scipy.signal as sig
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-
-plt.rcParams["image.cmap"] = "jet"
-
-
-import dbspace.control.neigh_mont as neigh_mont
-from dbspace.utils.io.pcs_io import load_BR_dict
-from dbspace.signal.oscillations import gen_SG, calc_feats
 
 import dbspace as dbo
+import dbspace.control.neigh_mont as neigh_mont
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.io as scio
+import scipy.signal as sig
+import yaml
+from dbspace.signal.oscillations import calc_feats, gen_SG
+from dbspace.utils.io.pcs_io import load_BR_dict
 from dbspace.utils.structures import nestdict
 from dbspace.viz.MM import EEG_Viz
-
-import pickle
-
-from sklearn import mixture
+from sklearn import mixture, svm
 from sklearn.decomposition import PCA
-from sklearn import svm
+
+# plt.rcParams["image.cmap"] = "jet"
+
+logging.basicConfig(
+    filename="/tmp/network_action.log",
+    filemode="w",
+    format="%(name)s - %(levelname)s - %(message)s",
+)
+logging.info("Starting the log...")
 
 
-Targeting = defaultdict(dict)
-Targeting["All"] = {
-    "901": {
-        "OnT": {
-            "fname": "/home/virati/MDD_Data/hdEEG/Continuous/ALLMATS/DBS901_E52_On_Target_20151030_015625.mat",
-            "lfp": "/home/virati/MDD_Data/BR/901/Session_2014_05_16_Friday/DBS901_2014_05_16_17_10_31__MR_0.txt",
-            "epochs": {"Bilat": (600, 630), "PreBilat": (500, 530)},
-        },
-        "OffT": {
-            "fname": "/home/virati/MDD_Data/hdEEG/Continuous/ALLMATS/DBS901_E52_Off_Target_20151030_022924.mat",
-            "lfp": "/home/virati/MDD_Data/BR/901/Session_2014_05_16_Friday/DBS901_2014_05_16_16_25_07__MR_0.txt",
-            "epochs": {"Bilat": (600, 630), "PreBilat": (480, 510)},
-            "Volt": {},
-        },
-    },
-    "903": {
-        "OnT": {
-            "fname": "",
-            "lfp": "/home/virati/MDD_Data/BR/903/Session_2014_09_03_Wednesday/DBS903_2014_09_03_14_16_57__MR_0.txt",
-            "epochs": {"Bilat": (550, 580), "PreBilat": (501, 531)},
-        },
-        "OffT": {
-            "fname": "",
-            "lfp": "/home/virati/MDD_Data/BR/903/Session_2014_09_04_Thursday/DBS903_2014_09_04_12_53_09__MR_0.txt",
-            "epochs": {"Bilat": (550, 580), "PreBilat": (501, 531)},
-            "Volt": {},
-        },
-    },
-    "905": {
-        "OnT": {
-            "fname": "/home/virati/MDD_Data/hdEEG/Continuous/ALLMATS/DBS905_TurnOn_Day1_onTARGET_20150928_015403.mat",
-            "lfp": "/home/virati/MDD_Data/BR/905/Session_2015_09_28_Monday/Dbs905_2015_09_28_13_51_42__MR_0.txt",
-            "epochs": {"Bilat": (610, 640), "PreBilat": (561, 591)},
-        },
-        "OffT": {
-            "fname": "/home/virati/MDD_Data/hdEEG/Continuous/ALLMATS/DBS905_TurnOn_OffTargetStims_20150929_123449.mat",
-            "lfp": "/home/virati/MDD_Data/BR/905/Session_2015_09_29_Tuesday/Dbs905_2015_09_29_12_32_47__MR_0.txt",
-            "epochs": {"Bilat": (610, 640), "PreBilat": (561, 591)},
-        },
-        "Volt": {},
-    },
-    "906": {
-        "OnT": {
-            #'fname':'/home/virati/MDD_Data/hdEEG/Continuous/DS500/DBS906_TurnOn_Day1_Sess1_20150827_024013_tds.mat'
-            "fname": "/home/virati/MDD_Data/hdEEG/Continuous/Targeting/B04/DBS906/DBS906_TurnOn_Day1_Sess1_20150827_024013_OnTarget.mat",
-            "lfp": "/home/virati/MDD_Data/BR/906/Session_2015_08_27_Thursday/DBS906_2015_08_27_15_10_44__MR_0.txt",
-            "epochs": {"Bilat": (610, 640), "PreBilat": (561, 591)},
-        },
-        "OffT": {
-            "fname": "/home/virati/MDD_Data/hdEEG/Continuous/Targeting/B04/DBS906/DBS906_TurnOn_Day1_Sess2_20150827_041726_OffTarget.mat",
-            "lfp": "/home/virati/MDD_Data/BR/906/Session_2015_08_27_Thursday/DBS906_2015_08_27_16_20_23__MR_0.txt",
-            "epochs": {"Bilat": (610, 640), "PreBilat": (561, 591)},
-        },
-        "Volt": {
-            #
-            #'fname':'/home/virati/MDD_Data/hdEEG/Continuous/ALLMATS/DBS906_TurnOn_Day2_Sess3_Sess4_20150828_043231_VoltageAndFreq.mat'
-            "fname": "/home/virati/MDD_Data/hdEEG/Continuous/ALLMATS/DBS906_TurnOn_Day2_Sess2_20150828_032515_CurrentSweep.mat",
-            "lfp": "",
-        },
-    },
-    "907": {
-        "OnT": {
-            "fname": "/home/virati/MDD_Data/hdEEG/Continuous/ALLMATS/DBS907_TurnOn_Day1_onTARGET_20151216_105913.mat",
-            "lfp": "/home/virati/MDD_Data/BR/907/Session_2015_12_16_Wednesday/DBS907_2015_12_16_12_09_04__MR_0.txt",
-            "epochs": {"Bilat": (640, 670), "PreBilat": (590, 620)},
-        },
-        "OffT": {
-            "fname": "/home/virati/MDD_Data/hdEEG/Continuous/ALLMATS/DBS907_TurnOn_Day2_offTARGET_20151217_094245.mat",
-            "lfp": "/home/virati/MDD_Data/BR/907/Session_2015_12_17_Thursday/DBS907_2015_12_17_10_53_08__MR_0.txt",
-            "epochs": {"Bilat": (625, 655), "PreBilat": (560, 590)},
-        },
-        "Volt": {
-            #'fname':'/home/virati/MDD_Data/hdEEG/Continuous/ALLMATS/DBS907_TurnOn_Day2_Voltage_20151217_102952.mat'
-            "fname": "/home/virati/MDD_Data/hdEEG/Continuous/ALLMATS/DBS907_TurnOn_Day3_Current_20151218_092443.mat",
-            "lfp": "",
-        },
-    },
-    "908": {
-        "OnT": {
-            "fname": "/home/virati/MDD_Data/hdEEG/Continuous/Targeting/B04/DBS908/DBS908_TurnOn_Day1_onTARGET_20160210_125231.mat",
-            "lfp": "/home/virati/MDD_Data/BR/908/Session_2016_02_10_Wednesday/DBS908_2016_02_10_13_03_10__MR_0.txt",
-            "epochs": {"Bilat": (611, 641), "PreBilat": (551, 581)},
-        },
-        "OffT": {
-            "fname": "/home/virati/MDD_Data/hdEEG/Continuous/Targeting/B04/DBS908/DBS908_TurnOn_Day2_offTARGET_20160211_123540.mat",
-            "lfp": "/home/virati/MDD_Data/BR/908/Session_2016_02_11_Thursday/DBS908_2016_02_11_12_34_21__MR_0.txt",
-            "epochs": {"Bilat": (611, 641), "PreBilat": (551, 581)},
-        },
-        "Volt": {"fname": "", "lfp": ""},
-    },
-    "910": {
-        "OnT": {
-            "fname": "/home/virati/MDD_Data/hdEEG/Continuous/ALLMATS/DBS910_TurnOn_OnTarget_20180530_022545.mat",
-            "lfp": "",
-        },
-        "OffT": {
-            "fname": "/home/virati/MDD_Data/hdEEG/Continuous/ALLMATS/DBS910_TurnOn_OffTarget_TO_20180530_014051.mat",
-            "lfp": "",
-        },
-        "Volt": {},
-    },
-}
+DEFAULT_FEAT_ORDER = dbo.signal.oscillations.feat_order
 
 
 class EEG_check:
@@ -147,16 +49,23 @@ class responseLFP:
 
 
 class streamLFP:
-    def __init__(self, pt="908", condit="OnT", ds_fact=1, spotcheck=False):
+    def __init__(self, config_file, pt="908", condit="OnT", ds_fact=1, spotcheck=False):
         self.donfft = 2**10
 
         self.pt = pt
         self.condit = condit
 
+        if config_file is None:
+            raise ValueError("Need to input a streaming configuration file...")
+
+        with open(config_file, "r") as config:
+            Targeting = yaml.safe_load(config)
+
         try:
             container = load_BR_dict(Targeting["All"][pt][condit]["lfp"], sec_offset=0)
         except:
             raise Exception("There's a problem loading the BR Dictionary")
+
         fs = 422
 
         rec_length = container["Left"].shape
@@ -260,6 +169,7 @@ class streamLFP:
 class streamEEG:
     def __init__(
         self,
+        config_file,
         pt="908",
         condit="OnT",
         ds_fact=1,
@@ -270,6 +180,12 @@ class streamEEG:
         # self.data_dict = {ev:{condit:[] for condit in do_condits} for ev in do_pts}
 
         self.donfft = 2**10
+
+        if config_file is None:
+            raise ValueError("Need to input a streaming configuration file...")
+
+        with open(config_file, "r") as config:
+            Targeting = yaml.safe_load(config)
 
         data_dict = defaultdict(dict)
         container = scio.loadmat(Targeting["All"][pt][condit]["fname"])

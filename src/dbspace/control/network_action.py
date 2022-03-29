@@ -19,7 +19,14 @@ import numpy as np
 
 from copy import deepcopy
 
-import pdb
+import logging
+
+logging.basicConfig(
+    filename="/tmp/network_action.log",
+    filemode="w",
+    format="%(name)s - %(levelname)s - %(message)s",
+)
+logging.info("Starting the log...")
 
 DEFAULT_FEAT_ORDER = dbo.signal.oscillations.feat_order
 
@@ -34,7 +41,7 @@ class local_response:
     # Ancillary analysis variables
     Osc_response_uncorr = nestdict()
 
-    def __init__(self, do_pts, analysis_windows=["Bilat", "PreBilat"]):
+    def __init__(self, config_file, do_pts, analysis_windows=["Bilat", "PreBilat"]):
         # Which two epochs are we analysing?
 
         self.win_list = analysis_windows
@@ -43,6 +50,8 @@ class local_response:
 
         self.colors = ["b", "g"]
 
+        self.config_file = config_file
+
     def extract_baselines(self):
         TF_response = self.TF_response
         Osc_response_uncorr = self.Osc_response_uncorr
@@ -50,7 +59,7 @@ class local_response:
         Osc_baseline = self.Osc_baseline
 
         for pt, condit in cart_prod(self.do_pts, ["OnT", "OffT"]):
-            eg_rec = streamLFP(pt=pt, condit=condit)
+            eg_rec = streamLFP(config_file=self.config_file, pt=pt, condit=condit)
             rec = eg_rec.time_series(epoch_name="PreBilat")
             TF_response[pt][condit] = eg_rec.tf_transform(epoch_name="Bilat")
             Osc_response_uncorr[pt][condit] = eg_rec.osc_transform(epoch_name="Bilat")
@@ -267,16 +276,10 @@ class local_response:
                 try:
                     rsres = stats.ks_2samp(distr["OnT"][:, bb], distr["OffT"][:, bb])
                 except:
-                    pdb.set_trace()
-                # rsres = stats.wilcoxon(distr['OnT'][:,bb],distr['OffT'][:,bb])
-                # rsres = stats.ttest_ind(distr['OnT'][:,bb],distr['OffT'][:,bb])
-                print(rsres)
-
-                # ontres = stats.ranksums(distr['OnT'][:,bb])
-                # ontres = stats.kstest(distr['OnT'][:,bb],cdf='norm')
-                # ontres = stats.mannwhitneyu(distr['OnT'][:,bb])
+                    raise Exception("Problem with the KS 2 sample test...")
+                logging.info(rsres)
                 ontres = stats.ttest_1samp(distr["OnT"][:, bb], np.zeros((5, 1)))
-                print(condit + " " + str(ontres))
+                logging.info(condit + " " + str(ontres))
 
             plt.ylim((-30, 50))
             plt.legend()

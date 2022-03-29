@@ -9,6 +9,7 @@ Streaming Class
 import logging
 import pickle
 from collections import defaultdict
+import json
 
 import dbspace as dbo
 import dbspace.control.neigh_mont as neigh_mont
@@ -17,7 +18,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.io as scio
 import scipy.signal as sig
-import yaml
 from dbspace.signal.oscillations import calc_feats, gen_SG
 from dbspace.utils.io.pcs_io import load_BR_dict
 from dbspace.utils.structures import nestdict
@@ -59,7 +59,9 @@ class streamLFP:
             raise ValueError("Need to input a streaming configuration file...")
 
         with open(config_file, "r") as config:
-            Targeting = yaml.safe_load(config)
+            Targeting = json.load(config)
+
+        self.targeting_config = Targeting
 
         try:
             container = load_BR_dict(Targeting["All"][pt][condit]["lfp"], sec_offset=0)
@@ -78,7 +80,7 @@ class streamLFP:
     def gen_epochs(self):
         print("Generating Epochs...")
         # Go in and generate the epochs associated with this recording
-        self.epochs = Targeting["All"][self.pt][self.condit]["epochs"]
+        self.epochs = self.targeting_config["All"][self.pt][self.condit]["epochs"]
         self.epochs["ALL"] = (0, -1)
 
     """
@@ -185,12 +187,14 @@ class streamEEG:
             raise ValueError("Need to input a streaming configuration file...")
 
         with open(config_file, "r") as config:
-            Targeting = yaml.safe_load(config)
+            Targeting = json.load(config)
 
         data_dict = defaultdict(dict)
         container = scio.loadmat(Targeting["All"][pt][condit]["fname"])
         dkey = [key for key in container.keys() if key[0:3] == "DBS"][-1]
         fs = container["EEGSamplingRate"]
+
+        self.targeting_config = Targeting
 
         # data_dict = np.zeros((257,6*60*fs))
         # THIS IS FINE SINCE it's like a highpass with a DCish cutoff

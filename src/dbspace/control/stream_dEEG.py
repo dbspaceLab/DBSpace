@@ -58,10 +58,7 @@ class streamLFP:
         if config_file is None:
             raise ValueError("Need to input a streaming configuration file...")
 
-        with open(config_file, "r") as config:
-            Targeting = json.load(config)
-
-        self.targeting_config = Targeting
+        self.load_config
 
         try:
             container = load_BR_dict(Targeting["All"][pt][condit]["lfp"], sec_offset=0)
@@ -76,6 +73,12 @@ class streamLFP:
         self.data_dict = container
         self.Fs = fs
         self.gen_epochs()
+
+    def load_config(self, config_file):
+        with open(config_file, "r") as config:
+            Targeting = json.load(config)
+
+        self.targeting_config = Targeting
 
     def gen_epochs(self):
         print("Generating Epochs...")

@@ -41,48 +41,6 @@ sns.set_context("paper")
 sns.set(font_scale=4)
 sns.set_style("white")
 
-
-#%%
-
-TargetingEXP = defaultdict(dict)
-# TargetingEXP['conservative'] = {'905':0,'906':0,'907':0,'908':0}
-TargetingEXP["conservative"] = {
-    "905": {
-        "OnT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/conservative/DBS905_B4_OnTarget_HP_LP_seg_mff_cln_ref_con.mat",
-        "OffT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/conservative/DBS905_B4_OffTar_HP_LP_seg_mff_cln_ref_con.mat",
-    },
-    "906": {
-        "OnT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/conservative/DBS906_TO_onTAR_MU_HP_LP_seg_mff_cln_ref_1.mat",
-        "OffT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/conservative/DBS906_TO_offTAR_bcr_LP_HP_seg_bcr_ref.mat",
-    },
-    "907": {
-        "OnT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/conservative/DBS907_TO_onTAR_MU_seg_mff_cln_ref.mat",
-        "OffT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/conservative/DBS907_TO_offTAR_MU_seg_mff_cln_ref.mat",
-    },
-    "908": {
-        "OnT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/conservative/DBS908_TO_onTAR_bcr_LP_seg_mff_cln_bcr_ref.mat",
-        "OffT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/conservative/DBS908_TO_offTAR_bcr_MU_seg_mff_cln_ref_1.mat",
-    },
-}
-TargetingEXP["liberal"] = {
-    "905": {
-        "OnT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/liberal/DBS905_B4_OnTarget_HP_LP_seg_mff_cln_ref_lib.mat",
-        "OffT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/liberal/DBS905_B4_OffTar_HP_LP_seg_mff_cln_ref_lib.mat",
-    },
-    "906": {
-        "OnT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/liberal/DBS906_TO_onTAR_MU_HP_LP_seg_mff_cln_ref.mat",
-        "OffT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/liberal/DBS906_TO_offTAR_LP_seg_mff_cln_ref_1.mat",
-    },
-    "907": {
-        "OnT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/liberal/DBS907_TO_onTAR_MU_seg_mff_cln_2ref.mat",
-        "OffT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/liberal/DBS907_TO_offTAR_MU_seg_mff_cln_2ref.mat",
-    },
-    "908": {
-        "OnT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/liberal/DBS908_TO_onTAR_bcr_LP_seg_mff_cln_ref.mat",
-        "OffT": "/home/virati/MDD_Data/hdEEG/Segmented/Targeting_B4/liberal/DBS908_TO_offTAR_bcr_MU_seg_mff_cln_ref.mat",
-    },
-}
-
 keys_oi = {"OnT": ["Off_3", "BONT"], "OffT": ["Off_3", "BOFT"]}
 
 
@@ -90,11 +48,19 @@ class network_action_dEEG:
     def __init__(
         self,
         pts,
+        config_file=None,
         procsteps="liberal",
         condits=["OnT", "OffT"],
         pretty_mode=False,
         polyfix=0,
     ):
+
+        if config_file is None:
+            raise ValueError(
+                "No config file provided, please provide an experiment json..."
+            )
+
+        self.load_config(config_file)
 
         self.chann_dim = 257
         self.ch_order_list = range(self.chann_dim)
@@ -118,6 +84,12 @@ class network_action_dEEG:
         self.gen_output_variables()
 
     """Setup all the output variables we need"""
+
+    def load_config(self, config_file):
+        with open(config_file, "r") as config:
+            Targeting = json.load(config)
+
+        self.targeting_config = Targeting
 
     def gen_output_variables(self):
         # CHECK IF we're still using ANY of these
@@ -165,7 +137,7 @@ class network_action_dEEG:
             for condit in self.condits:
                 ts_data[pt][condit] = defaultdict(dict)
 
-                temp_data = loadmat(TargetingEXP[self.procsteps][pt][condit])
+                temp_data = loadmat(self.targeting_config[self.procsteps][pt][condit])
 
                 for epoch in keys_oi[condit]:
                     ts_data[pt][condit][epoch] = temp_data[epoch]

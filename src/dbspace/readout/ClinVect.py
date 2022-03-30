@@ -33,7 +33,7 @@ class CStruct:
     scale_max = {"HDRS17": 40, "MADRS": 50, "BDI": 60, "GAF": -100, "DSC": 0.01}
 
     def __init__(self, incl_scales=["HDRS17"]):
-        self.phase_list = dbo.Phase_List("all")
+        self.phase_list = Phase_List("all")
         ClinVect = json.load(
             open("/home/virati/Dropbox/projects/Research/MDD-DBS/Data/ClinVec.json")
         )
@@ -768,3 +768,30 @@ def plot_c_vs_c():
     TestFrame.plot_scale(scale="HDRS17")
     TestFrame.c_dict()
     plt.show()
+
+
+def Phase_List(exprs='all',nmo=-1):
+    '''
+    Phase list for MaybergLab DBS study - patients DBS901-908
+    
+    '''
+    all_phases = ['A04','A03','A02','A01','B01','B02','B03','B04']
+    for aa in range(1,25):
+        if aa < 10:
+            numstr = '0' + str(aa)
+        else:
+            numstr = str(aa)
+        all_phases.append('C'+numstr)
+        
+        ephys_phases = all_phases[4:]
+    if exprs=='all':
+        return all_phases
+    elif exprs=='ephys':
+        return ephys_phases
+    elif exprs == 'Nmo_ephys':
+        #nmo = 3
+        return ephys_phases[0:4*(nmo+1)-1]
+    elif exprs == 'Nmo_onStim':
+        #nmo = 5
+        return ephys_phases[4:4*(nmo+1)-1]
+

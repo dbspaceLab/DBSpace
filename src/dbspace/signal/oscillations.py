@@ -93,7 +93,7 @@ def gen_SG(inpX, Fs=422, nfft=2**10, plot=False, overlap=True):
 def calc_feats(psdIn, yvect, dofeats="", modality="eeg", compute_method="median"):
     # psdIn is a VECTOR, yvect is the basis vector
     if dofeats == "":
-        dofeats = feat_order
+        dofeats = DEFAULT_FEAT_ORDER
 
     if modality == "eeg":
         ch_list = np.arange(0, 257)
@@ -105,12 +105,12 @@ def calc_feats(psdIn, yvect, dofeats="", modality="eeg", compute_method="median"
         # print(feat_dict[feat]['param'])
         # dofunc = feat_dict[feat]['fn']
         if compute_method == "median":
-            computed_featinspace = feat_dict[feat]["fn"](
-                psdIn, yvect, feat_dict[feat]["param"]
+            computed_featinspace = FEAT_DICT[feat]["fn"](
+                psdIn, yvect, FEAT_DICT[feat]["param"]
             )
         elif compute_method == "mean":
-            computed_featinspace = feat_dict[feat]["fn"](
-                psdIn, yvect, feat_dict[feat]["param"], cmode=np.mean
+            computed_featinspace = FEAT_DICT[feat]["fn"](
+                psdIn, yvect, FEAT_DICT[feat]["param"], cmode=np.mean
             )
 
         cfis_matrix = [computed_featinspace[ch] for ch in ch_list]
@@ -126,12 +126,12 @@ def calc_feats(psdIn, yvect, dofeats="", modality="eeg", compute_method="median"
 def featDict_to_Matr(featDict):
     # structure of feat dict is featDict[FEATURE][CHANNEL] = VALUE
     ret_matr = np.array(
-        [(featDict[feat]["Left"], featDict[feat]["Right"]) for feat in feat_order]
+        [(featDict[feat]["Left"], featDict[feat]["Right"]) for feat in DEFAULT_FEAT_ORDER]
     )
 
     # assert that the size is as expected?
     # should be number of feats x number of channels!
-    assert ret_matr.shape == (len(feat_order), 2)
+    assert ret_matr.shape == (len(DEFAULT_FEAT_ORDER), 2)
 
     return ret_matr
 
@@ -353,7 +353,7 @@ def grab_median_psd(
 def calc_feats(psdIn, yvect, dofeats="", modality="eeg", compute_method="median"):
     # psdIn is a VECTOR, yvect is the basis vector
     if dofeats == "":
-        dofeats = feat_order
+        dofeats = DEFAULT_FEAT_ORDER
 
     if modality == "eeg":
         ch_list = np.arange(0, 257)
@@ -365,12 +365,12 @@ def calc_feats(psdIn, yvect, dofeats="", modality="eeg", compute_method="median"
         # print(feat_dict[feat]['param'])
         # dofunc = feat_dict[feat]['fn']
         if compute_method == "median":
-            computed_featinspace = feat_dict[feat]["fn"](
-                psdIn, yvect, feat_dict[feat]["param"]
+            computed_featinspace = FEAT_DICT[feat]["fn"](
+                psdIn, yvect, FEAT_DICT[feat]["param"]
             )
         elif compute_method == "mean":
-            computed_featinspace = feat_dict[feat]["fn"](
-                psdIn, yvect, feat_dict[feat]["param"], cmode=np.mean
+            computed_featinspace = FEAT_DICT[feat]["fn"](
+                psdIn, yvect, FEAT_DICT[feat]["param"], cmode=np.mean
             )
 
         cfis_matrix = [computed_featinspace[ch] for ch in ch_list]
@@ -386,17 +386,17 @@ def calc_feats(psdIn, yvect, dofeats="", modality="eeg", compute_method="median"
 def featDict_to_Matr(featDict):
     # structure of feat dict is featDict[FEATURE][CHANNEL] = VALUE
     ret_matr = np.array(
-        [(featDict[feat]["Left"], featDict[feat]["Right"]) for feat in feat_order]
+        [(featDict[feat]["Left"], featDict[feat]["Right"]) for feat in DEFAULT_FEAT_ORDER]
     )
 
-    assert ret_matr.shape == (len(feat_order), 2)
+    assert ret_matr.shape == (len(DEFAULT_FEAT_ORDER), 2)
 
     return ret_matr
 
 
 #%%
 # Variables related to what we're soft-coding as our feature library
-feat_dict = {
+FEAT_DICT = {
     "Delta": {"fn": get_pow, "param": (1, 4)},
     "Alpha": {"fn": get_pow, "param": (8, 13)},
     "Theta": {"fn": get_pow, "param": (4, 8)},
@@ -414,7 +414,7 @@ feat_dict = {
     "GCratio": {"fn": get_ratio, "param": ((63, 65), (65, 67))},
 }
 
-feat_order = ["Delta", "Theta", "Alpha", "Beta*", "Gamma1"]  # ,'fSlope','nFloor']
+DEFAULT_FEAT_ORDER = ["Delta", "Theta", "Alpha", "Beta*", "Gamma1"]  # ,'fSlope','nFloor']
 
 
 #%%

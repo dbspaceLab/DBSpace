@@ -19,6 +19,7 @@ import pdb
 import numpy as np
 import random
 import scipy.signal as signal
+from dbspace.signal.oscillations import FEAT_DICT
 
 from collections import defaultdict
 import matplotlib.pyplot as plt
@@ -39,7 +40,6 @@ def nearest(items, pivot):
 
 
 class BR_Data_Tree:
-
     data_root_dir = "/home/virati/MDD_Data/BR"  # Where is the raw data?
     im_root_dir = (
         "/home/virati/Dropbox/Data"  # the root directory for intermediate file
@@ -47,21 +47,20 @@ class BR_Data_Tree:
     clin_data_dir = "/home/virati/Dropbox/projects/Research/MDD-DBS/Data"
     sec_end = 10
 
-    def __init__(self, preFrame, do_pts=["901", "903", "905", "906", "907", "908"]):
+    def __init__(self, premade_frame_file, clin_vector_file, do_pts=["901", "903", "905", "906", "907", "908"]):
         # Fix this and don't really make it accessible; we'll stick with a single intermediate file unless you really want to change it
 
         self.do_pts = do_pts
         self.fs = 422
 
         # Load in our clinical vector object with the data from ClinVec.json
-        CVect = json.load(open(self.clin_data_dir + "/ClinVec.json"))["HAMDs"]
+        CVect = json.load(open(clin_vector_file))["HAMDs"]
         clinvect = {pt["pt"]: pt for pt in CVect}
         self.ClinVect = clinvect
 
         self.data_basis = defaultdict()
 
-        """
-        if preFrame == 'GENERATE':
+        if premade_frame_file == 'GENERATE':
             print('Generating the dataframe...')
             self.generate_sequence()
             #Save it now
@@ -70,13 +69,12 @@ class BR_Data_Tree:
 
         else:
             # IF we're loading in a preframe, we're probably doing a bigger analysis
-            self.preFrame_file = self.im_root_dir + preFrame
+            self.preFrame_file = premade_frame_file
             print('Loading in PreFrame...' + self.preFrame_file)
             self.Import_Frame(self.preFrame_file)
 
         #how many seconds to take from the chronic recordings
 
-        """
 
     def generate_TD_sequence(self):
         self.build_phase_dict()
@@ -113,10 +111,6 @@ class BR_Data_Tree:
         # in case the meta-data isn't properly updated from the loaded in deta
         print("Data Loaded")
 
-    def gc_roster(self):
-        # Generate a roster for the GC of all recordings
-        roster = [dbo.check_gc(rr) for rr in self.file_meta]
-
     def Check_GC(self):
         # do just the key features
         # get the stim-related and gc related measures
@@ -125,7 +119,7 @@ class BR_Data_Tree:
             gc_measures = ["Stim", "SHarm", "THarm", "fSlope", "nFloor"]
             gc_results = {key: 0 for key in gc_measures}
             for meas in gc_measures:
-                dofunc = dbo.feat_dict[meas]
+                dofunc = FEAT_DICT[meas]
                 gc_results[meas] = dofunc["fn"](
                     rr["Data"], self.data_basis["F"], dofunc["param"]
                 )
@@ -491,6 +485,6 @@ class BR_Data_Tree:
 if __name__ == "__main__":
     # Unit Test
     # Generate our dataframe
-    DataFrame = BR_Data_Tree(preFrame="GENERATE")
+    DataFrame = BR_Data_Tree(premade_frame_file="GENERATE")
     DataFrame.generate_TD_sequence()
     DataFrame.Save_Frame(name_addendum="Dec2020_T")

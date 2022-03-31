@@ -10,73 +10,72 @@ The PURPOSE of this library should be to just bring in the BrainRadio data in a 
 For example: Determining which phase a recording belongs to will NOT be done in this script, that is under the perview of the DSV
 
 """
-# import sys
-# Need to important DBSpace and DBS_Osc Libraries
-# sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/SigProc/CFC-Testing/Python CFC/')
-# sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
-
-import pdb
-import numpy as np
-import random
-import scipy.signal as signal
-
-from collections import defaultdict
-import matplotlib.pyplot as plt
-
-import os
 import datetime
 import glob
 import json
+import logging
+import os
 import pickle
+import random
+from collections import defaultdict
+from pathlib import Path
 
-# This function is a general function that finds the "nearest" object to the pivot
-# Used in this module for finding the nearest datetime
-def nearest(items, pivot):
-    return min(items, key=lambda x: abs(x - pivot))
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.signal as signal
+from dbspace.readout.ClinVect import Phase_List
+from dbspace.signal.oscillations import FEAT_DICT, gen_psd
+from dbspace.utils.io.pcs_io import load_br_file
 
-
-""" This class generates the data frame (.pickle) that is used in the SCC_Readout project"""
-
+from dbspace.utils.functions import nearest
 
 class BR_Data_Tree:
-
-    data_root_dir = "/home/virati/MDD_Data/BR"  # Where is the raw data?
-    im_root_dir = (
-        "/home/virati/Dropbox/Data"  # the root directory for intermediate file
-    )
-    clin_data_dir = "/home/virati/Dropbox/projects/Research/MDD-DBS/Data"
+    """ 
+    This class generates the data frame (.pickle) that is used in the SCC_Readout project
+    
+    """
     sec_end = 10
+    intermediate_dir = '../../assets/intermediate_data'
 
-    def __init__(self, preFrame, do_pts=["901", "903", "905", "906", "907", "908"]):
+    def __init__(self, frame_label = None, premade_frame_file = None, clin_vector_file = None, do_pts=["901", "903", "905", "906", "907", "908"]):
         # Fix this and don't really make it accessible; we'll stick with a single intermediate file unless you really want to change it
 
         self.do_pts = do_pts
         self.fs = 422
 
         # Load in our clinical vector object with the data from ClinVec.json
-        CVect = json.load(open(self.clin_data_dir + "/ClinVec.json"))["HAMDs"]
-        clinvect = {pt["pt"]: pt for pt in CVect}
-        self.ClinVect = clinvect
+        if clin_vector_file is None:
+            raise ValueError("Need to pass in a Clinical Vector (json) file...")
+
+        CVect = json.load(open(clin_vector_file))["HAMDs"]
+        self.ClinVect = {pt["pt"]: pt for pt in CVect}
+
+        if frame_label is None:
+            #construct from date
+            self._frame_label = str(datetime.date)
+        if Path.Path(self.intermediate_dir + '/ChronicFrame_' + self._frame_label).is_file():
+            logging.info(f"Loading in {frame_label} frame from intermediate file cache...")
+        else:
+            #make a new frame
+            pass
 
         self.data_basis = defaultdict()
 
-        """
-        if preFrame == 'GENERATE':
+        if premade_frame_file is None:
             print('Generating the dataframe...')
             self.generate_sequence()
             #Save it now
-            self.Save_Frame(name_addendum='Dec2020')
+            self.Save_Frame(name_addendum=frame_label)
             #Now just dump us out so we can do whatever we need to with the file above
 
         else:
             # IF we're loading in a preframe, we're probably doing a bigger analysis
-            self.preFrame_file = self.im_root_dir + preFrame
+            self.preFrame_file = premade_frame_file
             print('Loading in PreFrame...' + self.preFrame_file)
             self.Import_Frame(self.preFrame_file)
 
         #how many seconds to take from the chronic recordings
 
-        """
 
     def generate_TD_sequence(self):
         self.build_phase_dict()
@@ -113,10 +112,6 @@ class BR_Data_Tree:
         # in case the meta-data isn't properly updated from the loaded in deta
         print("Data Loaded")
 
-    def gc_roster(self):
-        # Generate a roster for the GC of all recordings
-        roster = [dbo.check_gc(rr) for rr in self.file_meta]
-
     def Check_GC(self):
         # do just the key features
         # get the stim-related and gc related measures
@@ -125,7 +120,7 @@ class BR_Data_Tree:
             gc_measures = ["Stim", "SHarm", "THarm", "fSlope", "nFloor"]
             gc_results = {key: 0 for key in gc_measures}
             for meas in gc_measures:
-                dofunc = dbo.feat_dict[meas]
+                dofunc = FEAT_DICT[meas]
                 gc_results[meas] = dofunc["fn"](
                     rr["Data"], self.data_basis["F"], dofunc["param"]
                 )
@@ -173,7 +168,7 @@ class BR_Data_Tree:
         try:
             self.file_meta = [rr for rr in self.file_meta if rr["BadFlag"] != True]
         except:
-            pdb.set_trace()
+            raise ValueError("Error in the bad flag parsing...")
 
     """This method parses the root data structure and populates a list of recordings"""
 
@@ -282,7 +277,6 @@ class BR_Data_Tree:
 
         if len(empty_phases):
             print("Some Empty Phases!")
-        # pdb.set_trace()
 
     def meta_files(self, mode="Chronic"):
         # Here we're loading in the files that are in the MODE that we want
@@ -363,14 +357,15 @@ class BR_Data_Tree:
     """Saves the frame to the intermediate directory"""
 
     def Save_Frame(self, name_addendum=""):
-        print("Saving File Metastructure in " + self.im_root_dir + "...")
+        print("Saving File Metastructure in /tmp/")
         # np.save(self.im_root_dir + '/Chronic_Frame' + name_addendum + '.npy',self.file_meta)
 
         # Try pickling below
-        pickle.dump(
-            self,
-            open(self.im_root_dir + "/Chronic_Frame" + name_addendum + ".pickle", "wb"),
-        )
+        with open("/tmp/Chronic_Frame" + name_addendum + ".pickle", "wb") as file:
+            pickle.dump(
+                self,
+                file,
+            )
 
     """Here we load in the file *AND* do some preliminary Fourier analysis"""
 
@@ -379,7 +374,7 @@ class BR_Data_Tree:
         # should be 1:1 from file_meta to ts_data
 
         # this returns the full recording
-        txtdata = dbo.load_br_file(fname)
+        txtdata = load_br_file(fname)
 
         # take just the last 10 seconds
         sec_end = self.sec_end
@@ -401,7 +396,7 @@ class BR_Data_Tree:
             # This saves a lot of RAM but obviously has its caveats
             # for this, we want to call the DBS_Osc method for doing FFTs
             # The return from gen_psd is a dictionary eg: {'Left':{'F','PSD'},'Right':{'F','PSD'}}
-            F = dbo.gen_psd(X)  # JUST CHANGED THIS TO abs 12/15/2020
+            F = gen_psd(X)  # JUST CHANGED THIS TO abs 12/15/2020
 
             return F
 
@@ -425,7 +420,7 @@ class BR_Data_Tree:
         tss = {"Left": [], "Right": []}
         for ch in ["Left", "Right"]:
             for rr in self.file_meta:
-                if "Data" in rr.keys() and rr["Phase"] in dbo.Phase_List("ephys"):
+                if "Data" in rr.keys() and rr["Phase"] in Phase_List("ephys"):
                     tss[ch].append(rr["Data"][ch])
         # choose a random sampling
         total_recs = len(tss["Left"])
@@ -436,7 +431,7 @@ class BR_Data_Tree:
             try:
                 output = signal.filtfilt(b, a, tss["Right"][ii].squeeze())
             except:
-                pdb.set_trace()
+                raise Exception("Filtfilt is erroring")
             plt.plot(output, alpha=0.5)
 
     def plot_PSD(self, pt="901"):
@@ -453,11 +448,11 @@ class BR_Data_Tree:
                         np.log10(rr["Data"][ch])
                         for rr in self.file_meta
                         if rr["Patient"] == pt
-                        and rr["Phase"] in dbo.Phase_List("ephys")
+                        and rr["Phase"] in Phase_List("ephys")
                     ]
                 ).T
             except:
-                pdb.set_trace()
+                raise ValueError("PSDs are erroring in log10 conversion")
 
         # list2 = np.array([np.log10(rr['Data']['Left']) for rr in DataFrame.file_meta if rr['Patient'] == '901' and rr['Circadian'] == 'night' and rr['Phase'] in dbo.Phase_List('notherapy')]).T
 
@@ -491,6 +486,6 @@ class BR_Data_Tree:
 if __name__ == "__main__":
     # Unit Test
     # Generate our dataframe
-    DataFrame = BR_Data_Tree(preFrame="GENERATE")
+    DataFrame = BR_Data_Tree(premade_frame_file="GENERATE")
     DataFrame.generate_TD_sequence()
     DataFrame.Save_Frame(name_addendum="Dec2020_T")

@@ -21,7 +21,7 @@ import scipy.signal as sig
 import scipy.stats as stats
 
 import sklearn
-from dbspace.signal.oscillations import calc_feats, feat_dict, feat_order, gen_psd
+from dbspace.signal.oscillations import calc_feats, FEAT_DICT, DEFAULT_FEAT_ORDER, gen_psd
 from dbspace.utils.structures import nestdict
 from dbspace.viz.MM import EEG_Viz
 from scipy.io import loadmat
@@ -179,7 +179,7 @@ class network_action_dEEG:
                     # gotta flatten the DICTIONARY, so have to do it carefully
                     PSD_matr = np.array([seg_psds[ch] for ch in self.ch_order_list])
 
-                    OSC_matr = np.zeros((seg_psds[0].shape[0], 257, len(feat_order)))
+                    OSC_matr = np.zeros((seg_psds[0].shape[0], 257, len(DEFAULT_FEAT_ORDER)))
                     # middle_osc = {chann:seg_psd for chann,seg_psd in seg_psds.items}
                     middle_osc = np.array([seg_psds[ch] for ch in range(257)])
 
@@ -269,7 +269,7 @@ class network_action_dEEG:
         self.targ_response = response
 
     def response_stats(self, band="Alpha", plot=False):
-        band_idx = feat_order.index(band)
+        band_idx = DEFAULT_FEAT_ORDER.index(band)
         response_diff_stats = {pt: [] for pt in self.do_pts}
 
         ## First, check to see if per-channel h-testing rejects the null
@@ -435,7 +435,7 @@ class network_action_dEEG:
 
     # Do per-channel, standard stats. Compare pre-stim to stim condition
     def per_chann_stats(self, condit="OnT", band="Alpha"):
-        band_idx = feat_order.index(band)
+        band_idx = DEFAULT_FEAT_ORDER.index(band)
 
         for pt in self.do_pts:
             ch_stat = np.zeros((257,))
@@ -498,7 +498,7 @@ class network_action_dEEG:
     def topo_median_variability(
         self, pt="POOL", band="Alpha", do_condits=[], use_maya=False
     ):
-        band_i = feat_order.index(band)
+        band_i = DEFAULT_FEAT_ORDER.index(band)
 
         # medians = self.median_response(pt=pt)
 
@@ -543,7 +543,7 @@ class network_action_dEEG:
         scale_w_mad=False,
         avg_func=np.median,
     ):
-        band_i = feat_order.index(band)
+        band_i = DEFAULT_FEAT_ORDER.index(band)
         # medians = self.median_response(pt=pt)
 
         for condit in do_condits:
@@ -604,7 +604,7 @@ class network_action_dEEG:
             medians = self.calc_median_response(pt=pt)[
                 condit
             ]  # if we want to use the standard median Alpha change
-            band_i = feat_order.index(band)
+            band_i = DEFAULT_FEAT_ORDER.index(band)
 
         # medians = np.median(self.targ_response[pt][condit],axis=0)
         fig = plt.figure()
@@ -745,7 +745,7 @@ class network_action_dEEG:
         self, pt="POOL", data_source=[], do_plot=False, band="Alpha"
     ):
         seg_responses = self.osc_bl_norm[pt]["OnT"][
-            :, :, feat_order.index(band)
+            :, :, DEFAULT_FEAT_ORDER.index(band)
         ].squeeze()
         source_label = "Alpha Segmental Response"
 
@@ -1211,7 +1211,7 @@ class network_action_dEEG:
             seg_stack = sig.detrend(self.GMM_Osc_stack[condit], axis=1, type="constant")
             seg_num = seg_stack.shape[1]
 
-            for bb, band in enumerate(feat_order):
+            for bb, band in enumerate(DEFAULT_FEAT_ORDER):
                 covar_matrix[condit][band] = []
                 for seg in range(seg_num):
 
@@ -1325,7 +1325,7 @@ class network_action_dEEG:
             # CHOOSE ALPHA HERE
 
             if band == "Alpha":
-                band_idx = feat_order.index(band)
+                band_idx = DEFAULT_FEAT_ORDER.index(band)
                 segs_feats[condit] = segs_chann_feats[:, chann_mask, band_idx]
 
             elif band == "All":
@@ -1560,7 +1560,7 @@ class network_action_dEEG:
             doridge = doridge / np.linalg.norm(doridge)
             band_idx = np.array([0, 1, 2, 3, 4])
         else:
-            band_idx = feat_order.index(band)
+            band_idx = DEFAULT_FEAT_ORDER.index(band)
             doridge = [0, 0, 0, 0, 0]
             doridge[band_idx] = 1
             # rridge = [0,0,0,0,0]
@@ -1781,7 +1781,7 @@ class network_action_dEEG:
         print(np.sum(np.array(Yte) == np.array(predlabels)) / len(Yte))
 
     def assess_dynamics(self, band="Alpha"):
-        band_idx = feat_order.index(band)
+        band_idx = DEFAULT_FEAT_ORDER.index(band)
         self.OnT_v_OffT_MAD()
 
         # Now, move on to plotting
@@ -2240,7 +2240,7 @@ class network_action_dEEG:
 
         if not mask:
             EEG_Viz.plot_3d_scalp(
-                self.pop_osc_change[condit][feat_order.index(band)],
+                self.pop_osc_change[condit][DEFAULT_FEAT_ORDER.index(band)],
                 mainfig,
                 animate=animate,
                 label=label,
@@ -2249,8 +2249,8 @@ class network_action_dEEG:
         else:
             try:
                 EEG_Viz.plot_3d_scalp(
-                    self.pop_osc_mask[condit][feat_order.index(band)]
-                    * self.pop_osc_change[condit][feat_order.index(band)],
+                    self.pop_osc_mask[condit][DEFAULT_FEAT_ORDER.index(band)]
+                    * self.pop_osc_change[condit][DEFAULT_FEAT_ORDER.index(band)],
                     mainfig,
                     clims=(-1, 1),
                     animate=animate,

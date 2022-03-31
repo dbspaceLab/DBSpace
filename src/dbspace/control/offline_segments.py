@@ -32,15 +32,19 @@ from sklearn.model_selection import StratifiedKFold, learning_curve
 from sklearn.utils import resample
 from statsmodels import robust
 import json
-
+import logging
 sys.path.append("/home/virati/Dropbox/projects/libs/robust-pca/")
 import r_pca
 
 #%%
-keys_oi = {"OnT": ["Off_3", "BONT"], "OffT": ["Off_3", "BOFT"]}
+logging.captureWarnings(True)
 
+#%%
+#%%
 
 class network_action_dEEG:
+    keys_of_interest = {"OnT": ["Off_3", "BONT"], "OffT": ["Off_3", "BOFT"]}
+
     def __init__(
         self,
         pts,
@@ -92,7 +96,7 @@ class network_action_dEEG:
 
         # sloppy containers for the outputs of our analyses
         self.psd_trans = {
-            pt: {condit: {epoch: [] for epoch in keys_oi} for condit in self.condits}
+            pt: {condit: {epoch: [] for epoch in self.keys_of_interest} for condit in self.condits}
             for pt in self.do_pts
         }
         self.PSD_diff = {
@@ -103,7 +107,7 @@ class network_action_dEEG:
         }
 
         self.Feat_trans = {
-            pt: {condit: {epoch: [] for epoch in keys_oi} for condit in self.condits}
+            pt: {condit: {epoch: [] for epoch in self.keys_of_interest} for condit in self.condits}
             for pt in self.do_pts
         }
         self.Feat_diff = {
@@ -135,7 +139,7 @@ class network_action_dEEG:
 
                 temp_data = loadmat(self.targeting_config[self.procsteps][pt][condit])
 
-                for epoch in keys_oi[condit]:
+                for epoch in self.keys_of_interest[condit]:
                     ts_data[pt][condit][epoch] = temp_data[epoch]
 
         self.fs = temp_data["EEGSamplingRate"][0][0]
@@ -161,7 +165,7 @@ class network_action_dEEG:
 
             for condit in self.condits:
                 # feat_dict[pt][condit] = defaultdict(dict)
-                for epoch in keys_oi[condit]:
+                for epoch in self.keys_of_interest[condit]:
                     # find the mean for all segments
                     data_matr = self.ts_data[pt][condit][
                         epoch
@@ -263,7 +267,7 @@ class network_action_dEEG:
                     pdb.set_trace()
                 # Now, go to each segment during stim and subtract the BL for that
                 response[pt][condit] = (
-                    self.osc_dict[pt][condit][keys_oi[condit][1]] - BL[pt][condit]
+                    self.osc_dict[pt][condit][self.keys_of_interest[condit][1]] - BL[pt][condit]
                 )
 
         self.targ_response = response
@@ -344,8 +348,8 @@ class network_action_dEEG:
         print("Pooling Patient Observations")
         self.osc_bl_norm = {
             pt: {
-                condit: self.osc_dict[pt][condit][keys_oi[condit][1]]
-                - np.median(self.osc_dict[pt][condit][keys_oi[condit][0]], axis=0)
+                condit: self.osc_dict[pt][condit][self.keys_of_interest[condit][1]]
+                - np.median(self.osc_dict[pt][condit][self.keys_of_interest[condit][0]], axis=0)
                 for condit in self.condits
             }
             for pt in self.do_pts
@@ -353,8 +357,8 @@ class network_action_dEEG:
         self.osc_bl_norm["POOL"] = {
             condit: np.concatenate(
                 [
-                    self.osc_dict[pt][condit][keys_oi[condit][1]]
-                    - np.median(self.osc_dict[pt][condit][keys_oi[condit][0]], axis=0)
+                    self.osc_dict[pt][condit][self.keys_of_interest[condit][1]]
+                    - np.median(self.osc_dict[pt][condit][self.keys_of_interest[condit][0]], axis=0)
                     for pt in self.do_pts
                 ]
             )
@@ -364,7 +368,7 @@ class network_action_dEEG:
         self.osc_stim = nestdict()
         self.osc_stim = {
             pt: {
-                condit: 10 ** (self.osc_dict[pt][condit][keys_oi[condit][1]] / 10)
+                condit: 10 ** (self.osc_dict[pt][condit][self.keys_of_interest[condit][1]] / 10)
                 for condit in self.condits
             }
             for pt in self.do_pts
@@ -372,7 +376,7 @@ class network_action_dEEG:
         self.osc_stim["POOL"] = {
             condit: np.concatenate(
                 [
-                    10 ** (self.osc_dict[pt][condit][keys_oi[condit][1]] / 10)
+                    10 ** (self.osc_dict[pt][condit][self.keys_of_interest[condit][1]] / 10)
                     for pt in self.do_pts
                 ]
             )
@@ -449,34 +453,34 @@ class network_action_dEEG:
                 for ii in range(100):
                     bl_rand_idx = random.sample(
                         range(
-                            0, self.osc_dict[pt][condit][keys_oi[condit][0]].shape[0]
+                            0, self.osc_dict[pt][condit][self.keys_of_interest[condit][0]].shape[0]
                         ),
                         10,
                     )
                     stim_rand_idx = random.sample(
                         range(
-                            0, self.osc_dict[pt][condit][keys_oi[condit][1]].shape[0]
+                            0, self.osc_dict[pt][condit][self.keys_of_interest[condit][1]].shape[0]
                         ),
                         10,
                     )
 
                     baseline_distr.append(
                         np.mean(
-                            self.osc_dict[pt][condit][keys_oi[condit][0]][
+                            self.osc_dict[pt][condit][self.keys_of_interest[condit][0]][
                                 bl_rand_idx, ch, band_idx
                             ]
                         )
                     )
                     stim_distr.append(
                         np.mean(
-                            self.osc_dict[pt][condit][keys_oi[condit][1]][
+                            self.osc_dict[pt][condit][self.keys_of_interest[condit][1]][
                                 stim_rand_idx, ch, band_idx
                             ]
                         )
                     )
 
-                # baseline_distr = self.osc_dict[pt][condit][keys_oi[condit][0]][0:20,ch,band_idx]#should be segments x bands
-                # stim_distr = self.osc_dict[pt][condit][keys_oi[condit][1]][0:20,ch,band_idx]
+                # baseline_distr = self.osc_dict[pt][condit][self.keys_of_interest[condit][0]][0:20,ch,band_idx]#should be segments x bands
+                # stim_distr = self.osc_dict[pt][condit][self.keys_of_interest[condit][1]][0:20,ch,band_idx]
                 diff_stat = stats.mannwhitneyu(baseline_distr, stim_distr)
                 # diff_stat = stats.f_oneway(baseline_distr,stim_distr)
                 print(str(ch) + ":" + str(diff_stat))
@@ -2138,7 +2142,7 @@ class network_action_dEEG:
             pt: {
                 condit: 10
                 * (
-                    np.log10(avg_psd[pt][condit][keys_oi[condit][1]])
+                    np.log10(avg_psd[pt][condit][self.keys_of_interest[condit][1]])
                     - np.log10(avg_psd[pt][condit]["Off_3"])
                 )
                 for pt, condit in itertools.product(self.do_pts, self.condits)
@@ -2357,7 +2361,7 @@ class network_action_dEEG:
         plt.plot(self.PSD_var[pt][condit]["Off_3"].T)
         plt.xlim((0, 150))
         plt.subplot(122)
-        plt.plot(self.PSD_var[pt][condit][keys_oi[condit][1]].T)
+        plt.plot(self.PSD_var[pt][condit][self.keys_of_interest[condit][1]].T)
         plt.xlim((0, 150))
 
         plt.suptitle(pt + " " + condit)
@@ -2378,7 +2382,7 @@ class network_action_dEEG:
         for pt in do_pts:
             for condit in do_condits:
                 if epochs == "all":
-                    do_epochs = keys_oi[condit]
+                    do_epochs = self.keys_of_interest[condit]
                 else:
                     do_epochs = epochs
 

@@ -244,7 +244,7 @@ class CStruct:
         )
         # find the phase corresponding to the stim change
         bump_phases = np.array(
-            [np.array(dbo.all_phases)[0:][idxs] for idxs in diff_matrix]
+            [np.array(Phase_List('all'))[0:][idxs] for idxs in diff_matrix]
         )
 
         full_table = [

@@ -11,26 +11,17 @@ Linear Regression approaches will extend this class
 import sys
 
 sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
-import DBSpace as dbo
-from DBSpace import nestdict
-
-from DBSpace import unity,displog
-import scipy.stats as stats
-
-import pdb
-import numpy as np
-
-import matplotlib.pyplot as plt
-import seaborn as sns
 from collections import defaultdict
 
-#sns.set()
+import dbspace as dbo
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.stats as stats
+from dbspace.utils.functions import unity
+from dbspace.utils.structures import nestdict
 
-sns.set_context('talk')
-sns.set(font_scale=4)
-sns.set_style('white')
 
-class naive_readout:
+class naive_biomarker:
     def __init__(self,feat_frame,ClinFrame):
         self.feat_frame = feat_frame
         
@@ -174,7 +165,7 @@ class OBands:
             rr.update({'FeatVect':feat_dict})
          
 
-#Standard two state/categorical analyses HERE
+    #Standard two state/categorical analyses HERE
     def mean_psds(self,patients='all',weeks=['C01','C23']):
         if patients == 'all':
             patients = dbo.all_pts

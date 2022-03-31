@@ -8,7 +8,6 @@ Main Class for Processed dEEG Data
 
 """
 
-import pickle
 import random
 import sys
 from collections import defaultdict
@@ -20,7 +19,7 @@ import mne
 import numpy as np
 import scipy.signal as sig
 import scipy.stats as stats
-import seaborn as sns
+
 import sklearn
 from dbspace.signal.oscillations import calc_feats, feat_dict, feat_order, gen_psd
 from dbspace.utils.structures import nestdict
@@ -32,15 +31,12 @@ from sklearn.metrics import auc, confusion_matrix, roc_auc_score, roc_curve
 from sklearn.model_selection import StratifiedKFold, learning_curve
 from sklearn.utils import resample
 from statsmodels import robust
+import json
 
 sys.path.append("/home/virati/Dropbox/projects/libs/robust-pca/")
 import r_pca
 
 #%%
-sns.set_context("paper")
-sns.set(font_scale=4)
-sns.set_style("white")
-
 keys_oi = {"OnT": ["Off_3", "BONT"], "OffT": ["Off_3", "BOFT"]}
 
 
@@ -1497,7 +1493,7 @@ class network_action_dEEG:
     """Plot distribution of change for individual bands"""
 
     def band_distr(self, do_moment="meds"):
-        print("Plotting Distribution for Bands")
+        print("Plotting Distribution for Bands (OLD)")
 
         meds = nestdict()
         mads = nestdict()

@@ -12,7 +12,7 @@ from collections import defaultdict
 import json
 
 import dbspace as dbo
-import dbspace.control.neigh_mont as neigh_mont
+import dbspace.signal.dEEG.neigh_mont as neigh_mont
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np

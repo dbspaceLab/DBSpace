@@ -6,20 +6,17 @@ Created on Sun Dec 15 17:34:13 2019
 @author: virati
 """
 
-import dbspace as dbo
-from dbspace.utils.structures import nestdict
-
+import logging
+from copy import deepcopy
 from itertools import product as cart_prod
 
-from dbspace.control.stream_buffers import streamLFP
-
+import dbspace as dbo
 import matplotlib.pyplot as plt
-import scipy.stats as stats
 import numpy as np
-
-from copy import deepcopy
-
-import logging
+import scipy.stats as stats
+from dbspace.control.stream_buffers import streamLFP
+from dbspace.signal.oscillations import DEFAULT_FEAT_ORDER
+from dbspace.utils.structures import nestdict
 
 logging.basicConfig(
     filename="/tmp/network_action.log",
@@ -28,7 +25,6 @@ logging.basicConfig(
 )
 logging.info("Starting the log...")
 
-DEFAULT_FEAT_ORDER = dbo.signal.oscillations.feat_order
 
 
 class local_response:

@@ -17,7 +17,6 @@ import matplotlib.pylab as pl
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as stats
-import seaborn as sns
 from dbspace.readout.ClinVect import Phase_List
 from dbspace.signal.oscillations import DEFAULT_FEAT_ORDER, poly_subtr
 from dbspace.utils.structures import nestdict
@@ -29,11 +28,6 @@ default_params = {"CrossValid": 10}
 
 np.random.seed(seed=2011)
 random.seed(2011)
-
-sns.set_context("paper")
-
-sns.set(font_scale=4)
-sns.set_style("white")
 
 #%%
 class base_decoder:

@@ -23,6 +23,8 @@ from dbspace.utils.structures import nestdict
 from sklearn import linear_model
 from sklearn.linear_model import ElasticNet, LassoCV, RidgeCV
 from sklearn.model_selection import train_test_split
+from dbspace.utils.functions import zero_mean
+import seaborn as sns
 
 default_params = {"CrossValid": 10}
 

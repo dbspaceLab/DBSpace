@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as stats
 from dbspace.control.stream_buffers import streamLFP
+from dbspace.signal.oscillations import DEFAULT_FEAT_ORDER
 from dbspace.utils.structures import nestdict
 
 logging.basicConfig(
@@ -24,7 +25,6 @@ logging.basicConfig(
 )
 logging.info("Starting the log...")
 
-DEFAULT_FEAT_ORDER = dbo.signal.oscillations.feat_order
 
 
 class local_response:

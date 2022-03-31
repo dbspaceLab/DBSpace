@@ -24,6 +24,7 @@ from dbspace.utils.structures import nestdict
 from dbspace.viz.MM import EEG_Viz
 from sklearn import mixture, svm
 from sklearn.decomposition import PCA
+from dbspace.signal.oscillations import DEFAULT_FEAT_ORDER
 
 # plt.rcParams["image.cmap"] = "jet"
 
@@ -33,9 +34,6 @@ logging.basicConfig(
     format="%(name)s - %(levelname)s - %(message)s",
 )
 logging.info("Starting the log...")
-
-
-DEFAULT_FEAT_ORDER = dbo.signal.oscillations.feat_order
 
 
 class EEG_check:

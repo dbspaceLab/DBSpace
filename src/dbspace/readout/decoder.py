@@ -12,12 +12,11 @@ import matplotlib.cm as cm
 import matplotlib.pylab as pl
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.signal as sig
 import scipy.stats as stats
-import sklearn
 from scipy import interp
 from sklearn import metrics
-from sklearn.linear_model import ElasticNet, ElasticNetCV
+from sklearn.linear_model import ElasticNet, RidgeCV, LassoCV
+from dbspace.signal.oscillations import poly_subtr
 from sklearn.metrics import (
     auc,
     average_precision_score,
@@ -34,7 +33,7 @@ np.random.seed(seed=2011)
 random.seed(2011)
 
 import dbspace as dbo
-from dbspace.utils import nestdict
+from dbspace.utils.structures import nestdict
 from sklearn import linear_model
 
 default_params = {"CrossValid": 10}
@@ -49,6 +48,9 @@ sns.set_style("white")
 import copy
 import itertools
 
+from dbspace.signal.oscillations import DEFAULT_FEAT_ORDER
+from dbspace.readout.ClinVect import Phase_List
+import dbspace.signal.oscillations as dbo
 
 def zero_mean(inp):
     return inp - np.mean(inp)
@@ -76,7 +78,7 @@ class base_decoder:
         if kwargs["FeatureSet"] == "stim_check":
             self.do_feats = ["Delta", "Theta", "Alpha", "Beta*", "Gamma1", "THarm"]
         elif kwargs["FeatureSet"] == "main":
-            self.do_feats = dbo.feat_order
+            self.do_feats = DEFAULT_FEAT_ORDER
 
         self.feat_labels = ["L" + feat for feat in self.do_feats] + [
             "R" + feat for feat in self.do_feats
@@ -88,7 +90,7 @@ class base_decoder:
 
     def filter_recs(self, rec_class="main_study"):
         if rec_class == "main_study":
-            filter_phases = dbo.Phase_List(exprs="ephys")
+            filter_phases = Phase_List(exprs="ephys")
             self.active_rec_list = [
                 rec
                 for rec in self.YFrame.file_meta
@@ -107,7 +109,7 @@ class base_decoder:
     """ Plot things we care about when it comes to how many recordings each patient x phase has, etc."""
 
     def rec_set_size(self):
-        filter_phases = dbo.Phase_List(exprs="ephys")
+        filter_phases = Phase_List(exprs="ephys")
         accounting = np.zeros((len(self.pts), len(filter_phases)))
         detailed_dict = nestdict()
 
@@ -343,15 +345,15 @@ class base_decoder:
 
         for rr in data_set:
             psd_poly_done = {
-                ch: dbo.poly_subtr_vect(
-                    fvect=self.fvect, inp_psd=rr["Data"][ch], polyord=5
+                ch: poly_subtr(
+                    fvect=self.fvect, input_psd=rr["Data"][ch], polyord=5
                 )[0]
                 for ch in rr["Data"].keys()
             }
 
             feat_vect = np.zeros(shape=(len(self.do_feats), self.ch_num))
             for ff, featname in enumerate(self.do_feats):
-                dofunc = dbo.feat_dict[featname]
+                dofunc = dbo.FEAT_DICT[featname]
                 feat_calc = dofunc["fn"](psd_poly_done, self.fvect, dofunc["param"])
                 feat_vect[ff, :] = np.array([feat_calc[ch] for ch in ["Left", "Right"]])
 
@@ -489,15 +491,15 @@ class weekly_decoder(base_decoder):
         super().__init__(*args, **kwargs)
 
         if kwargs["algo"] == "ENR":
-            self.regression_algo = linear_model.ElasticNet(alpha=0.2)
+            self.regression_algo = ElasticNet(alpha=0.2)
         elif kwargs["algo"] == "ENR_all":
-            self.regression_algo = linear_model.ElasticNet
+            self.regression_algo = ElasticNet
             # self.model_args = {'alpha':np.e **-3.4,'l1_ratio':0.8} #5/28, good stats, visual is small
             self.model_args = {"alpha": [], "l1_ratio": 0.8}
         elif kwargs["algo"] == "Ridge":
-            self.regression_algo = linear_model.RidgeCV()
+            self.regression_algo = RidgeCV()
         elif kwargs["algo"] == "Lasso":
-            self.regression_algo = linear_model.LassoCV()
+            self.regression_algo = LassoCV()
 
         if kwargs["variance"] == True:
             self.variance_analysis = True
@@ -579,7 +581,7 @@ class weekly_decoder(base_decoder):
         ) = train_test_split(
             self.train_set_y, self.train_set_c, train_size=0.6, shuffle=True
         )
-        path_model = linear_model.ElasticNet(
+        path_model = ElasticNet(
             l1_ratio=0.8, fit_intercept=True, normalize=False
         )
         path = path_model.path(
@@ -589,7 +591,7 @@ class weekly_decoder(base_decoder):
             n_alphas=1000,
         )
         for alpha in path[0]:
-            run_model = linear_model.ElasticNet(
+            run_model = ElasticNet(
                 alpha=alpha, l1_ratio=0.8, fit_intercept=True, normalize=False
             )
             run_model.fit(internal_train_y, internal_train_c)
@@ -661,7 +663,7 @@ class weekly_decoderCV(weekly_decoder):
 
         if kwargs["algo"] == "ENR":
 
-            self.regression_algo = linear_model.ElasticNet
+            self.regression_algo = ElasticNet
             # self.regression_algo = linear_model.Lasso
             # self.model_args = {'alpha':np.e **-3.4,'l1_ratio':0.8} #5/28, good stats, visual is small
             self.model_args = {"alpha": np.e ** kwargs["alpha"], "l1_ratio": 0.8}
@@ -1197,7 +1199,7 @@ class feat_check(base_decoder):
 
             feat_vect = np.zeros(shape=(len(self.do_feats), self.ch_num))
             for ff, featname in enumerate(self.do_feats):
-                dofunc = dbo.feat_dict[featname]
+                dofunc = dbo.FEAT_DICT[featname]
                 feat_calc = dofunc["fn"](psd_poly_done, self.fvect, dofunc["param"])
                 feat_vect[ff, :] = np.array([feat_calc[ch] for ch in ["Left", "Right"]])
 

@@ -11,7 +11,7 @@ from dbspace.utils.structures import nestdict
 
 from itertools import product as cart_prod
 
-from dbspace.control.stream_dEEG import streamLFP
+from dbspace.control.stream_buffers import streamLFP
 
 import matplotlib.pyplot as plt
 import scipy.stats as stats

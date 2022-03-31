@@ -58,7 +58,9 @@ class streamLFP:
         if config_file is None:
             raise ValueError("Need to input a streaming configuration file...")
 
-        self.load_config
+        with open(config_file, "r") as config:
+            Targeting = json.load(config)
+        self.targeting_config = Targeting
 
         try:
             container = load_BR_dict(Targeting["All"][pt][condit]["lfp"], sec_offset=0)
@@ -86,14 +88,7 @@ class streamLFP:
         self.epochs = self.targeting_config["All"][self.pt][self.condit]["epochs"]
         self.epochs["ALL"] = (0, -1)
 
-    """
-    This should return the timeseries associated with a particular segment
-    """
-
     def time_series(self, epoch_name="All", full_stim=False):
-
-        # Find the indices we need
-        # Do adjustments here if you want LARGER or SMALLER epochs
         if full_stim:
             rec_idxs = np.where(
                 np.logical_and(
@@ -118,15 +113,10 @@ class streamLFP:
 
         return SG
 
-    """
-    Plots and transforms below
-    """
-
     def osc_plot(self, epoch_name="All"):
         Osc_state = self.osc_transform(epoch_name)
 
     def osc_transform(self, epoch_name):
-        # psds = dbo.gen_psd()
         firstpsds = gen_SG(
             self.time_series(epoch_name=epoch_name),
             Fs=self.Fs,

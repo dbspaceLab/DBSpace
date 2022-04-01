@@ -37,9 +37,6 @@ sys.path.append("/home/virati/Dropbox/projects/libs/robust-pca/")
 import r_pca
 
 #%%
-logging.captureWarnings(True)
-
-#%%
 #%%
 
 class network_action_dEEG:

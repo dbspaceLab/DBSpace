@@ -6,29 +6,13 @@ Created on Mon Feb 19 16:39:29 2018
 @author: virati
 """
 
-import sys
-#sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/IntegratedAnalysis/')
-sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
-#import DBSpace as dbs
-import DBSpace as dbo
-from DBSpace import nestdict
-
-import ipdb
-
-import itertools as itt
-
-import numpy as np
-import scipy.signal as sig
+import dbspace as dbo
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
-
-import seaborn as sns
-
-sns.set_context('paper')
-sns.set(font_scale=2)
-sns.set_style('white')
-
+from dbspace.utils.structures import nestdict
 from openpyxl import load_workbook
+
 
 # Create a function to calculat the total brain volume
 def total_brain_volume(gm, wm, wsf):
@@ -54,16 +38,18 @@ class Anatomy:
 
 
 class Z_class:
-    def __init__(self):
-        #fname = '/home/virati/Downloads/MDT_Zs.xlsx'
-        fname = '/home/virati/Dropbox/projects/Research/MDD-DBS/Data/Anatomy/CT/Zs_GMs_Es.xlsx'
-        wb = load_workbook(fname)
-        ws = wb['Zs']
+    def __init__(self, data_file_name='/home/virati/Dropbox/projects/Research/MDD-DBS/Data/Anatomy/CT/Zs_GMs_Es.xlsx', pts = ['DBS901','DBS903','DBS905','DBS906','DBS907','DBS908'],
+):
+        self.data_file_name = data_file_name
         self.xs = nestdict()
-        self.pts = ['DBS901','DBS903','DBS905','DBS906','DBS907','DBS908']
+        self.pts = pts
+
+    def load_data_from_file(self):
+        wb = load_workbook(self.data_file_name)
+        ws = wb['Zs']
+
         for pp,pt in enumerate(self.pts):
             first_col = (pp)*5
-            print(first_col)
             self.xs[pt]['Date'] = np.array([r[first_col].value for r in ws.iter_rows()])[1:]
             self.xs[pt]['Left'] = np.array([r[first_col+2].value for r in ws.iter_rows()])[1:]
             self.xs[pt]['Right'] = np.array([r[first_col+4].value for r in ws.iter_rows()])[1:]
@@ -73,11 +59,7 @@ class Z_class:
             #F ORDER IS CORRECT, gives us 4xobs matrix for each electrode
             self.xs[pt]['Left'] = self.xs[pt]['Left'].reshape(4,-1,order='F')
             self.xs[pt]['Right'] = self.xs[pt]['Right'].reshape(4,-1,order='F')
-            #self.xs[pt]['Left'] = self.xs[pt]['Left'][self.xs[pt]['Left'] != None].reshape(4,-1,order='F')
-            #self.xs[pt]['Right'] = self.xs[pt]['Right'][self.xs[pt]['Right'] != None].reshape(4,-1,order='F')
             
-        self.get_recZs()
-        self.gen_Zdiff()
             
     def ret_Z(self,pt,etrode):
         if etrode > 4:
@@ -99,13 +81,10 @@ class Z_class:
         rec_Zs = {'Left':np.zeros((6,2,28)),'Right':np.zeros((6,2,28))}
                 
         for pp, pt in enumerate(self.pts):
-            print(pt)
             for side in ['Left','Right']:
             #RIGHT NOW THIS DOES E1 FIRST then E3; so goes from lower number to higher number
             #NEEDS TO BE PLOTTED BACKWARDS
                 rec_Zs[side][pp,:,:] = np.vstack((self.xs[pt][side][on_t_es[pp][0]-1][0:28],self.xs[pt]['Left'][on_t_es[pp][0]+1][0:28]))
-        
-        
                 rec_Zs[side][rec_Zs[side] > 4000] = np.nan
         
         self.rec_Zs = rec_Zs
@@ -126,6 +105,8 @@ class Z_class:
             plt.plot(abs_Zdiff,alpha=0.2)
             plt.plot(np.nanmean(abs_Zdiff,axis=1),color='black')
         
+        
+    def impedance_histogram(self):
         #plot the histogram of impedances, all of them
         plt.figure()
         for ss,side in enumerate(['Left','Right']):
@@ -136,7 +117,7 @@ class Z_class:
             plt.hist(side_stack)
             plt.vlines(np.median(side_stack),0,100)
             print(side + ' ' + str(np.median(side_stack)))
-            
+   
     def gen_Zdiff(self):
         self.Zdiff = {'Left':[],'Right':[]}
         for side in ['Left','Right']:

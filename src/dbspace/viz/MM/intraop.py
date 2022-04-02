@@ -15,7 +15,7 @@ def blackrock_plot(pt='905',zoom=False,subtr_baseline=False,domain='TF'):
         plotch = 30
 
     elif pt == '906':
-        datafile = '/home/virati/MDD_Data/OR/DBS906/20150727-174713/20150727-174713-001.ns2'
+        datafile = '/home/virati/MDD_Data/OR/DBS906/20150727-174713-001.ns2'
         start_t = 0
         elec_ids     = 'all'  # 'all' is default for all (1-indexed)
         start_time_s = start_t                       # 0 is default for all

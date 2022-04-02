@@ -40,6 +40,16 @@ class engaged_tractography:
 
         self.load_electrode_map(target_electrode_map)
 
+    def load_behavior(self):
+        #literally just need a map from each stim condition to the button presses involved
+        # Then can invert it
+        pass
+
+    def load_dynamic_oscillations(self):
+        #same as load behavior, but load in the presence of dynamic oscillations
+        # Will do this with a config file for now
+        pass
+
     def load_dti(self, hide_progress=False):
         data_arr = nestdict()
 

@@ -122,6 +122,8 @@ class Z_class:
         self.Zdiff = {'Left':[],'Right':[]}
         for side in ['Left','Right']:
             self.Zdiff[side] = np.squeeze(self.rec_Zs[side][:,1,:].T - self.rec_Zs[side][:,0,:].T)
+
+        return self
         
 
     def plot_recZs(self):

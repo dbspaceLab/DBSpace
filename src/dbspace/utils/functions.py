@@ -1,3 +1,5 @@
+import numpy as np
+
 def unity(x):
     return x
 
@@ -8,3 +10,8 @@ def quadratic(x, c=[0, 0]):
 # Used in this module for finding the nearest datetime
 def nearest(items, pivot):
     return min(items, key=lambda x: abs(x - pivot))
+
+
+def zero_mean(inp):
+    return inp - np.mean(inp)
+

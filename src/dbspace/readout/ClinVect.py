@@ -238,13 +238,14 @@ class CStruct:
 
     def Stim_Change_Table(self):
         # return stim changes in a meaningful format
+        all_phases = Phase_List("all")
 
         diff_matrix = np.hstack(
             (np.diff(self.stim_change_mat) > 0, np.zeros((6, 1)).astype(np.bool))
         )
         # find the phase corresponding to the stim change
         bump_phases = np.array(
-            [np.array(dbo.all_phases)[0:][idxs] for idxs in diff_matrix]
+            [np.array(all_phases)[0:][idxs] for idxs in diff_matrix]
         )
 
         full_table = [
@@ -508,7 +509,7 @@ class CFrame:
             # pt_tcourse = {rr:self.clin_dict['DBS'+patient][rr][scale] for rr in self.clin_dict['DBS'+patient]}
             pt_tcourse = self.pt_scale_tcourse(patient)
             # now setup the right order
-            prop_order = dbo.Phase_List("all")
+            prop_order = Phase_List("all")
             # ordered_tcourse = [pt_tcourse[phase][scale] for phase in prop_order]
             # 4/7/2020
             ordered_tcourse = pt_tcourse[scale]
@@ -525,7 +526,7 @@ class CFrame:
         props = dict(boxstyle="round", facecolor="wheat", alpha=0.5)
 
         # do we want to plot the points when the stim was changed?
-        phase_list = dbo.Phase_List("all")
+        phase_list = Phase_List("all")
         if plot_v_change:
             stim_change_list = self.Stim_Change_Table()
 

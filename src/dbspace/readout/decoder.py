@@ -972,6 +972,8 @@ class weekly_decoderCV(weekly_decoder):
 
 
 class controller_analysis:
+    test_iterations = 100
+
     def __init__(self, readout, **kwargs):
         self.readout_model = readout
         # get our binarized disease states
@@ -1033,7 +1035,7 @@ class controller_analysis:
         aucs = {key: [] for key in controller_types}
         pr_curves = {key: [] for key in controller_types}
 
-        for ii in range(100):
+        for ii in range(self.test_iterations):
             test_subset_y, test_subset_c, test_subset_pt, test_subset_ph = zip(
                 *random.sample(
                     list(
@@ -1068,9 +1070,15 @@ class controller_analysis:
             controllers["empirical"].append(self.pr_classif(binarized_c, test_subset_c))
             controllers["null"].append(self.pr_classif(binarized_c, coinflip))
 
+        self.controllers = controllers
+
+    def controller_runs_plot(self,controller_types,auc,pr_curves):
+        controllers = self.controllers
+
+
         # organize results
         for kk in controller_types:
-            for ii in range(100):
+            for ii in range(self.test_iterations):
                 aucs[kk].append(
                     metrics.auc(controllers[kk][ii][1], controllers[kk][ii][0])
                 )
@@ -1127,6 +1135,14 @@ class controller_analysis:
 
     def density_plot(self):
         pass
+
+    def plot_classif_thresholds(self, thresh, curves, **kwargs):
+        plt.figure()
+        mean_fpr = curves[0]
+        mean_tpr = curves[1]
+
+        plt.plot(thresh,mean_fpr)
+        plt.plot(thresh,mean_tpr)
 
     def plot_classif_runs(self, aucs, roc_curves, **kwargs):
         plt.figure()

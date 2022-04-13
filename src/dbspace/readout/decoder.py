@@ -1079,7 +1079,7 @@ class controller_analysis:
             plot_controllers = controllers.keys()
         # organize results
         
-        pr_curves = {key: [] for key in controller_types}
+        pr_curves = {key: [] for key in plot_controllers}
         
         for kk in plot_controllers:
             for ii in range(self.test_iterations):

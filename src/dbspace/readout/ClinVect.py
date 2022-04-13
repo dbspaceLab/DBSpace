@@ -50,6 +50,9 @@ class CStruct:
         self.normalize_scales()
         self.load_stim_changes()
 
+        self.gen_mHDRS()
+        self.gen_DSC()
+
     """Wraps self.depr_dict to output a patient->scale->phase ARRAY"""
 
     def normalize_scales(self):
@@ -83,7 +86,7 @@ class CStruct:
         allptX = []
 
         # get phase lookup table
-        ph_lut = dbo.all_phases
+        ph_lut = Phase_List('all')
 
         # this is the dictionary of optimal decompositions
         opt_lam_dict = defaultdict(dict)
@@ -151,7 +154,7 @@ class CStruct:
 
     def gen_mHDRS(self):
         print("Generating mHDRS")
-        ph_lut = dbo.all_phases
+        ph_lut = Phase_List('all')
 
         # Cycle through !! THIS USES DSS DICT
         for pat in self.pt_list:

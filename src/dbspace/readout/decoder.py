@@ -582,7 +582,7 @@ class weekly_decoder(base_decoder):
             self.train_set_y, self.train_set_c, train_size=0.6, shuffle=True
         )
         path_model = ElasticNet(
-            l1_ratio=0.8, fit_intercept=True, normalize=False
+            l1_ratio=0.8, fit_intercept=True, 
         )
         path = path_model.path(
             zero_mean(self.train_set_y),
@@ -592,7 +592,7 @@ class weekly_decoder(base_decoder):
         )
         for alpha in path[0]:
             run_model = ElasticNet(
-                alpha=alpha, l1_ratio=0.8, fit_intercept=True, normalize=False
+                alpha=alpha, l1_ratio=0.8, fit_intercept=True, 
             )
             run_model.fit(internal_train_y, internal_train_c)
             # lin regression to identify slope
@@ -998,23 +998,21 @@ class controller_analysis:
 
         precision, recall, thresholds = precision_recall_curve(binarized, predicted)
 
-        # plt.figure()
-        # plt.step(recall,precision)
-        return precision, recall
+        return precision, recall, thresholds
 
     def pr_oracle(self, binarized, level=0.5):
         oracle = np.array(np.copy(binarized)).astype(np.float)
         oracle += np.random.normal(0, level, size=oracle.shape)
 
         precision, recall, thresholds = precision_recall_curve(binarized, oracle)
-        return precision, recall
+        return precision, recall, thresholds
 
     def pr_classif_2pred(self, binarized, predicted, empirical):
         empirical = np.array(empirical).squeeze()
         precision, recall, thresholds = precision_recall_curve(
             binarized, empirical - predicted
         )
-        return precision, recall
+        return precision, recall, thresholds
 
     def bin_classif(self, binarized, predicted):
         fpr, tpr, thresholds = metrics.roc_curve(binarized, predicted)
@@ -1033,7 +1031,7 @@ class controller_analysis:
         ]
         controllers = {key: [] for key in controller_types}
         aucs = {key: [] for key in controller_types}
-        pr_curves = {key: [] for key in controller_types}
+        
 
         for ii in range(self.test_iterations):
             test_subset_y, test_subset_c, test_subset_pt, test_subset_ph = zip(
@@ -1071,20 +1069,30 @@ class controller_analysis:
             controllers["null"].append(self.pr_classif(binarized_c, coinflip))
 
         self.controllers = controllers
+        self.aucs = aucs
 
-    def controller_runs_plot(self,controller_types,auc,pr_curves):
+    def controller_runs_plot(self,plot_controllers = None, plot_pr_aucs=True,plot_pr_thresholds=True):
         controllers = self.controllers
+        aucs = self.aucs
 
-
+        if plot_controllers is None:
+            plot_controllers = controllers.keys()
         # organize results
-        for kk in controller_types:
+        
+        pr_curves = {key: [] for key in controller_types}
+        
+        for kk in plot_controllers:
             for ii in range(self.test_iterations):
                 aucs[kk].append(
                     metrics.auc(controllers[kk][ii][1], controllers[kk][ii][0])
                 )
-                pr_curves[kk].append((controllers[kk][ii][0], controllers[kk][ii][1]))
+                pr_curves[kk].append((controllers[kk][ii][0], controllers[kk][ii][1], controllers[kk][ii][2]))
 
-            self.plot_classif_runs(aucs[kk], pr_curves[kk], title=kk)
+            if plot_pr_aucs:
+                self.plot_classif_runs(aucs[kk], pr_curves[kk], title=kk)
+            
+            if plot_pr_thresholds:
+                self.plot_classif_thresholds(aucs[kk],pr_curves[kk], title=kk)
 
     def classif_runs(
         self,
@@ -1133,27 +1141,45 @@ class controller_analysis:
 
     """Here we'll do a 2-d density plot for error rates using both DR-SCC and nHDRS"""
 
-    def density_plot(self):
-        pass
+    def plot_classif_thresholds(self, aucs, roc_curves, **kwargs):
+        fig, ax = plt.subplots()
+        mean_fpr = np.linspace(0, 1, 100)
+        interp_tpr = []
+        for aa in roc_curves:
+            interp_tpr_individ = interp(mean_fpr, aa[0], aa[1])
+            interp_tpr_individ[0] = 0
+            interp_tpr.append(interp_tpr_individ)
 
-    def plot_classif_thresholds(self, thresh, curves, **kwargs):
-        plt.figure()
-        mean_fpr = curves[0]
-        mean_tpr = curves[1]
+        mean_tpr = np.mean(interp_tpr, axis=0)
+        std_tpr = np.std(interp_tpr, axis=0)
 
-        plt.plot(thresh,mean_fpr)
-        plt.plot(thresh,mean_tpr)
+        #avg_prec = np.mean([roc_curves[ii][0] for ii in range(len(roc_curves))])
+        #avg_recall = np.mean([roc_curves[ii][1] for ii in range(len(roc_curves))])
 
-    def plot_classif_runs(self, aucs, roc_curves, **kwargs):
+
+        ax.plot(roc_curves[0][2],roc_curves[0][0], label="precision")
+        ax.plot(roc_curves[0][2],roc_curves[0][1], label="recall")
+
+        #ax.plot(roc_curves[0][2],avg_prec, label="precision")
+        #ax.plot(roc_curves[0][2],avg_recall, label="recall")
+
+
+        if "title" in kwargs:
+            plt.title(kwargs["title"])
+
+    def plot_classif_histo(self, aucs, roc_curves, **kwargs):
         plt.figure()
         plt.hist(aucs)
         plt.vlines(np.mean(aucs), -1, 10, linewidth=10)
         plt.xlim((0.0, 1.0))
         plt.title(kwargs["title"])
 
-        fig, ax = plt.subplots()
+        
+    def plot_classif_runs(self, aucs, roc_curves, **kwargs):
         mean_fpr = np.linspace(0, 1, 100)
         interp_tpr = []
+
+        fig, ax = plt.subplots()
         for aa in roc_curves:
             interp_tpr_individ = interp(mean_fpr, aa[0], aa[1])
             interp_tpr_individ[0] = 0

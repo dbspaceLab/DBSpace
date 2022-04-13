@@ -60,20 +60,6 @@ def gen_psd(inpX, Fs=422, nfft=2**10, polyord=0):
 #%%
 """Below used to be called poly_subtrLFP, unclear whether it was being used, now renamed and look for errors elsewhere"""
 
-
-def poly_SG(inSG, fVect, order=4):
-    out_sg = np.zeros_like(inSG)
-
-    for seg in range(inSG.shape[1]):
-        inpsd = 10 * np.log10(inpPSD[chann][seg, :])
-        polyCoeff = np.polyfit(fVect, inpsd, order)
-        polyfunc = np.poly1d(polyCoeff)
-        polyitself = polyfunc(fVect)
-        out_sg[:, seg] = 10 ** ((curr_psd - polyitself) / 10)
-
-    return out_sg
-
-
 def gen_SG(inpX, Fs=422, nfft=2**10, plot=False, overlap=True):
     outSG = nestdict()
     for chann in inpX.keys():
@@ -86,6 +72,28 @@ def gen_SG(inpX, Fs=422, nfft=2**10, plot=False, overlap=True):
         plot_TF(outSG, chs=inpX.keys())
 
     return outSG
+
+
+def poly_subtr(inpPSD,fVect,order=5):
+    fix_psd = nestdict()
+
+    for chann in inpPSD.keys():
+        fix_psd[chann] = []
+        inpPSD[chann] = inpPSD[chann].reshape(-1,1).T
+        
+        postpsd_matr = np.zeros((inpPSD[chann].shape[0],inpPSD[chann].shape[1]))
+        
+        for seg in range(inpPSD[chann].shape[0]):
+            curr_psd = 10*np.log10(inpPSD[chann][seg,:])
+            polyCoeff = np.polyfit(fVect,curr_psd,order)
+            
+            polyfunc = np.poly1d(polyCoeff)
+            polyitself = polyfunc(fVect)
+            
+            postpsd_matr[seg,:] = curr_psd - polyitself
+        fix_psd[chann] = 10**(postpsd_matr/10).T
+    
+    return fix_psd, polyitself
 
 
 #%%

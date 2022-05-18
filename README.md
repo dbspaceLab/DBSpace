@@ -18,6 +18,10 @@ A file list can be chosen *a priori* for spot_check.py to run through. This is c
 ## Outputs and Visualizations
 The key visualizations done for each of the selected files is (1) a spectrogram of the left and right channels and (2) a PSD of a particular interval in the recording for the left and right channels.
 
-## History
-
+## Historical Note
 This library was developed slowly over the course of my PhD work under Dr. Helen Mayberg and Dr. Robert Butera.
+The PhD was focused on analysing timeseries from intracranial and extracranial recordings, particularly problematic ones.
+The importance of establishing a model _a priori_ in analysing neural recordings became clear - especially because we had high-dimensional models that were being used ever-day in the management of the patient.
+
+The goal of this library was to recented DBS around the models we were using to treat patients, and enable a way to check in with data to shape those models.
+

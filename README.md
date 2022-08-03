@@ -1,4 +1,4 @@
-# DBSpace
+# dbspace
 A Python library for *model-centric* development of adaptive deep brain stimulation (DBS).
 
 ## Overview

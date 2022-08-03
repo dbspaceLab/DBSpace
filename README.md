@@ -1,7 +1,9 @@
 # DBSpace
-A model-centric Python library to study the dynamics and control of deep brain stimulation.
+A Python library for *model-centric* development of adaptive deep brain stimulation (DBS).
 
 ## Overview
+
+The deployed package is available at PyPi::[dbspace](https://pypi.org/project/dbspace/)
 
 ## Structure
 

@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="DBSpace",
-    version="0.9.0",
+    version="0.1.1",
     author="Vineet Tiruvadi",
     author_email="virati@gmail.com",
     packages=["dbspace"],

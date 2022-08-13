@@ -12,10 +12,7 @@ from collections import defaultdict
 import numpy as np
 import sys
 
-sys.path.append("/home/virati/Dropbox/projects/libs/robust-pca/")
-import r_pca
-
-
+from dbspace.utils.r_pca import r_pca
 import dbspace as dbo
 from dbspace.utils.structures import nestdict
 from dbspace.utils.stats import pca
@@ -770,28 +767,27 @@ def plot_c_vs_c():
     plt.show()
 
 
-def Phase_List(exprs='all',nmo=-1):
-    '''
+def Phase_List(exprs="all", nmo=-1):
+    """
     Phase list for MaybergLab DBS study - patients DBS901-908
-    
-    '''
-    all_phases = ['A04','A03','A02','A01','B01','B02','B03','B04']
-    for aa in range(1,25):
+
+    """
+    all_phases = ["A04", "A03", "A02", "A01", "B01", "B02", "B03", "B04"]
+    for aa in range(1, 25):
         if aa < 10:
-            numstr = '0' + str(aa)
+            numstr = "0" + str(aa)
         else:
             numstr = str(aa)
-        all_phases.append('C'+numstr)
-        
-        ephys_phases = all_phases[4:]
-    if exprs=='all':
-        return all_phases
-    elif exprs=='ephys':
-        return ephys_phases
-    elif exprs == 'Nmo_ephys':
-        #nmo = 3
-        return ephys_phases[0:4*(nmo+1)-1]
-    elif exprs == 'Nmo_onStim':
-        #nmo = 5
-        return ephys_phases[4:4*(nmo+1)-1]
+        all_phases.append("C" + numstr)
 
+        ephys_phases = all_phases[4:]
+    if exprs == "all":
+        return all_phases
+    elif exprs == "ephys":
+        return ephys_phases
+    elif exprs == "Nmo_ephys":
+        # nmo = 3
+        return ephys_phases[0 : 4 * (nmo + 1) - 1]
+    elif exprs == "Nmo_onStim":
+        # nmo = 5
+        return ephys_phases[4 : 4 * (nmo + 1) - 1]

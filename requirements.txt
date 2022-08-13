@@ -16,7 +16,6 @@ configobj==5.0.6
 cryptography==36.0.1
 cycler==0.11.0
 Cython==0.29.27
--e git+https://github.com/virati/DBSpace.git@07c4e416683db8ef5263762778807209cc58141b#egg=DBSpace
 decorator==5.1.1
 docutils==0.18.1
 envisage==6.0.1

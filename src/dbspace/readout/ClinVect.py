@@ -1,16 +1,6 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Feb  7 23:27:33 2018
-
-@author: virati
-Clinical Vector Class
-"""
-
 import json
 from collections import defaultdict
 import numpy as np
-import sys
 
 from dbspace.utils.r_pca import r_pca
 import dbspace as dbo
@@ -20,6 +10,7 @@ from dbspace.utils.stats import pca
 import scipy.stats as stats
 import scipy.signal as sig
 import scipy.io as sio
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 from sklearn.metrics import precision_recall_curve, average_precision_score, auc
@@ -29,7 +20,7 @@ class CStruct:
     all_scales = ["HDRS17", "MADRS", "BDI", "GAF"]
     scale_max = {"HDRS17": 40, "MADRS": 50, "BDI": 60, "GAF": -100, "DSC": 0.01}
 
-    def __init__(self, incl_scales=["HDRS17"]):
+    def __init__(self, incl_scales=["HDRS17"], clinical_data_filepath: Path = None):
         self.phase_list = Phase_List("all")
         ClinVect = json.load(
             open("/home/virati/Dropbox/projects/Research/MDD-DBS/Data/ClinVec.json")

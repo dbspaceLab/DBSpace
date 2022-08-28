@@ -330,10 +330,6 @@ class sim_diff:
 
         plt.pcolormesh(T + self.tlims[0], F, 10 * np.log10(SG), rasterized=True)
 
-
-#%%
-
-
 def unity(in_sig):
     return in_sig
 
@@ -600,35 +596,3 @@ class sim_amp:
         plt.subplot(3, 2, 3)
         # do corrected PSD here
         plt.suptitle("Zdiff = " + str(np.abs(Z1 - Z3)))
-
-
-#%%
-
-if __name__ == "__main__":
-    plt.close("all")
-    diff_run = sim_diff(Ad=2000, wform="moresine4", clock=True, stim_v=6, stim_freq=130)
-    # diff_run.set_brain()
-    # diff_run.set_stim(wform='ipg')
-
-    amp_run = sim_amp(
-        diff_run, family="tanh", noise=1e-6, sig_amp_gain=1, pre_amp_gain=1
-    )
-
-    # diff_run.plot_V_out(1000,1200)
-    # diff_out = diff_run.V_out(1000,1100)['sim_1']
-    Z1 = 1200
-    Z3 = 1300
-
-    amp_run.simulate(Z1, Z3)
-    amp_run.plot_time_dom()
-    amp_run.plot_freq_dom()
-    plt.suptitle(str(Z1) + " diff " + str(Z3))
-    amp_run.plot_tf_dom()
-    plt.suptitle(str(Z1) + " diff " + str(Z3))
-
-    # amp_run.PAPER_plot_V_out(diff_run,Z1,Z3)
-
-    # Do some PAC here..?
-    amp_run.plot_PAC(time_start=5, time_end=8, title="No Stim")
-
-    amp_run.plot_PAC(time_start=12, time_end=15, title="Stim")

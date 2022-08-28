@@ -17,11 +17,13 @@ class sig_amp:
         noise=0,
         sig_amp_gain=1,
         pre_amp_gain=1,
+        final_fs=422,
     ):
         self.diff_inst = diff_inst
         self.family = family
         self.inscale = inscale  # This is a hack to bring the inside of the amp into whatever space we want, transform, and then bring it back out. It should really be removed...
         self.tscale = tscale
+        self.Fs = final_fs
 
         self.sig_amp_gain = sig_amp_gain
 
@@ -59,8 +61,9 @@ class sig_amp:
         return V_out
 
     # BELOW IS THE MEASUREMENT PROCESS< NOISE
-    def gen_recording(self, Z1, Z3):
-        diff_out = self.diff_inst.V_out(Z1, Z3)["sim_1"]
+    def gen_sig_amp_output(self, Z1, Z3):
+        diff_out = self.diff_out
+
         y_out = self.V_out(diff_out)
 
         # do we want to add noise?
@@ -69,89 +72,34 @@ class sig_amp:
 
         return y_out
 
-    def plot_amp_output(self, amp_type="linear"):
+    def dac_sample(self, input_signal, skips):
+        return input_signal[0::skips]
 
-        # First we're going to get our differential amplifier output
-        diff_out = sig.decimate(self.V_out(Z1, Z3)["sim_1"], 10)
-        Fs = self.Fs
-
-        # Here we generate our recording, after the signal amplifier component
-        V_preDC = self.gen_recording(Z1, Z3)
-
-        # now we're going to DOWNSAMPLE
-        # simple downsample, sicne the filter is handled elsewhere and we're trying to recapitulate the hardware
-        Vo = V_preDC[0::10]
-
-        V_out = Vo
-        # Final filtering stage here
-        # b,a = sig.butter(6,1/211,btype='high')
-        # V_out = sig.lfilter(b,a,Vo)
-
-        plt.figure()
-        # Plot the input and output voltages directly over time
-
-        nperseg = 2**9
-        noverlap = 2**9 - 50
-
-        # plot histograms
-        bins = np.linspace(-5, 5, 100)
-        half_pt = np.int(diff_out.shape[0] / 2)
-        plt.hist(diff_out[:half_pt], bins, alpha=0.9)
-        plt.hist(V_out[:half_pt], bins, alpha=0.9)
-
-        plt.subplot(3, 2, 3)
-        # Here, we find the spectrogram of the output from the diff_amp, should not be affected at all by the gain, I guess...
-        # BUT the goal of this is to output a perfect amp... so maybe this is not ideal since the perfect amp still has the gain we want.
-        F, T, SGdiff = sig.spectrogram(
-            self.sig_amp_gain * diff_out,
-            nperseg=nperseg,
-            noverlap=noverlap,
-            window=sig.get_window("blackmanharris", nperseg),
-            fs=4220 / 10,
-        )
-        plt.pcolormesh(T + diff_obj.tlims[0], F, 10 * np.log10(SGdiff), rasterized=True)
-        plt.clim(-120, 0)
-        plt.ylim((0, 200))
-        plt.title("Perfect Amp Output")
-        # plt.colorbar()
-
-        plt.subplot(3, 2, 5)
-        t_beg = T + diff_obj.tlims[0] < -1
-        t_end = T + diff_obj.tlims[0] > 1
-        Pbeg = np.median(10 * np.log10(SGdiff[:, t_beg]), axis=1)
-        Pend = np.median(10 * np.log10(SGdiff[:, t_end]), axis=1)
-        plt.plot(F, Pbeg, color="black")
-        plt.plot(F, Pend, color="green")
-        plt.xlabel("Frequency (Hz)")
-        plt.ylabel("Power (dB)")
-
-        plt.ylim((-200, -20))
-
-    def simulate(self, Z1, Z3, use_windowing="blackmanharris"):
-        diff_out = sig.decimate(self.diff_inst.V_out(Z1, Z3)["sim_1"], 10)
+    def simulate(self, Z1, Z3):
+        self.diff_out = self.diff_inst.V_out(Z1, Z3)["sim_1"]
 
         # Here we generate our recording, after the signal amplifier component
-        V_preDC = self.gen_recording(Z1, Z3)
+        V_preDC = self.gen_sig_amp_output(Z1, Z3)
 
-        # now we're going to DOWNSAMPLE
-        # simple downsample, sicne the filter is handled elsewhere and we're trying to recapitulate the hardware
-        Vo = V_preDC[0::10]
+        downsample_factor = int(np.round(self.diff_inst.full_Fs / self.Fs))
+        V_sampled = self.dac_sample(V_preDC, downsample_factor)
 
-        self.sim_output_signal = Vo
-        self.diff_out = diff_out
+        self.simulated_lfp = V_sampled
+
+    def plot_simulated(self, use_windowing="blackmanharris"):
 
         nperseg = self.nperseg
         noverlap = self.noverlap
 
         self.F, self.T, self.SGout = sig.spectrogram(
-            self.sim_output_signal,
+            self.simulated_lfp,
             nperseg=nperseg,
             noverlap=noverlap,
             window=sig.get_window("blackmanharris", nperseg),
             fs=422,
         )
         _, _, self.SGdiff = sig.spectrogram(
-            self.sig_amp_gain * diff_out,
+            self.sig_amp_gain * self.diff_out,
             nperseg=nperseg,
             noverlap=noverlap,
             window=sig.get_window(use_windowing, nperseg),
@@ -163,7 +111,7 @@ class sig_amp:
     """
 
     def plot_time_dom(self):
-        V_out = self.sim_output_signal
+        V_out = self.simulated_lfp
         diff_out = self.diff_out
         diff_obj = self.diff_inst
 
@@ -175,7 +123,7 @@ class sig_amp:
         plt.ylim((-1e-2, 1e-2))
 
     def plot_freq_dom(self):
-        V_out = self.sim_output_signal
+        V_out = self.simulated_lfp
         diff_out = self.diff_out
         diff_obj = self.diff_inst
 
@@ -215,7 +163,7 @@ class sig_amp:
 
     def plot_tf_dom(self):
 
-        V_out = self.sim_output_signal
+        V_out = self.simulated_lfp
         diff_out = self.diff_out
         diff_obj = self.diff_inst
 
@@ -247,19 +195,6 @@ class sig_amp:
         )
         plt.title("Imperfect Amp Output")
         # plt.colorbar()
-
-    def plot_PAC(self, time_start, time_end, title=""):
-        freqForAmp = 1.5 * np.arange(2, 100)
-        freqForPhase = np.arange(2, 100) / 2 + 1
-        Fs = 422
-        sig1 = self.sim_output_signal[422 * time_start : 422 * time_end]
-        plt.figure()
-        plt.plot(sig1)
-        plt.figure()
-        MIs, comodplt = GLMcomod(sig1, sig1, freqForAmp, freqForPhase, Fs, bw=1.5)
-        # MIs, comodplt = GLMcomodCWT(sig1,sig1,freqForAmp,freqForPhase,Fs,sd_rel_phase=0.14,sd_rel_amp=40);
-        plt.suptitle(title)
-        plt.show()
 
     def plot_osc_power(self):
         # Now we move on to the oscillatory analyses
@@ -319,7 +254,7 @@ class sig_amp:
         Fs = diff_obj.Fs
 
         # Here we generate our recording, after the signal amplifier component
-        V_preDC = self.gen_recording(Z1, Z3)
+        V_preDC = self.gen_sig_amp_output(Z1, Z3)
 
         # now we're going to DOWNSAMPLE
         # simple downsample, sicne the filter is handled elsewhere and we're trying to recapitulate the hardware

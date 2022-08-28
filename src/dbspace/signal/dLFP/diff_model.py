@@ -410,8 +410,7 @@ class sim_amp:
 
     # BELOW IS THE MEASUREMENT PROCESS< NOISE
     def gen_recording(self, Z1, Z3):
-        diff_out = self.diff_inst.V_out(Z1, Z3)["sim_1"]
-        y_out = self.V_out(diff_out)
+        y_out = self.V_out(self.diff_inst.V_out(Z1, Z3)["sim_1"])
 
         # do we want to add noise?
         if self.noise:
@@ -420,7 +419,7 @@ class sim_amp:
         return y_out
 
     def simulate(self, Z1, Z3, use_windowing="blackmanharris"):
-        diff_out = self.diff_inst.V_out(Z1, Z3)["sim_1"]
+        self.diff_out = self.diff_inst.V_out(Z1, Z3)["sim_1"]
         Fs = self.diff_inst.fullFs
 
         # Here we generate our recording, after the signal amplifier component
@@ -428,10 +427,10 @@ class sim_amp:
 
         # now we're going to DOWNSAMPLE
         # simple downsample, sicne the filter is handled elsewhere and we're trying to recapitulate the hardware
+        print(f"Downsampling by {self.ds_factor}")
         Vo = V_preDC[0 :: self.ds_factor]
 
         self.sim_output_signal = Vo
-        self.diff_out = diff_out
 
         nperseg = self.nperseg
         noverlap = self.noverlap
@@ -444,10 +443,10 @@ class sim_amp:
             fs=self.finalFs,
         )
         self.diff_F, self.diff_T, self.SGdiff = sig.spectrogram(
-            self.sig_amp_gain * diff_out,
-            nperseg=nperseg,
+            self.sig_amp_gain * self.diff_out,
+            nperseg=nperseg * self.ds_factor,
             noverlap=noverlap,
-            window=sig.get_window(use_windowing, nperseg),
+            window=sig.get_window(use_windowing, nperseg * self.ds_factor),
             fs=self.diff_inst.fullFs,
         )
 
@@ -490,6 +489,7 @@ class sim_amp:
         plt.xlabel("Frequency (Hz)")
         plt.ylabel("Power (dB)")
         plt.ylim((-200, -20))
+        plt.xlim((0, 250))
         plt.title("Perfect Amp")
 
         plt.subplot(1, 2, 2)
@@ -503,6 +503,7 @@ class sim_amp:
         plt.xlabel("Frequency (Hz)")
         plt.ylabel("Power (dB)")
         plt.ylim((-200, -20))
+        plt.xlim((0, 250))
         plt.title("Realistic Amp")
         # plt.suptitle('Zdiff = ' + str(np.abs(Z1 - Z3)))
 

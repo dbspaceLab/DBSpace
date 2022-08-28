@@ -37,7 +37,7 @@ class sim_amp:
 
         self.pre_amp_gain = pre_amp_gain
 
-        self.final_fs = final_Fs
+        self.final_Fs = final_Fs
 
     def set_T_func(self):
         if self.family == "perfect":
@@ -51,7 +51,9 @@ class sim_amp:
     # THIS JUST FOCUsES ON THE ACTUAL SCALING AND AMPLIFIER PROCESS, ignore noise here
     def V_out(self, V_in):
         self.tvect = np.linspace(
-            self.tscale[0], self.tscale[1], np.round(V_in.shape[0] / 10).astype(np.int)
+            self.tscale[0],
+            self.tscale[1],
+            (self.tscale[1] - self.tscale[0]) * self.final_Fs,
         )
         # put some noise inside?
         V_out = (
@@ -97,7 +99,7 @@ class sim_amp:
             nperseg=nperseg,
             noverlap=noverlap,
             window=sig.get_window("blackmanharris", nperseg),
-            fs=self.final_fs,
+            fs=self.final_Fs,
         )
         _, _, self.SGdiff = sig.spectrogram(
             self.sig_amp_gain * diff_out,
@@ -118,10 +120,13 @@ class sim_amp:
         # for plotting, we may want to decimate the diff_output
         if display_downsample:
             diff_out = sig.decimate(diff_out, display_downsample)
+            diff_out_tvect = self.diff_inst.tvect // display_downsample
+        else:
+            diff_out_tvect = self.diff_inst.tvect
 
         plt.figure()
         # Plot the input and output voltages directly over time
-        plt.plot(self.tvect, diff_out, label="Input Voltage", alpha=0.6)
+        plt.plot(diff_out_tvect, diff_out, label="Input Voltage", alpha=0.6)
         plt.plot(self.tvect, V_out, label="Output Voltage", alpha=0.5)
         plt.legend()
         plt.ylim((-1e-2, 1e-2))

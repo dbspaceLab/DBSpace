@@ -275,16 +275,14 @@ class sim_diff:
         self.Vd_x2(Z1, Z3)
         self.Vd_brain(Z1, Z3)
 
-        # amplitudes should be determined HERE
-
-        Vo = (self.brain_component + self.x2_component) + (self.stim_component)
+        V_target = (self.brain_component + self.x2_component) + (self.stim_component)
 
         if self.clockflag:
-            Vo += self.clock
+            V_target += self.clock
 
         # first, filter
         b, a = sig.butter(5, 100 / self.Fs, btype="lowpass")
-        Vo = sig.lfilter(b, a, Vo)
+        Vo = sig.lfilter(b, a, V_target)
 
         return {"sim_1": Vo / 2}
 

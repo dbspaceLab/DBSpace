@@ -78,7 +78,8 @@ class sim_amp:
         V_preDC, self.diff_out = self.gen_recording(Z1, Z3)
 
         # now we're going to DOWNSAMPLE (raw)
-        Vo = V_preDC[0::10]
+        downsample_factor = self.diff_inst.Fs // self.final_Fs
+        Vo = V_preDC[0::downsample_factor]
 
         self.sim_output_signal = Vo
 

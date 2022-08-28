@@ -176,9 +176,7 @@ class stim_sig:
             # tenth_sec_stim = np.load('/home/virati/tenth_sec_ipg.npy')
             # full_stim = gaussian_filter1d(np.tile(tenth_sec_stim,10*21),100)
             # self.stim_osc = 10 * self.amplit * full_stim[0::237][0:84400]
-            in_wform = np.load(
-                "/home/virati/Dropbox/projects/Research/MDD-DBS/Data/StimEphys/stim_wform.npy"
-            )
+            in_wform = np.load("/home/vscode/data/stim_waveform/stim_wform.npy")
 
             # b,a = sig.butter(10,100/self.fs,btype='highpass')
             # stim_osc = sig.lfilter(b,a,in_wform)

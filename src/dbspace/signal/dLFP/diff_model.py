@@ -448,7 +448,7 @@ class sim_amp:
             nperseg=nperseg,
             noverlap=noverlap,
             window=sig.get_window(use_windowing, nperseg),
-            fs=self.diff_inst.fullFs / self.ds_factor,
+            fs=self.diff_inst.fullFs,
         )
 
     """
@@ -485,8 +485,8 @@ class sim_amp:
         t_end = self.diff_T + diff_obj.tlims[0] > 1
         Pbeg = np.median(10 * np.log10(SGdiff[:, t_beg]), axis=1)
         Pend = np.median(10 * np.log10(SGdiff[:, t_end]), axis=1)
-        plt.plot(self.F, Pbeg, color="black")
-        plt.plot(self.F, Pend, color="green")
+        plt.plot(self.diff_F, Pbeg, color="black")
+        plt.plot(self.diff_F, Pend, color="green")
         plt.xlabel("Frequency (Hz)")
         plt.ylabel("Power (dB)")
         plt.ylim((-200, -20))
@@ -603,180 +603,3 @@ class sim_amp:
         plt.subplot(3, 2, 3)
         # do corrected PSD here
         plt.suptitle("Zdiff = " + str(np.abs(Z1 - Z3)))
-
-    def PAPER_plot_V_out(self, diff_obj, Z1, Z3):
-        # Plot the output multipanel for the paper
-
-        # First we're going to get our differential amplifier output
-        diff_out = sig.decimate(diff_obj.V_out(Z1, Z3)["sim_1"], 10)
-        Fs = diff_obj.Fs
-
-        # Here we generate our recording, after the signal amplifier component
-        V_preDC = self.gen_recording(Z1, Z3)
-
-        # now we're going to DOWNSAMPLE
-        # simple downsample, sicne the filter is handled elsewhere and we're trying to recapitulate the hardware
-        Vo = V_preDC[0::10]
-
-        V_out = Vo
-        # Final filtering stage here, unclear why
-        # b,a = sig.butter(6,1/211,btype='high')
-        # V_out = sig.lfilter(b,a,Vo)
-
-        plt.figure()
-        # Plot the input and output voltages directly over time
-        plt.subplot(3, 2, 1)
-        plt.plot(self.tvect, diff_out, label="Input Voltage")
-        plt.plot(self.tvect, V_out, label="Output Voltage")
-        plt.legend()
-        plt.ylim((-1e-3, 1e-3))
-
-        nperseg = 2**9
-        noverlap = 2**9 - 50
-
-        # plot histograms
-        bins = np.linspace(-5, 5, 100)
-        plt.subplot(3, 4, 3)
-        half_pt = np.int(diff_out.shape[0] / 2)
-        plt.hist(diff_out[:half_pt], bins, alpha=0.9)
-        plt.hist(V_out[:half_pt], bins, alpha=0.9)
-
-        plt.subplot(3, 4, 4)
-        half_pt = np.int(diff_out.shape[0] / 2)
-        plt.hist(diff_out[half_pt:], bins, alpha=0.4)
-        plt.hist(V_out[half_pt:], bins, alpha=0.4)
-
-        # Plot the T-F representation of both input and output
-        plt.subplot(3, 2, 3)
-        # Here, we find the spectrogram of the output from the diff_amp, should not be affected at all by the gain, I guess...
-        # BUT the goal of this is to output a perfect amp... so maybe this is not ideal since the perfect amp still has the gain we want.
-        F, T, SGdiff = sig.spectrogram(
-            self.sig_amp_gain * diff_out,
-            nperseg=nperseg,
-            noverlap=noverlap,
-            window=sig.get_window("blackmanharris", nperseg),
-            fs=4220 / 10,
-        )
-        plt.pcolormesh(T + diff_obj.tlims[0], F, 10 * np.log10(SGdiff), rasterized=True)
-        plt.clim(-120, 0)
-        plt.ylim((0, 200))
-        plt.title("Perfect Amp Output")
-        # plt.colorbar()
-
-        plt.subplot(3, 2, 5)
-        t_beg = T + diff_obj.tlims[0] < -1
-        t_end = T + diff_obj.tlims[0] > 1
-        Pbeg = np.median(10 * np.log10(SGdiff[:, t_beg]), axis=1)
-        Pend = np.median(10 * np.log10(SGdiff[:, t_end]), axis=1)
-        plt.plot(F, Pbeg, color="black")
-        plt.plot(F, Pend, color="green")
-        plt.xlabel("Frequency (Hz)")
-        plt.ylabel("Power (dB)")
-        plt.ylim((-200, -20))
-
-        plt.subplot(3, 2, 4)
-        F, T, SGout = sig.spectrogram(
-            V_out,
-            nperseg=nperseg,
-            noverlap=noverlap,
-            window=sig.get_window("blackmanharris", nperseg),
-            fs=422,
-        )
-        plt.clim(-120, 0)
-        plt.pcolormesh(T + diff_obj.tlims[0], F, 10 * np.log10(SGout), rasterized=True)
-        plt.title("Imperfect Amp Output")
-        # plt.colorbar()
-
-        plt.subplot(3, 2, 6)
-        t_beg = T + diff_obj.tlims[0] < -1
-        t_end = T + diff_obj.tlims[0] > 1
-        # Below we're just taking the median of the SG. Maybe do the Welch estimate on this?
-        Pbeg = np.median(10 * np.log10(SGout[:, t_beg]), axis=1)
-        Pend = np.median(10 * np.log10(SGout[:, t_end]), axis=1)
-        plt.plot(F, Pbeg, color="black")
-        plt.plot(F, Pend, color="green")
-        plt.xlabel("Frequency (Hz)")
-        plt.ylabel("Power (dB)")
-        plt.ylim((-200, -20))
-        plt.suptitle("Zdiff = " + str(np.abs(Z1 - Z3)))
-
-        # Now we move on to the oscillatory analyses
-        plt.figure()
-        plt.suptitle("Oscillatory Analyses")
-
-        plt.subplot(3, 2, 1)
-        # plot PSDs here
-        bl_ts = {0: V_out[: 5 * 422].reshape(-1, 1)}
-        stim_ts = {0: V_out[: -5 * 422].reshape(-1, 1)}
-
-        bl_psd = dbo.gen_psd(bl_ts, polyord=0)
-        stim_psd = dbo.gen_psd(stim_ts, polyord=0)
-        Frq = np.linspace(0, 211, bl_psd[0].shape[0])
-
-        plt.plot(Frq, np.log10(bl_psd[0]))
-        plt.plot(Frq, np.log10(stim_psd[0]))
-        plt.ylim((-70, 0))
-
-        plt.subplot(3, 2, 3)
-        # bl_osc = dbo.calc_feats(bl_psd[0].reshape(-1,1),Frq)
-        # stim_osc = dbo.calc_feats(stim_psd[0].reshape(-1,1),Frq)
-        # plt.bar([bl_osc,stim_osc])
-
-        plt.subplot(3, 2, 2)
-        bl_psd = dbo.gen_psd(bl_ts, polyord=4)
-        stim_psd = dbo.gen_psd(stim_ts, polyord=4)
-        plt.plot(Frq, np.log10(bl_psd[0][0]))
-        plt.plot(Frq, np.log10(stim_psd[0][0]))
-
-        # do band power now
-        sg_avg = False
-        if sg_avg:
-            # these plot the average of the Spectrogram
-            plt.subplot(3, 2, 3)
-            # plt.plot(F,Pbeg)
-            # plt.plot(F,Pend)
-
-            plt.subplot(3, 2, 4)
-            bl_P = {0: 10 ** (Pbeg)}
-            stim_P = {0: 10 ** (Pend)}
-
-            corr_bl = dbo.poly_subtr(bl_P, F)
-            corr_stim = dbo.poly_subtr(stim_P, F)
-            # plt.plot(F,np.log10(corr_bl[0]))
-            # plt.plot(F,np.log10(corr_stim[0]))
-
-        plt.subplot(3, 2, 3)
-        # do corrected PSD here
-        plt.suptitle("Zdiff = " + str(np.abs(Z1 - Z3)))
-
-
-#%%
-
-if __name__ == "__main__":
-    plt.close("all")
-    diff_run = sim_diff(Ad=2000, wform="moresine4", clock=True, stim_v=6, stim_freq=130)
-    # diff_run.set_brain()
-    # diff_run.set_stim(wform='ipg')
-
-    amp_run = sim_amp(
-        diff_run, family="tanh", noise=1e-6, sig_amp_gain=1, pre_amp_gain=1
-    )
-
-    # diff_run.plot_V_out(1000,1200)
-    # diff_out = diff_run.V_out(1000,1100)['sim_1']
-    Z1 = 1200
-    Z3 = 1300
-
-    amp_run.simulate(Z1, Z3)
-    amp_run.plot_time_dom()
-    amp_run.plot_freq_dom()
-    plt.suptitle(str(Z1) + " diff " + str(Z3))
-    amp_run.plot_tf_dom()
-    plt.suptitle(str(Z1) + " diff " + str(Z3))
-
-    # amp_run.PAPER_plot_V_out(diff_run,Z1,Z3)
-
-    # Do some PAC here..?
-    amp_run.plot_PAC(time_start=5, time_end=8, title="No Stim")
-
-    amp_run.plot_PAC(time_start=12, time_end=15, title="Stim")

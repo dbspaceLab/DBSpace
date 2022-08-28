@@ -107,9 +107,7 @@ class stim_sig:
         np.save("/tmp/ipg", orig_big_x)
 
     def brute_ipg_func(self, decay=30, order=15, Wn=0.5):
-        tenth_sec_stim = np.load(
-            "/home/virati/Dropbox/projects/Research/MDD-DBS/Data/StimEphys/tenth_sec_ipg.npy"
-        )
+        tenth_sec_stim = np.load("/home/vscode/data/stim_waveform/tenth_sec_ipg.npy")
         # gaussian filter versus
 
         full_stim = np.tile(tenth_sec_stim, 10 * 21)
@@ -129,7 +127,7 @@ class stim_sig:
         stim_osc = full_stim[0::2370][0 : self.fs * 20]
 
         np.save(
-            "/home/virati/Dropbox/projects/Research/MDD-DBS/Data/StimEphys/stim_wform",
+            "/home/vscode/data/stim_waveform/stim_wform",
             stim_osc,
         )
 
@@ -176,9 +174,7 @@ class stim_sig:
             # tenth_sec_stim = np.load('/home/virati/tenth_sec_ipg.npy')
             # full_stim = gaussian_filter1d(np.tile(tenth_sec_stim,10*21),100)
             # self.stim_osc = 10 * self.amplit * full_stim[0::237][0:84400]
-            in_wform = np.load(
-                "/home/virati/Dropbox/projects/Research/MDD-DBS/Data/StimEphys/stim_wform.npy"
-            )
+            in_wform = np.load("/home/vscode/data/stim_waveform/stim_wform.npy")
 
             # b,a = sig.butter(10,100/self.fs,btype='highpass')
             # stim_osc = sig.lfilter(b,a,in_wform)

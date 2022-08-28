@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 
 import scipy.signal as sig
 
-
 from dbspace.signal.dLFP.brain_amp_model import stim_sig, brain_sig
 from dbspace.signal.PAC.PyPAC import *
 

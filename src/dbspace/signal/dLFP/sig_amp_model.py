@@ -71,7 +71,8 @@ class sig_amp:
         return y_out
 
     def dac_sample(self, input_signal, skips):
-        ds_input = input_signal[0::skips]
+        # ds_input = input_signal[0::skips]
+        ds_input = sig.decimate(input_signal, skips)
         new_tvect = np.linspace(self.tscale[0], self.tscale[1], ds_input.shape[0])
 
         return ds_input, new_tvect
@@ -86,7 +87,7 @@ class sig_amp:
 
         self.simulated_lfp = V_sampled
 
-    def plot_simulated(self, use_windowing="blackmanharris"):
+    def gen_simulated_SGs(self, use_windowing="blackmanharris"):
 
         nperseg = self.nperseg
         noverlap = self.noverlap
@@ -98,7 +99,7 @@ class sig_amp:
             window=sig.get_window("blackmanharris", nperseg),
             fs=self.Fs,
         )
-        _, _, self.SGdiff = sig.spectrogram(
+        self.diff_F, self.diff_T, self.diff_SG = sig.spectrogram(
             self.sig_amp_gain * self.diff_out,
             nperseg=nperseg,
             noverlap=noverlap,
@@ -127,7 +128,7 @@ class sig_amp:
         diff_out = self.diff_out
         diff_obj = self.diff_inst
 
-        SGdiff = self.SGdiff
+        SGdiff = self.diff_SG
         SGout = self.SGout
 
         nperseg = self.nperseg
@@ -136,8 +137,8 @@ class sig_amp:
         plt.figure()
 
         plt.subplot(1, 2, 1)
-        t_beg = self.T + diff_obj.tlims[0] < -1
-        t_end = self.T + diff_obj.tlims[0] > 1
+        t_beg = self.diff_T + diff_obj.tlims[0] < -1
+        t_end = self.diff_T + diff_obj.tlims[0] > 1
         Pbeg = np.median(10 * np.log10(SGdiff[:, t_beg]), axis=1)
         Pend = np.median(10 * np.log10(SGdiff[:, t_end]), axis=1)
         plt.plot(self.F, Pbeg, color="black")
@@ -168,7 +169,7 @@ class sig_amp:
         diff_obj = self.diff_inst
 
         SGout = self.SGout
-        SGdiff = self.SGdiff
+        SGdiff = self.diff_SG
 
         nperseg = self.nperseg
         noverlap = self.noverlap
@@ -180,7 +181,10 @@ class sig_amp:
         # BUT the goal of this is to output a perfect amp... so maybe this is not ideal since the perfect amp still has the gain we want.
 
         plt.pcolormesh(
-            self.T + diff_obj.tlims[0], self.F, 10 * np.log10(SGdiff), rasterized=True
+            self.diff_T + diff_obj.tlims[0],
+            self.F,
+            10 * np.log10(SGdiff),
+            rasterized=True,
         )
         plt.clim(-120, 0)
         plt.ylim((0, 200))

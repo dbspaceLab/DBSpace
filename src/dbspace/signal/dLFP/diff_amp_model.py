@@ -28,15 +28,16 @@ class diff_amp:
         zero_onset=True,
         stim_v=6,
         stim_freq=130,
+        raw_fs=4220,
     ):
-        self.fullFs = 4220
-        self.Fs = self.fullFs
+        self.full_Fs = raw_fs
+
         self.tlims = (-10, 10)
         self.analogtvect = np.linspace(
-            self.tlims[0], self.tlims[1], (self.tlims[1] - self.tlims[0]) * self.fullFs
+            self.tlims[0], self.tlims[1], (self.tlims[1] - self.tlims[0]) * self.full_Fs
         )
         self.tvect = np.linspace(
-            self.tlims[0], self.tlims[1], (self.tlims[1] - self.tlims[0]) * self.Fs
+            self.tlims[0], self.tlims[1], (self.tlims[1] - self.tlims[0]) * self.full_Fs
         )
 
         self.Ad = Ad
@@ -64,7 +65,7 @@ class diff_amp:
 
         for bb, sett in params.items():
             self.X[bb] = sig.detrend(
-                brain_sig(self.fullFs, sett[0], sett[1]).ts_return(), type="constant"
+                brain_sig(self.full_Fs, sett[0], sett[1]).ts_return(), type="constant"
             )
 
     def set_stim(self, wform, zero_onset, freq=130, stim_ampl=6):
@@ -75,7 +76,7 @@ class diff_amp:
             stim_scaling
             * decay_factor
             * stim_sig(
-                fs=self.fullFs,
+                fs=self.full_Fs,
                 stim_ampl=stim_ampl,
                 wform=wform,
                 zero_onset=zero_onset,
@@ -85,7 +86,7 @@ class diff_amp:
 
     def set_clock(self, clock_V=2e-3):
         self.clock = stim_sig(
-            fs=self.fullFs,
+            fs=self.full_Fs,
             stim_ampl=clock_V,
             wform="sine",
             stim_freq=105.5,

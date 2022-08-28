@@ -129,7 +129,6 @@ class sig_amp:
 
     def simulate(self, Z1, Z3, use_windowing="blackmanharris"):
         diff_out = sig.decimate(self.diff_inst.V_out(Z1, Z3)["sim_1"], 10)
-        Fs = self.diff_inst.Fs
 
         # Here we generate our recording, after the signal amplifier component
         V_preDC = self.gen_recording(Z1, Z3)

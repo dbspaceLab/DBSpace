@@ -81,6 +81,8 @@ class sim_amp:
 
         # now we're going to DOWNSAMPLE (raw)
         downsample_factor = self.diff_inst.Fs // self.final_Fs
+        print(f"Downsample factor {downsample_factor}")
+        # Vo = sig.decimate(V_preDC, downsample_factor)
         Vo = V_preDC[0::downsample_factor]
 
         self.sim_output_signal = Vo
@@ -113,21 +115,22 @@ class sim_amp:
     Plotting Functions
     """
 
-    def plot_time_dom(self, display_downsample=10):
+    def plot_time_dom(self, display_downsample=None):
         V_out = self.sim_output_signal
         diff_out = self.diff_out
 
         # for plotting, we may want to decimate the diff_output
-        if display_downsample:
+        if display_downsample is not None:
             diff_out = sig.decimate(diff_out, display_downsample)
             diff_out_tvect = self.diff_inst.tvect // display_downsample
         else:
             diff_out_tvect = self.diff_inst.tvect
 
+        plot_final_tvect = np.linspace(self.tscale[0], self.tscale[1], V_out.shape[0])
         plt.figure()
         # Plot the input and output voltages directly over time
         plt.plot(diff_out_tvect, diff_out, label="Input Voltage", alpha=0.6)
-        plt.plot(self.tvect, V_out, label="Output Voltage", alpha=0.5)
+        plt.plot(plot_final_tvect, V_out, label="Output Voltage", alpha=0.5)
         plt.legend()
         plt.ylim((-1e-2, 1e-2))
 

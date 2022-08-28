@@ -282,10 +282,8 @@ class sim_diff:
         if self.clockflag:
             Vo += self.clock
 
-        self.outputV = Vo
         # first, filter
-        b, a = sig.butter(5, 100 / 4220, btype="lowpass")
-        # b,a = sig.ellip(4,4,5,100/2110,btype='lowpass')
+        b, a = sig.butter(5, 100 / self.Fs, btype="lowpass")
         Vo = sig.lfilter(b, a, Vo)
 
         return {"sim_1": Vo / 2}

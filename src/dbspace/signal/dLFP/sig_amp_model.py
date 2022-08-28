@@ -18,6 +18,7 @@ class sim_amp:
         noise=0,
         sig_amp_gain=1,
         pre_amp_gain=1,
+        final_Fs=422,
     ):
         self.diff_inst = diff_inst
         self.family = family
@@ -36,7 +37,7 @@ class sim_amp:
 
         self.pre_amp_gain = pre_amp_gain
 
-        self.final_fs = 422
+        self.final_fs = final_Fs
 
     def set_T_func(self):
         if self.family == "perfect":

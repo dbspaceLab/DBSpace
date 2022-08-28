@@ -28,7 +28,7 @@ def gm_total_ratio(gm, total):
 
 
 class Anatomy:
-    def __init__(self, impedance_data: Path = None):
+    def __init__(self, impedance_data_path: Path = None):
         lead = nestdict()
 
         lead["Left"] = pd.read_csv(

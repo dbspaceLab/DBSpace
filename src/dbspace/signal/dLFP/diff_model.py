@@ -205,15 +205,15 @@ class sim_diff:
         zero_onset=True,
         stim_v=6,
         stim_freq=130,
+        fullFs=4220,
     ):
-        self.fullFs = 4220
-        self.Fs = self.fullFs
+        self.fullFs = fullFs
         self.tlims = (-10, 10)
         self.analogtvect = np.linspace(
             self.tlims[0], self.tlims[1], (self.tlims[1] - self.tlims[0]) * self.fullFs
         )
         self.tvect = np.linspace(
-            self.tlims[0], self.tlims[1], (self.tlims[1] - self.tlims[0]) * self.Fs
+            self.tlims[0], self.tlims[1], (self.tlims[1] - self.tlims[0]) * self.fullFs
         )
 
         self.Ad = Ad
@@ -306,7 +306,7 @@ class sim_diff:
 
         self.outputV = Vo
         # first, filter
-        b, a = sig.butter(5, 100 / 4220, btype="lowpass")
+        b, a = sig.butter(5, 100 / self.fullFs, btype="lowpass")
         # b,a = sig.ellip(4,4,5,100/2110,btype='lowpass')
         Vo = sig.lfilter(b, a, Vo)
 
@@ -361,11 +361,15 @@ class sim_amp:
         noise=0,
         sig_amp_gain=1,
         pre_amp_gain=1,
+        finalFs=422,
     ):
         self.diff_inst = diff_inst
         self.family = family
         self.inscale = inscale  # This is a hack to bring the inside of the amp into whatever space we want, transform, and then bring it back out. It should really be removed...
         self.tscale = tscale
+        self.finalFs = finalFs
+
+        self.ds_factor = int(round(self.diff_inst.fullFs / self.finalFs))
 
         self.sig_amp_gain = sig_amp_gain
 
@@ -451,7 +455,7 @@ class sim_amp:
             nperseg=nperseg,
             noverlap=noverlap,
             window=sig.get_window("blackmanharris", nperseg),
-            fs=4220 / 10,
+            fs=self.diff_inst.fullFs / 10,
         )
         plt.pcolormesh(T + diff_obj.tlims[0], F, 10 * np.log10(SGdiff), rasterized=True)
         plt.clim(-120, 0)
@@ -473,14 +477,14 @@ class sim_amp:
 
     def simulate(self, Z1, Z3, use_windowing="blackmanharris"):
         diff_out = sig.decimate(self.diff_inst.V_out(Z1, Z3)["sim_1"], 10)
-        Fs = self.diff_inst.Fs
+        Fs = self.diff_inst.fullFs
 
         # Here we generate our recording, after the signal amplifier component
         V_preDC = self.gen_recording(Z1, Z3)
 
         # now we're going to DOWNSAMPLE
         # simple downsample, sicne the filter is handled elsewhere and we're trying to recapitulate the hardware
-        Vo = V_preDC[0::10]
+        Vo = V_preDC[0 :: self.ds_factor]
 
         self.sim_output_signal = Vo
         self.diff_out = diff_out
@@ -493,14 +497,14 @@ class sim_amp:
             nperseg=nperseg,
             noverlap=noverlap,
             window=sig.get_window("blackmanharris", nperseg),
-            fs=422,
+            fs=self.finalFs,
         )
         _, _, self.SGdiff = sig.spectrogram(
             self.sig_amp_gain * diff_out,
             nperseg=nperseg,
             noverlap=noverlap,
             window=sig.get_window(use_windowing, nperseg),
-            fs=4220 / 10,
+            fs=self.diff_inst.fullFs / self.ds_factor,
         )
 
     """

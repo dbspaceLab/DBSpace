@@ -1,30 +1,13 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Mar 24 15:26:42 2018
-
-@author: virati
-Redo of the Z_mismatch -> Gain Compression work
-DISSERTATION FINAL
-"""
-
-# import sys
-# sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
 import dbspace as dbo
+from dbspace.utils.functions import unity
+from dbspace.signal.dLFP.amp_models import hard_amp
 
 import numpy as np
-import allantools
 from allantools.noise import pink as f_noise
 import matplotlib.pyplot as plt
 
 import scipy.signal as sig
-from scipy.ndimage.filters import gaussian_filter1d
-
 from dbspace.signal.PAC.PyPAC import *
-
-import pdb
-
-# plt.close('all')
 
 import seaborn as sns
 
@@ -33,6 +16,7 @@ sns.set_context("paper")
 sns.set(font_scale=2)
 sns.set_style("ticks")
 sns.set_style("white")
+
 plt.rcParams["image.cmap"] = "jet"
 
 
@@ -329,18 +313,6 @@ class sim_diff:
         plt.subplot(212)
 
         plt.pcolormesh(T + self.tlims[0], F, 10 * np.log10(SG), rasterized=True)
-
-def unity(in_sig):
-    return in_sig
-
-
-def hard_amp(xin, clip=1):
-    xhc = np.copy(xin)
-    xhc[np.where(xin > clip)] = clip
-    xhc[np.where(xin < -clip)] = -clip
-
-    return xhc
-
 
 class sim_amp:
     def __init__(

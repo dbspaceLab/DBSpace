@@ -183,7 +183,10 @@ class sig_amp:
         # BUT the goal of this is to output a perfect amp... so maybe this is not ideal since the perfect amp still has the gain we want.
 
         plt.pcolormesh(
-            self.T + diff_obj.tlims[0], self.F, 10 * np.log10(SGdiff), rasterized=True
+            self.diff_T + diff_obj.tlims[0],
+            self.diff_F,
+            10 * np.log10(SGdiff),
+            rasterized=True,
         )
         plt.clim(-120, 0)
         plt.ylim((0, 200))

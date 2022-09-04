@@ -25,19 +25,27 @@ import numpy as np
 import scipy.signal as signal
 from dbspace.readout.ClinVect import Phase_List
 from dbspace.signal.oscillations import FEAT_DICT, gen_psd
-from dbspace.utils.io.pcs_io import load_br_file
+from dbspace.utils.io.pcs import load_br_file
 
 from dbspace.utils.functions import nearest
 
-class BR_Data_Tree:
-    """ 
-    This class generates the data frame (.pickle) that is used in the SCC_Readout project
-    
-    """
-    sec_end = 10
-    intermediate_dir = '../../assets/intermediate_data'
 
-    def __init__(self, frame_label = None, premade_frame_file = None, clin_vector_file = None, do_pts=["901", "903", "905", "906", "907", "908"]):
+class BR_Data_Tree:
+    """
+    This class generates the data frame (.pickle) that is used in the SCC_Readout project
+
+    """
+
+    sec_end = 10
+    intermediate_dir = "../../assets/intermediate_data"
+
+    def __init__(
+        self,
+        frame_label=None,
+        premade_frame_file=None,
+        clin_vector_file=None,
+        do_pts=["901", "903", "905", "906", "907", "908"],
+    ):
         # Fix this and don't really make it accessible; we'll stick with a single intermediate file unless you really want to change it
 
         self.do_pts = do_pts
@@ -51,31 +59,34 @@ class BR_Data_Tree:
         self.ClinVect = {pt["pt"]: pt for pt in CVect}
 
         if frame_label is None:
-            #construct from date
+            # construct from date
             self._frame_label = str(datetime.date)
-        if Path.Path(self.intermediate_dir + '/ChronicFrame_' + self._frame_label).is_file():
-            logging.info(f"Loading in {frame_label} frame from intermediate file cache...")
+        if Path.Path(
+            self.intermediate_dir + "/ChronicFrame_" + self._frame_label
+        ).is_file():
+            logging.info(
+                f"Loading in {frame_label} frame from intermediate file cache..."
+            )
         else:
-            #make a new frame
+            # make a new frame
             pass
 
         self.data_basis = defaultdict()
 
         if premade_frame_file is None:
-            print('Generating the dataframe...')
+            print("Generating the dataframe...")
             self.generate_sequence()
-            #Save it now
+            # Save it now
             self.Save_Frame(name_addendum=frame_label)
-            #Now just dump us out so we can do whatever we need to with the file above
+            # Now just dump us out so we can do whatever we need to with the file above
 
         else:
             # IF we're loading in a preframe, we're probably doing a bigger analysis
             self.preFrame_file = premade_frame_file
-            print('Loading in PreFrame...' + self.preFrame_file)
+            print("Loading in PreFrame..." + self.preFrame_file)
             self.Import_Frame(self.preFrame_file)
 
-        #how many seconds to take from the chronic recordings
-
+        # how many seconds to take from the chronic recordings
 
     def generate_TD_sequence(self):
         self.build_phase_dict()
@@ -447,8 +458,7 @@ class BR_Data_Tree:
                     [
                         np.log10(rr["Data"][ch])
                         for rr in self.file_meta
-                        if rr["Patient"] == pt
-                        and rr["Phase"] in Phase_List("ephys")
+                        if rr["Patient"] == pt and rr["Phase"] in Phase_List("ephys")
                     ]
                 ).T
             except:

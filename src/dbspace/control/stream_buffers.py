@@ -19,7 +19,7 @@ import numpy as np
 import scipy.io as scio
 import scipy.signal as sig
 from dbspace.signal.oscillations import calc_feats, gen_SG
-from dbspace.utils.io.pcs_io import load_BR_dict
+from dbspace.utils.io.pcs import load_BR_dict
 from dbspace.utils.structures import nestdict
 from dbspace.viz.MM import EEG_Viz
 from sklearn import mixture, svm

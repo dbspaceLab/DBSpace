@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 import scipy.signal as sig
 import numpy as np
 import scipy.io as io
-from structures import nestdict
-from br_io import load_BR_dict
+from dbspace.utils.structures import nestdict
+from dbspace.utils.io.pcs import load_BR_dict
 from ..signal import oscillations as osc
 
 import scipy.signal as signal

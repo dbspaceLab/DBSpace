@@ -65,7 +65,7 @@ def poly_SG(inSG, fVect, order=4):
     out_sg = np.zeros_like(inSG)
 
     for seg in range(inSG.shape[1]):
-        inpsd = 10 * np.log10(inpPSD[chann][seg, :])
+        inpsd = 10 * np.log10(inSG[chann][seg, :])
         polyCoeff = np.polyfit(fVect, inpsd, order)
         polyfunc = np.poly1d(polyCoeff)
         polyitself = polyfunc(fVect)
@@ -94,6 +94,9 @@ def calc_feats(psdIn, yvect, dofeats="", modality="eeg", compute_method="median"
     # psdIn is a VECTOR, yvect is the basis vector
     if dofeats == "":
         dofeats = DEFAULT_FEAT_ORDER
+
+    if psdIn.ndim < 2:
+        psdIn = psdIn[..., np.newaxis]
 
     if modality == "eeg":
         ch_list = np.arange(0, 257)
@@ -126,7 +129,10 @@ def calc_feats(psdIn, yvect, dofeats="", modality="eeg", compute_method="median"
 def featDict_to_Matr(featDict):
     # structure of feat dict is featDict[FEATURE][CHANNEL] = VALUE
     ret_matr = np.array(
-        [(featDict[feat]["Left"], featDict[feat]["Right"]) for feat in DEFAULT_FEAT_ORDER]
+        [
+            (featDict[feat]["Left"], featDict[feat]["Right"])
+            for feat in DEFAULT_FEAT_ORDER
+        ]
     )
 
     # assert that the size is as expected?
@@ -386,7 +392,10 @@ def calc_feats(psdIn, yvect, dofeats="", modality="eeg", compute_method="median"
 def featDict_to_Matr(featDict):
     # structure of feat dict is featDict[FEATURE][CHANNEL] = VALUE
     ret_matr = np.array(
-        [(featDict[feat]["Left"], featDict[feat]["Right"]) for feat in DEFAULT_FEAT_ORDER]
+        [
+            (featDict[feat]["Left"], featDict[feat]["Right"])
+            for feat in DEFAULT_FEAT_ORDER
+        ]
     )
 
     assert ret_matr.shape == (len(DEFAULT_FEAT_ORDER), 2)
@@ -414,7 +423,13 @@ FEAT_DICT = {
     "GCratio": {"fn": get_ratio, "param": ((63, 65), (65, 67))},
 }
 
-DEFAULT_FEAT_ORDER = ["Delta", "Theta", "Alpha", "Beta*", "Gamma1"]  # ,'fSlope','nFloor']
+DEFAULT_FEAT_ORDER = [
+    "Delta",
+    "Theta",
+    "Alpha",
+    "Beta*",
+    "Gamma1",
+]  # ,'fSlope','nFloor']
 
 
 #%%

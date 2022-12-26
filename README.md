@@ -5,10 +5,7 @@ A Python library for *model-centric* development of adaptive deep brain stimulat
 
 The deployed package is available at PyPi::[dbspace](https://pypi.org/project/dbspace/)
 
-## Structure
-
 ## Example
-
 ### Choosing files
 spot_check.py is meant to be a quick option to view an LFP recording. It can be run (F5) without any arguments to open up a file chooser and select an LFP recording. Once chosen, the file chooser adds the file to a running list of files to visualize. The file chooser then opens again to enable further selection of files.
 

@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "DBSpace"
 version = "0.2.1"
-description = "Library for data-driven, network-level modeling of clinical DBS dynamics"
-authors = ["Vineet Tiruvadi <virati@gmail.com>"]
+description = "Library for data-congruent, model-centric DBS Research"
+authors = ["Vineet Tiruvadi <vineet.tiruvadi@gmail.com>"]
 license = "GLPv3"
 
 [tool.poetry.dependencies]

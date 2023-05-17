@@ -12,7 +12,7 @@ from collections import defaultdict
 import numpy as np
 import sys
 
-from dbspace.utils.r_pca import r_pca
+from dbspace.utils.r_pca import robust_pca
 import dbspace as dbo
 from dbspace.utils.structures import nestdict
 from dbspace.utils.stats import pca
@@ -102,7 +102,7 @@ class CStruct:
             min_changes = 100
             for ll, lmbda_s in enumerate(np.linspace(0.3, 0.5, 50)):
                 # lmbda = 0.33 did very well here
-                RPCA = r_pca.R_pca(sX, lmbda=lmbda_s)
+                RPCA = robust_pca.rpca(sX, lmbda=lmbda_s)
                 L, S = RPCA.fit()
                 Srcomp, Srevals, Srevecs = pca(S)
                 Lrcomp, Lrevals, Lrevecs = pca(L)
@@ -132,7 +132,7 @@ class CStruct:
             }
 
             # We have the "optimal" lambda now and we'll do the final rPCA to generate our components
-            RPCA = r_pca.R_pca(sX, lmbda=opt_lam_dict[pat]["Lambda"])
+            RPCA = robust_pca.rpca(sX, lmbda=opt_lam_dict[pat]["Lambda"])
             L, S = RPCA.fit()
             Srcomp, Srevals, Srevecs = pca(S)
             Lrcomp, Lrevals, Lrevecs = pca(L)
@@ -410,7 +410,7 @@ class CFrame:
             min_changes = 100
             for ll, lmbda_s in enumerate(np.linspace(0.3, 0.5, 50)):
                 # lmbda = 0.33 did very well here
-                RPCA = r_pca.R_pca(sX, lmbda=lmbda_s)
+                RPCA = robust_pca.rpca(sX, lmbda=lmbda_s)
                 L, S = RPCA.fit()
                 Srcomp, Srevals, Srevecs = pca(S)
                 Lrcomp, Lrevals, Lrevecs = pca(L)
@@ -440,7 +440,7 @@ class CFrame:
             }
 
             # We have the "optimal" lambda now and we'll do the final rPCA to generate our components
-            RPCA = r_pca.R_pca(sX, lmbda=opt_lam_dict[pat]["Lambda"])
+            RPCA = robust_pca.rpca(sX, lmbda=opt_lam_dict[pat]["Lambda"])
             L, S = RPCA.fit()
             Srcomp, Srevals, Srevecs = pca(S)
             Lrcomp, Lrevals, Lrevecs = pca(L)

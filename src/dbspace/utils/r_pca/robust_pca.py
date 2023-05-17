@@ -10,7 +10,7 @@ except ImportError:
     print("Unable to import pylab. R_pca.plot_fit() will not work.")
 
 
-class R_pca:
+class rpca:
     def __init__(self, D, mu=None, lmbda=None):
         self.D = D
         self.S = np.zeros(self.D.shape)

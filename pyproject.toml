@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "DBSpace"
-version = "0.3.1"
+version = "0.4.0"
 description = "Library for data-congruent, model-centric DBS Research"
 authors = ["Vineet Tiruvadi <vineet.tiruvadi@gmail.com>"]
 license = "GLPv3"

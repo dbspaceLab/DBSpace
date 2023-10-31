@@ -45,9 +45,20 @@ class BR_Data_Tree:
         premade_frame_file=None,
         clin_vector_file=None,
         do_pts=["901", "903", "905", "906", "907", "908"],
+        input_data_directory = None,
+        output_intermediate_directory = None
     ):
-        # Fix this and don't really make it accessible; we'll stick with a single intermediate file unless you really want to change it
+        if input_data_directory is None:
+            self.input_data_directory = "/data"
+        else:
+            self.input_data_directory = input_data_directory
 
+        if output_intermediate_directory is None:
+            self.output_data_directory = "/output"
+        else:
+            self.output_data_directory = output_intermediate_directory
+
+        # Fix this and don't really make it accessible; we'll stick with a single intermediate file unless you really want to change it
         self.do_pts = do_pts
         self.fs = 422
 
@@ -187,7 +198,7 @@ class BR_Data_Tree:
         file_list = []
         for pt in self.do_pts:
             for filename in glob.iglob(
-                self.data_root_dir + "/" + pt + "/**/" + "*.txt", recursive=True
+                self.input_data_directory + "/" + pt + "/**/" + "*.txt", recursive=True
             ):
                 # Append the full path to a list
                 # check the file's STRUCTURE HERE

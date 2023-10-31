@@ -61,7 +61,7 @@ class BR_Data_Tree:
         if frame_label is None:
             # construct from date
             self._frame_label = str(datetime.date)
-        if Path.Path(
+        if Path(
             self.intermediate_dir + "/ChronicFrame_" + self._frame_label
         ).is_file():
             logging.info(

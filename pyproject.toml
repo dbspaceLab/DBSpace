@@ -1,17 +1,17 @@
 [tool.poetry]
-name = "DBSpace"
-version = "0.2.1"
+name = "dbspace"
+version = "0.4.0"
 description = "Library for data-congruent, model-centric DBS Research"
 authors = ["Vineet Tiruvadi <vineet.tiruvadi@gmail.com>"]
 license = "GLPv3"
+packages = [{include = "dbspace", from = "src"}]
 
 [tool.poetry.dependencies]
-python = "^3.8.12"
+python = "3.8.17"
 numpy = "^1.21.2"
 scipy = "^1.7.1"
 matplotlib = "^3.4.3"
 seaborn = "^0.11.2"
-sklearn = "^0.0"
 scikit-learn = "^1.0"
 nilearn = "^0.8.1"
 nibabel = "^3.2.1"

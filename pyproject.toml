@@ -1,9 +1,10 @@
 [tool.poetry]
-name = "DBSpace"
+name = "dbspace"
 version = "0.4.0"
 description = "Library for data-congruent, model-centric DBS Research"
 authors = ["Vineet Tiruvadi <vineet.tiruvadi@gmail.com>"]
 license = "GLPv3"
+packages = [{include = "dbspace", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "3.8.17"

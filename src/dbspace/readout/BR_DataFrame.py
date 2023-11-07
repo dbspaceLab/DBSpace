@@ -45,7 +45,6 @@ class BR_Data_Tree:
     def __init__(
         self,
         frame_label=None,
-        premade_frame_file=None,
         clin_vector_file=None,
         do_pts=["901", "903", "905", "906", "907", "908"],
         input_data_directory = None,
@@ -82,8 +81,11 @@ class BR_Data_Tree:
 
         if frame_label is None:
             # construct from date
-            self._frame_label = str(datetime.date)
+            frame_label = str(datetime.date)
+        
+        self._frame_label = frame_label
 
+    def run_loading(self, premade_frame_file = None):
         if Path(
             self.output_data_directory + "/ChronicFrame_" + self._frame_label
         ).is_file():
@@ -100,7 +102,7 @@ class BR_Data_Tree:
             print("Generating the dataframe...")
             self.generate_sequence()
             # Save it now
-            self.Save_Frame(name_addendum=frame_label)
+            self.Save_Frame()
             # Now just dump us out so we can do whatever we need to with the file above
 
         else:
@@ -109,6 +111,7 @@ class BR_Data_Tree:
             print("Loading in PreFrame..." + self.preFrame_file)
             self.Import_Frame(self.preFrame_file)
 
+        return self
         # how many seconds to take from the chronic recordings
 
     def generate_TD_sequence(self):
@@ -374,7 +377,7 @@ class BR_Data_Tree:
         if domain == "F":
             self.data_basis[domain] = np.linspace(0, self.sampling_rate / 2, 2**9 + 1)
         elif domain == "T":
-            self.data_basis[domain] = np.linspace(0, self.sec_end)
+            self.data_basis[domain] = np.linspace(0, self.analysis_configuration.seconds_from_end)
 
         for rr in self.file_meta:
             # load in the file
@@ -388,10 +391,13 @@ class BR_Data_Tree:
 
     """Saves the frame to the intermediate directory"""
 
-    def Save_Frame(self, name_addendum=""):
+    def Save_Frame(self, name_addendum=None):
+        if name_addendum is None:
+            name_addendum = self._frame_label
+
         print("Saving File Metastructure in /tmp/")
         # np.save(self.im_root_dir + '/Chronic_Frame' + name_addendum + '.npy',self.file_meta)
-
+        print("/tmp/Chronic_Frame" + name_addendum + ".pickle")
         # Try pickling below
         with open("/tmp/Chronic_Frame" + name_addendum + ".pickle", "wb") as file:
             pickle.dump(

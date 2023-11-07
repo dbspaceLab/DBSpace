@@ -23,21 +23,24 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.signal as signal
+from dataclasses import dataclass
+from typing import List
+
 from dbspace.readout.ClinVect import Phase_List
 from dbspace.signal.oscillations import FEAT_DICT, gen_psd
 from dbspace.utils.io.pcs import load_br_file
-
 from dbspace.utils.functions import nearest
 
+@dataclass
+class br_config:
+    seconds_from_end : int
+    sampling_rate : int
 
 class BR_Data_Tree:
     """
     This class generates the data frame (.pickle) that is used in the SCC_Readout project
 
     """
-
-    sec_end = 10
-    intermediate_dir = "../../assets/intermediate_data"
 
     def __init__(
         self,
@@ -46,21 +49,29 @@ class BR_Data_Tree:
         clin_vector_file=None,
         do_pts=["901", "903", "905", "906", "907", "908"],
         input_data_directory = None,
-        output_intermediate_directory = None
+        output_intermediate_directory = None,
+        analysis_configuration : br_config = None
     ):
         if input_data_directory is None:
             self.input_data_directory = "/data"
         else:
             self.input_data_directory = input_data_directory
 
+        logging.info("Setting data directory to %s", self.input_data_directory)
+
         if output_intermediate_directory is None:
             self.output_data_directory = "/output"
         else:
             self.output_data_directory = output_intermediate_directory
 
+        if analysis_configuration is None:
+            analysis_configuration = br_config(seconds_from_end = 10, sampling_rate = 422)
+
+        self.analysis_configuration = analysis_configuration
+
         # Fix this and don't really make it accessible; we'll stick with a single intermediate file unless you really want to change it
         self.do_pts = do_pts
-        self.fs = 422
+        self.sampling_rate = self.analysis_configuration.sampling_rate
 
         # Load in our clinical vector object with the data from ClinVec.json
         if clin_vector_file is None:
@@ -72,11 +83,12 @@ class BR_Data_Tree:
         if frame_label is None:
             # construct from date
             self._frame_label = str(datetime.date)
+
         if Path(
-            self.intermediate_dir + "/ChronicFrame_" + self._frame_label
+            self.output_data_directory + "/ChronicFrame_" + self._frame_label
         ).is_file():
             logging.info(
-                f"Loading in {frame_label} frame from intermediate file cache..."
+                "Loading in %s frame from intermediate file cache...", frame_label
             )
         else:
             # make a new frame
@@ -193,7 +205,6 @@ class BR_Data_Tree:
             raise ValueError("Error in the bad flag parsing...")
 
     """This method parses the root data structure and populates a list of recordings"""
-
     def list_files(self):
         file_list = []
         for pt in self.do_pts:
@@ -202,7 +213,6 @@ class BR_Data_Tree:
             ):
                 # Append the full path to a list
                 # check the file's STRUCTURE HERE
-
                 islogf = filename[-7:] == "LOG.txt"
                 isrealtf = filename[-6:] == "RT.txt"
                 iseepromf = filename[-9:] == "Table.txt"
@@ -254,7 +264,7 @@ class BR_Data_Tree:
         xml_fname = fname.split(".")[0] + ".xml"
 
     def extract_pt(self, fname):
-        return fname.split("BR")[1][1:4]
+        return fname.split("brain_radio")[1][1:4]
 
     def build_phase_dict(self):
         # In this method we go in and map the date of our sessions to the phase that the patient was in
@@ -362,7 +372,7 @@ class BR_Data_Tree:
         # Use Import_Data to bring in an intermediate file
 
         if domain == "F":
-            self.data_basis[domain] = np.linspace(0, self.fs / 2, 2**9 + 1)
+            self.data_basis[domain] = np.linspace(0, self.sampling_rate / 2, 2**9 + 1)
         elif domain == "T":
             self.data_basis[domain] = np.linspace(0, self.sec_end)
 
@@ -399,7 +409,7 @@ class BR_Data_Tree:
         txtdata = load_br_file(fname)
 
         # take just the last 10 seconds
-        sec_end = self.sec_end
+        sec_end = self.analysis_configuration.seconds_from_end
 
         # extract channels
         X = {

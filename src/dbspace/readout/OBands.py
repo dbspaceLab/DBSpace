@@ -11,18 +11,17 @@ Linear Regression approaches will extend this class
 import sys
 
 sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
-import DBSpace as dbo
-from DBSpace import nestdict
+import dbspace as dbo
+from dbspace.utils.structures import nestdict
 
-from DBSpace import unity,displog
+from dbspace.utils.functions import unity
 import scipy.stats as stats
-
-import pdb
 import numpy as np
 
 import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import defaultdict
+from typing import List
 
 #sns.set()
 
@@ -143,10 +142,10 @@ class naive_readout:
 
 
 class OBands:
-    def __init__(self,BRFrame):
+    def __init__(self,BRFrame, do_patients : List[str] = None):
         #Bring in the BR Data Frame
         self.BRFrame = BRFrame
-        self.do_pts = dbo.all_pts
+        self.do_pts = do_patients
         
     def poly_subtr(self,inp_psd,polyord=6):
         raise ValueError
@@ -156,22 +155,25 @@ class OBands:
         return inp_psd - pchann
         
     def feat_extract(self,do_corrections=False):
+        full_feat_dict = dbo.signal.oscillations.FEAT_DICT
+
         big_list = self.BRFrame.file_meta
         #go through ALL files and do the feature extraction
         for rr in big_list:
-            feat_dict = {key:[] for key in dbo.feat_dict.keys()}
-            for featname,dofunc in dbo.feat_dict.items():
-                if do_corrections == False:
+            output_feats = {key:[] for key in full_feat_dict.keys()}
+            for featname, dofunc in full_feat_dict.items():
+                if do_corrections is False:
                     datacontainer = {ch: rr['Data'][ch] for ch in rr['Data'].keys()}
                     #Do we want to do any preprocessing for the PSDs before we send it to the next round?
                     #Maybe a poly-fit subtraction?
-                    feat_dict[featname] = dofunc['fn'](datacontainer,self.BRFrame.data_basis['F'],dofunc['param'])
+                    print(f"{featname} with {dofunc}")
+                    output_feats[featname] = dofunc['fn'](datacontainer,self.BRFrame.data_basis['F'],dofunc['param'])
                 else:
                     pre_correction = {ch: rr['Data'][ch] for ch in rr['Data'].keys()}
                     datacontainer,_ = dbo.poly_subtr(pre_correction,self.BRFrame.data_basis['F'])
-                    feat_dict[featname] = dofunc['fn'](datacontainer,self.BRFrame.data_basis['F'],dofunc['param'])
+                    output_feats[featname] = dofunc['fn'](datacontainer,self.BRFrame.data_basis['F'],dofunc['param'])
                     
-            rr.update({'FeatVect':feat_dict})
+            rr.update({'FeatVect':output_feats})
          
 
 #Standard two state/categorical analyses HERE

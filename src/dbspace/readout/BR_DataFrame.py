@@ -351,10 +351,16 @@ class BR_Data_Tree:
         self.file_meta = file_meta
 
     def check_meta(self, prob_condit=0):
+        """
+        Checks all PSDs in the Frame to see if there are any fully-zero channels
+        """
         for rr in self.file_meta:
             for ch in ["Left", "Right"]:
                 if rr["Data"][ch].all() == 0:
                     print("PROBLEM: " + str(rr) + " has a zero PSD in channel " + ch)
+
+        logging.info('Meta Checks Complete')
+        
 
     def prune_meta(self):
         print("Pruning out recordings that have no Phase in main study...")

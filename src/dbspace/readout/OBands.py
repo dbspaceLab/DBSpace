@@ -147,8 +147,9 @@ class OBands:
         self.BRFrame = BRFrame
         self.do_pts = do_patients
         
+    '''OBSOLETE'''
     def poly_subtr(self,inp_psd,polyord=6):
-        raise ValueError
+        raise ValueError("Calling OBands poly_subtr is a problem")
         
         pchann = np.poly1d(np.polyfit(self.BRFrame.data_basis,inp_psd,polyord))
         
@@ -170,7 +171,7 @@ class OBands:
                     output_feats[featname] = dofunc['fn'](datacontainer,self.BRFrame.data_basis['F'],dofunc['param'])
                 else:
                     pre_correction = {ch: rr['Data'][ch] for ch in rr['Data'].keys()}
-                    datacontainer,_ = dbo.poly_subtr(pre_correction,self.BRFrame.data_basis['F'])
+                    datacontainer,_ = dbo.signal.oscillations.poly_subtr(input_psd = pre_correction,fvect = self.BRFrame.data_basis['F'])
                     output_feats[featname] = dofunc['fn'](datacontainer,self.BRFrame.data_basis['F'],dofunc['param'])
                     
             rr.update({'FeatVect':output_feats})

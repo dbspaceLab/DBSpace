@@ -1,16 +1,9 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Feb  7 23:27:33 2018
-
-@author: virati
-Clinical Vector Class
-"""
-
 import json
 from collections import defaultdict
 import numpy as np
-import sys
+from typing import Union, List
+from pathlib import Path
+
 
 from dbspace.utils.r_pca import robust_pca
 import dbspace as dbo
@@ -25,14 +18,19 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import precision_recall_curve, average_precision_score, auc
 
 
+'''
+I Think CStruct is aspirational ?!?! :(
+'''
 class CStruct:
     all_scales = ["HDRS17", "MADRS", "BDI", "GAF"]
     scale_max = {"HDRS17": 40, "MADRS": 50, "BDI": 60, "GAF": -100, "DSC": 0.01}
 
-    def __init__(self, incl_scales=["HDRS17"]):
+    def __init__(self, clinical_metadata_file : Union[str,Path] = None, incl_scales=["HDRS17"]):
         self.phase_list = Phase_List("all")
+        if clinical_metadata_file is None:
+            raise ValueError("Did not provide clinical metadata file to initialize CStruct")
         ClinVect = json.load(
-            open("/home/virati/Dropbox/projects/Research/MDD-DBS/Data/ClinVec.json")
+            open(clinical_metadata_file)
         )
         self.pt_list = [ab["pt"] for ab in ClinVect["HAMDs"]]
 
@@ -80,7 +78,7 @@ class CStruct:
         allptX = []
 
         # get phase lookup table
-        ph_lut = dbo.all_phases
+        ph_lut = Phase_List("all")
 
         # this is the dictionary of optimal decompositions
         opt_lam_dict = defaultdict(dict)
@@ -113,7 +111,7 @@ class CStruct:
                     :, 0
                 ]  # grab just the HDRS sparse deviations
 
-                num_changes = np.sum(np.array(sdiff > 0.006).astype(np.int))
+                num_changes = np.sum(np.array(sdiff > 0.006).astype(int))
 
                 exp_probs = 3
                 nchange_diff = np.abs(num_changes - exp_probs)
@@ -148,7 +146,7 @@ class CStruct:
 
     def gen_mHDRS(self):
         print("Generating mHDRS")
-        ph_lut = dbo.all_phases
+        ph_lut = Phase_List("all")
 
         # Cycle through !! THIS USES DSS DICT
         for pat in self.pt_list:
@@ -202,7 +200,7 @@ class CStruct:
                         self.query_stim_change(pt, self.phase_list[pp])
                         for pp in range(self.get_pt_binary_timeline(pt).shape[0])
                     ]
-                ).astype(np.int)
+                ).astype(int)
                 plt.stem(stim_changes)
                 # plt.setp(stemlines, 'color', 'red')
 
@@ -226,12 +224,13 @@ class CStruct:
             ]
             return (pt, ph) in stim_change_list_rem_init
 
-    def load_stim_changes(self):
+    def load_stim_changes(self, stim_changes_file : Union[str,Path] = None):
+        if stim_changes_file is None:
+            raise ValueError("No Stim Changes Metadata file (mat) provided.")
         # this is where we'll load in information of when stim changes were done so we can maybe LABEL them in figures
-        self.stim_change_mat = sio.loadmat("/home/virati/Dropbox/stim_changes.mat")[
+        self.stim_change_mat = sio.loadmat(stim_changes_file)[
             "StimMatrix"
         ]
-        # remove the voltage DECREASES?? from DBS905
 
     def Stim_Change_Table(self):
         # return stim changes in a meaningful format
@@ -241,7 +240,7 @@ class CStruct:
         )
         # find the phase corresponding to the stim change
         bump_phases = np.array(
-            [np.array(dbo.all_phases)[0:][idxs] for idxs in diff_matrix]
+            [np.array(Phase_List("all"))[0:][idxs] for idxs in diff_matrix]
         )
 
         full_table = [
@@ -270,11 +269,16 @@ class CFrame:
     DSS_dict = []  # PT-SCALE-array
     clin_dict = []  # PT-PHASE-dictionary
 
-    def __init__(self, incl_scales=["HDRS17"], norm_scales=False):
-        # load in our JSON file
-        # Import the data structure needed for the CVect
+    def __init__(self, clinical_metadata_file : Union[str,Path] = None, 
+                 stim_metadata_file : Union[str,Path] = None,
+                 incl_scales : List[str] = None, norm_scales=False):
+        if incl_scales is None:
+            incl_scales = ["HDRS17"]
+        if clinical_metadata_file is None:
+            raise ValueError("Need to pass in the clinical metadata file to initialize CFrame")
+        
         ClinVect = json.load(
-            open("/home/virati/Dropbox/projects/Research/MDD-DBS/Data/ClinVec.json")
+            open(clinical_metadata_file)
         )
 
         # Setup the clinical dictionary structure
@@ -307,7 +311,8 @@ class CFrame:
 
         self.omega_state()
         self.derived_measures()
-        self.load_stim_changes()
+        if stim_metadata_file is not None:
+            self.load_stim_changes(stim_metadata_file)
 
     def OBS_make_dss(self, ClinVect):
         # Setup derived measures
@@ -368,7 +373,7 @@ class CFrame:
 
     def mHDRS_gen(self):
         print("Generating mHDRS")
-        ph_lut = dbo.all_phases
+        ph_lut = Phase_List("all")
 
         # Cycle through !! THIS USES DSS DICT
         for pat in self.DSS_dict.keys():
@@ -386,7 +391,7 @@ class CFrame:
         allptX = []
 
         # get phase lookup table
-        ph_lut = dbo.all_phases
+        ph_lut = Phase_List("all")
 
         # Copy our DSS_Dict reference
         big_dict = self.DSS_dict
@@ -421,7 +426,7 @@ class CFrame:
                     :, 0
                 ]  # grab just the HDRS sparse deviations
 
-                num_changes = np.sum(np.array(sdiff > 0.006).astype(np.int))
+                num_changes = np.sum(np.array(sdiff > 0.006).astype(int))
 
                 exp_probs = 3
                 nchange_diff = np.abs(num_changes - exp_probs)
@@ -668,12 +673,13 @@ class CFrame:
         # #plt.annotate('Average precision for ' + str(scales[ii]) + ': ' + str(avg_precision) + ' AUC: ' + str(prauc),(-2,1),fontsize=8)
         # ax.text(0.1, 0.95 - 3/4, 'AvgPrec ' + str(scale_labels[ii]) + ': ' + str(avg_precision)  + ' \nAUC: ' + str(prauc), transform=ax.transAxes, fontsize=14,verticalalignment='top', bbox=props)
 
-    def load_stim_changes(self):
+    def load_stim_changes(self, stim_metadata_file : Union[str,Path] = None):
+        if stim_metadata_file is None:
+            raise ValueError("No Stim Changes Metadata file (mat) provided.")
         # this is where we'll load in information of when stim changes were done so we can maybe LABEL them in figures
-        self.stim_change_mat = sio.loadmat("/home/virati/Dropbox/stim_changes.mat")[
+        self.stim_change_mat = sio.loadmat(stim_metadata_file)[
             "StimMatrix"
         ]
-        # remove the voltage DECREASES?? from DBS905
 
     def Stim_Change_Table(self):
         # return stim changes in a meaningful format
@@ -687,7 +693,7 @@ class CFrame:
         )
         # find the phase corresponding to the stim change
         bump_phases = np.array(
-            [np.array(dbo.all_phases)[0:][idxs] for idxs in diff_matrix]
+            [np.array(Phase_List("all"))[0:][idxs] for idxs in diff_matrix]
         )
 
         full_table = [

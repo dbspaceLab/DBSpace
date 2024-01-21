@@ -65,7 +65,9 @@ def L1_dist(x,y):
 def L2_dist(x,y):
     return np.linalg.norm(x-y)
 
+'''OBSOLETE'''
 def poly_subtr(fvect,inp_psd,polyord=4):
+    raise ValueError("Calling the wrong poly_subtr")
     #fvect HAS to be a vector function
     # This function takes in a raw PSD, Log transforms it, poly subtracts, and then returns the unloged version.
     #log10 in_psd first

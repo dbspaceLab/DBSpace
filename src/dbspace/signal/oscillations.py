@@ -266,6 +266,7 @@ def poly_subtr(input_psd: np.ndarray, fvect: np.ndarray = None, polyord: int = 4
     # log10 in_psd first
     if fvect is None:
         fvect = np.linspace(0, 1, input_psd.shape[0])
+    
 
     log_psd = 10 * np.log10(input_psd)
     pfit = np.polyfit(fvect, log_psd, polyord)

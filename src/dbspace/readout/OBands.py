@@ -148,7 +148,7 @@ class OBands:
         self.do_pts = do_patients
         
     '''OBSOLETE'''
-    def poly_subtr(self,inp_psd,polyord=6):
+    def poly_subtr_OBS(self,inp_psd,polyord=6):
         raise ValueError("Calling OBands poly_subtr is a problem")
         
         pchann = np.poly1d(np.polyfit(self.BRFrame.data_basis,inp_psd,polyord))

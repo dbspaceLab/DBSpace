@@ -1,16 +1,6 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Feb  7 09:05:07 2018
+import logging
+log = logging.getLogger(__name__)
 
-@author: virati
-Traditional Analyses
-This provides the main class used to do analysis and plot analyses related to "traditional" approaches
-Linear Regression approaches will extend this class
-"""
-import sys
-
-sys.path.append('/home/virati/Dropbox/projects/Research/MDD-DBS/Ephys/DBSpace/')
 import dbspace as dbo
 from dbspace.utils.structures import nestdict
 
@@ -167,7 +157,7 @@ class OBands:
                     datacontainer = {ch: rr['Data'][ch] for ch in rr['Data'].keys()}
                     #Do we want to do any preprocessing for the PSDs before we send it to the next round?
                     #Maybe a poly-fit subtraction?
-                    print(f"{featname} with {dofunc}")
+                    #log.info(f"{featname} with {dofunc}")
                     output_feats[featname] = dofunc['fn'](datacontainer,self.BRFrame.data_basis['F'],dofunc['param'])
                 else:
                     pre_correction = {ch: rr['Data'][ch] for ch in rr['Data'].keys()}

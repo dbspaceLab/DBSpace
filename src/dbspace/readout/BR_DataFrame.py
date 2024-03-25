@@ -81,7 +81,7 @@ class BR_Data_Tree:
 
         if frame_label is None:
             # construct from date
-            frame_label = str(datetime.date)
+            frame_label = str(datetime.today())
         
         self._frame_label = frame_label
 

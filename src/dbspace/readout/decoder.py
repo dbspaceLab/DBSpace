@@ -606,7 +606,7 @@ class weekly_decoder(base_decoder):
         self._path_slope_results = assess_traj, path
 
         # Figure out how many coefficients are around
-        coeff_present = (np.abs(path[1].squeeze().T) > 0).astype(np.int)
+        coeff_present = (np.abs(path[1].squeeze().T) > 0).astype(int)
         total_coeffs = np.sum(coeff_present, axis=1)
         slope_traj_vec = np.array([a["Slope"][0] for a in assess_traj])
         score_traj_vec = np.array([a["Score"] for a in assess_traj])
@@ -812,7 +812,7 @@ class weekly_decoderCV(weekly_decoder):
                             self.test_set_ph,
                         )
                     ),
-                    np.ceil(0.5 * len(self.test_set_y)).astype(np.int),
+                    np.ceil(0.5 * len(self.test_set_y)).astype(int),
                 )
             )
             test_subset_y = np.array(test_subset_y)
@@ -835,7 +835,7 @@ class weekly_decoderCV(weekly_decoder):
                         self.test_set_ph,
                     )
                 ),
-                np.ceil(0.5 * len(self.test_set_y)).astype(np.int),
+                np.ceil(0.5 * len(self.test_set_y)).astype(int),
             )
         )
         test_subset_y = np.array(test_subset_y)
@@ -1044,7 +1044,7 @@ class controller_analysis:
                             self.readout_model.test_set_ph,
                         )
                     ),
-                    np.ceil(0.8 * len(self.readout_model.test_set_y)).astype(np.int),
+                    np.ceil(0.8 * len(self.readout_model.test_set_y)).astype(int),
                 )
             )
             predicted_c = self.readout_model.decode_model.predict(test_subset_y)
@@ -1098,7 +1098,7 @@ class controller_analysis:
                             self.readout_model.test_set_ph,
                         )
                     ),
-                    np.ceil(0.8 * len(self.readout_model.test_set_y)).astype(np.int),
+                    np.ceil(0.8 * len(self.readout_model.test_set_y)).astype(int),
                 )
             )
             # THIS IS WHERE WE NEED TO SHUFFLE TO TEST THE READOU

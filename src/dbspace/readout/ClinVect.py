@@ -17,6 +17,8 @@ import scipy.io as sio
 import matplotlib.pyplot as plt
 from sklearn.metrics import precision_recall_curve, average_precision_score, auc
 
+import warnings
+warnings.warn("Warning...........Message")
 
 '''
 I Think CStruct is aspirational ?!?! :(
@@ -226,11 +228,12 @@ class CStruct:
 
     def load_stim_changes(self, stim_changes_file : Union[str,Path] = None):
         if stim_changes_file is None:
-            raise ValueError("No Stim Changes Metadata file (mat) provided.")
-        # this is where we'll load in information of when stim changes were done so we can maybe LABEL them in figures
-        self.stim_change_mat = sio.loadmat(stim_changes_file)[
-            "StimMatrix"
-        ]
+            warnings.warn("No Stim Changes Metadata file (mat) provided.")
+        else:
+            # this is where we'll load in information of when stim changes were done so we can maybe LABEL them in figures
+            self.stim_change_mat = sio.loadmat(stim_changes_file)[
+                "StimMatrix"
+            ]
 
     def Stim_Change_Table(self):
         # return stim changes in a meaningful format

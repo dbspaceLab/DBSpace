@@ -141,7 +141,6 @@ def featDict_to_Matr(featDict):
 
     return ret_matr
 
-
 def get_pow(Pxx, F, frange, cmode=np.median):
     # Pxx is a dictionary where the keys are the channels, the values are the [Pxx desired]
     # Pxx is assumed to NOT be log transformed, so "positive semi-def"

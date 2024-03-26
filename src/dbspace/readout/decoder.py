@@ -1,11 +1,7 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Fri May 15 19:47:25 2020
+import logging
+logger = logging.getLogger(__name__)
 
-@author: virati
-NEW classes for readout training, testing, and validation
-"""
+
 import random
 
 import matplotlib.cm as cm
@@ -40,9 +36,7 @@ default_params = {"CrossValid": 10}
 
 import seaborn as sns
 
-sns.set_context("paper")
-
-sns.set(font_scale=4)
+sns.set_context("paper", font_scale=4)
 sns.set_style("white")
 
 import copy
@@ -76,6 +70,8 @@ class base_decoder:
 
         # here we decide which features we want to do for this analysis
         if kwargs["FeatureSet"] == "stim_check":
+            self.do_feats = ["Delta", "Theta", "Alpha", "Beta*", "Gamma1", "THarm"]
+        elif kwargs["FeatureSet"] == "variance":
             self.do_feats = ["Delta", "Theta", "Alpha", "Beta*", "Gamma1", "THarm"]
         elif kwargs["FeatureSet"] == "main":
             self.do_feats = DEFAULT_FEAT_ORDER
@@ -404,10 +400,7 @@ class base_decoder:
         self.plot_decode_coeffs()
 
 
-#%%
 class var_decoder(base_decoder):
-    variance_analysis = True
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -482,8 +475,6 @@ class var_decoder(base_decoder):
 
         return y_state.reshape(-1, 1), c_state.reshape(-1, 1), pt_name, phase_label
 
-
-#%%
 class weekly_decoder(base_decoder):
     variance_analysis = False
 
@@ -512,10 +503,7 @@ class weekly_decoder(base_decoder):
         # self.plot_decode_coeffs(self.decode_model)
 
     def aggregate_weeks(self, dataset):
-        # print('Performing Training Setup for Weekly Decoder')
-        # go through our training set and aggregate every recording within a given week
-        # train_set_y,train_set_c = self.calculate_states_in_set(self.train_set)
-
+        logger.info(f"Aggregating Weeks (Variance Analysis is {self.variance_analysis})")
         running_list = []
         for pt in self.pts:
             for phase in self.filter_phases:
@@ -524,10 +512,11 @@ class weekly_decoder(base_decoder):
                 ]
                 if block_set != []:
                     y_set, c_set = self.calculate_states_in_set(block_set)
-                    if not self.variance_analysis:
-                        weekly_y_set = np.mean(y_set, axis=0)
-                    else:
+                    if self.variance_analysis:
                         weekly_y_set = np.var(y_set, axis=0)
+                    else:
+                        weekly_y_set = np.mean(y_set, axis=0)
+                        
 
                     running_list.append(
                         (weekly_y_set, c_set[0], pt, phase)
@@ -654,8 +643,6 @@ class weekly_decoder(base_decoder):
 
         return optimal_alpha
 
-
-#%%
 class weekly_decoderCV(weekly_decoder):
     def __init__(self, *args, **kwargs):
         print("Initialized the Weekly CV decoder")
@@ -664,14 +651,8 @@ class weekly_decoderCV(weekly_decoder):
         if kwargs["algo"] == "ENR":
 
             self.regression_algo = ElasticNet
-            # self.regression_algo = linear_model.Lasso
-            # self.model_args = {'alpha':np.e **-3.4,'l1_ratio':0.8} #5/28, good stats, visual is small
             self.model_args = {"alpha": np.e ** kwargs["alpha"], "l1_ratio": 0.8}
             print("Running ENR_CV w/:" + str(self.model_args["l1_ratio"]))
-
-            # BEFORE 5/28
-            # self.regression_algo = linear_model.ElasticNetCV
-            # self.model_args = {'alphas':np.linspace(0.01,0.04,20),'l1_ratio':np.linspace(0.1,0.3,10),'cv':10}
 
         self.pt_CV_sets(n=3)
 
@@ -898,7 +879,6 @@ class weekly_decoderCV(weekly_decoder):
         r2score = self.decode_model.score(self.test_set_y, self.test_set_c)
         mse = mean_squared_error(self.test_set_c, predicted_c)
 
-        #%%
 
         plt.figure()
         plt.plot([0, 1], [0, 1], color="gray", linestyle="dotted")

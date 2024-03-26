@@ -890,7 +890,7 @@ class weekly_decoderCV(weekly_decoder):
             plt.ylabel("nHDRS")
             plt.title(pt)
 
-    def plot_test_regression_figure(self):
+    def plot_test_regression_figure(self, plot_stim_changes : bool = False):
         # do a final test on *all* the data for plotting purposes
         predicted_c = self.decode_model.predict(self.test_set_y)
         slope = stats.linregress(predicted_c.squeeze(), self.test_set_c.squeeze())
@@ -903,12 +903,14 @@ class weekly_decoderCV(weekly_decoder):
         plt.figure()
         plt.plot([0, 1], [0, 1], color="gray", linestyle="dotted")
         ax = sns.regplot(x=predicted_c, y=self.test_set_c.squeeze())
-        for xx, yy, pp, cc in zip(
-            predicted_c, self.test_set_c, self.test_set_pt, self.test_set_ph
-        ):
-            if self.CFrame.query_stim_change(pp, cc, include_init=False):
-                ax.scatter(x=xx, y=yy, marker="^", s=100, color="r")
-                ax.text(xx, yy, pp + " " + cc)
+
+        if plot_stim_changes:
+            for xx, yy, pp, cc in zip(
+                predicted_c, self.test_set_c, self.test_set_pt, self.test_set_ph
+            ):
+                if self.CFrame.query_stim_change(pp, cc, include_init=False):
+                    ax.scatter(x=xx, y=yy, marker="^", s=100, color="r")
+                    ax.text(xx, yy, pp + " " + cc)
 
         plt.xlabel("Predicted")
         plt.ylabel("Actual")

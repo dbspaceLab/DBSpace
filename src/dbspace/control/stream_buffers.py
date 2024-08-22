@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Mar 25 17:41:48 2018
-
-@author: virati
-Streaming Class
-"""
 import logging
 import pickle
 from collections import defaultdict
@@ -13,7 +5,6 @@ import json
 
 import dbspace as dbo
 import dbspace.signal.dEEG.neigh_mont as neigh_mont
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.io as scio
@@ -21,12 +12,7 @@ import scipy.signal as sig
 from dbspace.signal.oscillations import calc_feats, gen_SG
 from dbspace.utils.io.pcs import load_BR_dict
 from dbspace.utils.structures import nestdict
-from dbspace.viz.MM import EEG_Viz
-from sklearn import mixture, svm
-from sklearn.decomposition import PCA
 from dbspace.signal.oscillations import DEFAULT_FEAT_ORDER
-
-# plt.rcParams["image.cmap"] = "jet"
 
 logging.basicConfig(
     filename="/tmp/network_action.log",
@@ -288,22 +274,7 @@ class streamEEG:
         medians = np.median(self.osc_matr[:, intv[0] : intv[1], :], axis=1)
 
         if do_plot:
-            if use_maya:
-                EEG_Viz.maya_band_display(medians[:, band_i])
-            else:
-                EEG_Viz.plot_3d_scalp(
-                    medians[:, band_i],
-                    plt.figure(),
-                    label="Volt Mean Response " + band + " | ",
-                    unwrap=True,
-                    scale=100,
-                    clims=(-1, 1),
-                    alpha=0.3,
-                    marker_scale=5,
-                )
-
-                plt.suptitle(self.pt)
-
+            raise NotImplementedError("Visualizations Not Yet Ported")
         return medians
 
     def median_response(self, intv=(0, 1), do_plot=False, use_maya=False, band="Alpha"):
@@ -317,22 +288,7 @@ class streamEEG:
         )
 
         if do_plot:
-            if use_maya:
-                EEG_Viz.maya_band_display(medians[:, band_i])
-            else:
-                EEG_Viz.plot_3d_scalp(
-                    medians[:, band_i],
-                    plt.figure(),
-                    label="Volt Mean Response " + band + " | ",
-                    unwrap=True,
-                    scale=100,
-                    clims=(-5, 5),
-                    alpha=0.5,
-                    marker_scale=5,
-                )
-
-                plt.suptitle(self.pt)
-
+            raise NotImplementedError("Visualizations Not Yet Ported")
         return medians
 
     def seg_PSDs(self):

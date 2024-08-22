@@ -3,12 +3,13 @@ import pickle
 from collections import defaultdict
 import json
 
-import dbspace as dbo
-import dbspace.signal.dEEG.neigh_mont as neigh_mont
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.io as scio
 import scipy.signal as sig
+
+import dbspace as dbo
+import dbspace.signal.dEEG.neigh_mont as neigh_mont
 from dbspace.signal.oscillations import calc_feats, gen_SG
 from dbspace.utils.io.pcs import load_BR_dict
 from dbspace.utils.structures import nestdict
